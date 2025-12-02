@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buctril Week 1 Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; margin-top: 20px; }
+    td, th { padding: 8px 12px; border: 1px solid #ccc; }
+    h1, h2 { margin-top: 40px; }
+    iframe { margin-top: 20px; max-width: 100%; height: 300px; }
+    canvas { max-width: 100%; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Buctril Week 1 Report</h1>
+
+  <h2>Embedded Field Video</h2>
+  <video controls width="640">
+    <source src="tmp.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+
+  <h2>Data Overview Table</h2>
+  <div id="output"></div>
+
+  <h2>Day-Wise Summary</h2>
+  <div id="summary">
+    <ul>
+      <li><strong>Day 1:</strong> Surveyed northern plots, mapped coordinates.</li>
+      <li><strong>Day 2:</strong> Herbicide applied; initial data collected.</li>
+      <li><strong>Day 3:</strong> Crop growth observed; mapped effectiveness zones.</li>
+      <li><strong>Day 4:</strong> Weed response documented; data tabulated.</li>
+      <li><strong>Day 5:</strong> Team coordination with GIS tags completed.</li>
+    </ul>
+  </div>
+
+  <h2>Growth Progress Chart</h2>
+  <canvas id="growthChart" width="600" height="300"></canvas>
+
+  <h2>Map & Field Coordinates</h2>
+  <div id="map" style="width:100%; height:300px; background:#eef; display:flex; align-items:center; justify-content:center;">
+    <em>Map showing coordinates and progress flow will appear here (GIS integration placeholder).</em>
+  </div>
+
+  <script src="data_processor.js"></script>
+</body>
+</html>
