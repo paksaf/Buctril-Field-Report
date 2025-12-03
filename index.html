@@ -1,1006 +1,1255 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Buctril Engagement Session Analysis Report</title>
-
-  <!-- Chart.js for charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Leaflet for map -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f8f9fa;
-      color: #333;
-      line-height: 1.6;
-      position: relative;
-      min-height: 100vh;
-    }
-
-    /* Video Background */
-    .video-background {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: -1;
-      overflow: hidden;
-    }
-
-    .video-background video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      opacity: 0.18;
-      filter: blur(3px) brightness(0.8);
-    }
-
-    .overlay {
-      position: relative;
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(10px);
-      min-height: 100vh;
-    }
-
-    /* Header */
-    .header {
-      background: linear-gradient(135deg, #2c3e50, #3498db);
-      color: white;
-      padding: 2rem;
-      text-align: center;
-      border-bottom: 5px solid #e74c3c;
-    }
-
-    .header h1 {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-
-    .header p {
-      font-size: 1.1rem;
-      opacity: 0.9;
-    }
-
-    /* Status Indicator */
-    .status-indicator {
-      background: #f39c12;
-      color: white;
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      margin-top: 0.5rem;
-      display: inline-block;
-    }
-
-    /* Loading Overlay */
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.95);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      transition: opacity 0.3s;
-    }
-
-    .loading-spinner {
-      width: 50px;
-      height: 50px;
-      border: 5px solid #f3f3f3;
-      border-top: 5px solid #3498db;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 1rem;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Error Message */
-    .error-message {
-      background: #e74c3c;
-      color: white;
-      padding: 1rem;
-      border-radius: 10px;
-      margin: 1rem;
-      display: none;
-      text-align: center;
-    }
-
-    /* Main Container */
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-
-    /* Dashboard Layout */
-    .dashboard {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-bottom: 2rem;
-    }
-
-    @media (max-width: 1024px) {
-      .dashboard {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Map Container */
-    .map-container {
-      grid-column: 1 / -1;
-      background: white;
-      border-radius: 15px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      overflow: hidden;
-      padding: 1.5rem;
-      border: 1px solid #e0e0e0;
-    }
-
-    .map-container h2 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 2px solid #3498db;
-    }
-
-    #map {
-      height: 500px;
-      width: 100%;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 1px solid #ddd;
-    }
-
-    /* Map Controls */
-    .map-controls {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .map-controls select,
-    .map-controls button {
-      padding: 0.5rem 1rem;
-      border: 2px solid #3498db;
-      background: white;
-      color: #2c3e50;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
-    }
-
-    .map-controls select:hover,
-    .map-controls button:hover {
-      background: #3498db;
-      color: white;
-    }
-
-    /* Cards */
-    .card {
-      background: white;
-      border-radius: 15px;
-      padding: 1.5rem;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-      border: 1px solid #e0e0e0;
-      transition: transform 0.3s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-5px);
-    }
-
-    .card h3 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    /* Summary Section */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-top: 1rem;
-    }
-
-    .summary-item {
-      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-      padding: 1rem;
-      border-radius: 10px;
-      border-left: 4px solid #3498db;
-    }
-
-    .summary-item strong {
-      color: #2c3e50;
-      font-size: 1.1rem;
-    }
-
-    .summary-item p {
-      color: #666;
-      margin-top: 0.5rem;
-    }
-
-    /* Charts */
-    .chart-container {
-      background: white;
-      border-radius: 15px;
-      padding: 1.5rem;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-      margin-top: 2rem;
-    }
-
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    /* Table */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-      background: white;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-    }
-
-    .data-table th {
-      background: linear-gradient(135deg, #3498db, #2980b9);
-      color: white;
-      padding: 1rem;
-      text-align: left;
-      font-weight: 600;
-    }
-
-    .data-table td {
-      padding: 0.8rem 1rem;
-      border-bottom: 1px solid #eee;
-      font-size: 0.9rem;
-    }
-
-    .data-table tr:hover {
-      background: #f8f9fa;
-    }
-
-    .table-container {
-      overflow-x: auto;
-      margin-top: 1rem;
-    }
-
-    /* Session Details */
-    .session-details {
-      background: white;
-      border-radius: 15px;
-      padding: 1.5rem;
-      margin-top: 2rem;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    }
-
-    .session-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-
-    .session-item {
-      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-      padding: 1rem;
-      border-radius: 10px;
-      border-left: 4px solid #e74c3c;
-    }
-
-    /* KPI Metrics */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-
-    .kpi-item {
-      text-align: center;
-      padding: 1rem;
-      background: linear-gradient(135deg, #2c3e50, #34495e);
-      color: white;
-      border-radius: 10px;
-    }
-
-    .kpi-value {
-      font-size: 2rem;
-      font-weight: bold;
-      margin: 0.5rem 0;
-    }
-
-    .kpi-label {
-      font-size: 0.9rem;
-      opacity: 0.9;
-    }
-
-    /* Data Info */
-    .data-info {
-      background: #e8f4fc;
-      border-left: 4px solid #3498db;
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 5px;
-    }
-
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding: 2rem;
-      margin-top: 3rem;
-      background: #2c3e50;
-      color: white;
-      border-top: 5px solid #3498db;
-    }
-
-    /* Animations */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .fade-in {
-      animation: fadeIn 0.6s ease forwards;
-    }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-      .container {
-        padding: 1rem;
-      }
-
-      .header h1 {
-        font-size: 2rem;
-      }
-
-      .charts-grid {
-        grid-template-columns: 1fr;
-      }
-
-      #map {
-        height: 300px;
-      }
-    }
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
   </style>
 </head>
 <body>
-  <!-- Loading Overlay -->
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="loading-spinner"></div>
-    <p>Loading session data...</p>
-  </div>
-
-  <!-- Error Message -->
-  <div class="error-message" id="errorMessage">
-    <p>Error loading data. Please check console for details.</p>
-    <button onclick="retryLoad()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer;">
-      Retry
-    </button>
-  </div>
-
-  <!-- Video Background -->
-  <div class="video-background">
-    <video autoplay muted loop playsinline>
-      <source src="tmp.mp4" type="video/mp4">
-      Your browser does not support the video tag.
-    </video>
-  </div>
-
-  <div class="overlay">
-    <!-- Header -->
-    <header class="header">
-      <h1>🌾 Buctril Engagement Session Analysis Report</h1>
-      <p>Comprehensive analysis of farmer engagement sessions & impact assessment</p>
-      <p style="margin-top: 0.5rem; font-size: 1rem; opacity: 0.8;">Week 1 | November 23 – December 12</p>
-      <div class="status-indicator" id="dataStatus">Loading data...</div>
-    </header>
-
-    <div class="container">
-      <!-- Data Info -->
-      <div class="data-info fade-in">
-        <strong>Data Source:</strong> sum sheet.csv | 
-        <strong>Loaded Sessions:</strong> <span id="sessionCount">0</span> | 
-        <strong>Last Updated:</strong> <span id="updateTime">Loading...</span>
-      </div>
-
-      <!-- Map Section -->
-      <section class="map-container fade-in">
-        <h2>📍 Engagement Session Locations</h2>
-        <div id="map"></div>
-        <div class="map-controls">
-          <select id="dayFilter">
-            <option value="all">All Days</option>
-            <option value="1">Day 1 – Multan → Ubaro</option>
-            <option value="2">Day 2 – Ubaro → Dharki</option>
-            <option value="3">Day 3 – Dharki → Ghotki</option>
-            <option value="4">Day 4 – Ghotki → Sukkur</option>
-            <option value="5">Day 5 – Sukkur → Jaferabad</option>
-            <option value="6">Day 6 – Jaferabad → Mehrabpur</option>
-            <option value="7">Day 7 – Mehrabpur → Dadu</option>
-            <option value="8">Day 8 – Dadu → …</option>
-          </select>
-          <select id="metricFilter">
-            <option value="farmers">Number of Farmers</option>
-            <option value="acres">Wheat Acres</option>
-            <option value="awareness">Awareness Rate</option>
-            <option value="definite">Definite Use Rate</option>
-          </select>
-          <button type="button" onclick="showHeatmap()">Show Heat Map</button>
-          <button type="button" onclick="showRoute()">Show Travel Route</button>
-          <button type="button" onclick="resetMap()">Reset View</button>
-          <button type="button" onclick="refreshData()">Refresh Data</button>
-        </div>
-      </section>
-
-      <!-- Dashboard -->
-      <div class="dashboard fade-in">
-        <!-- KPI Metrics -->
-        <div class="card">
-          <h3>📊 Key Performance Indicators</h3>
-          <div class="kpi-grid" id="kpiMetrics">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
-
-        <!-- Weekly Summary -->
-        <div class="card">
-          <h3>📈 Week 1 Summary</h3>
-          <div class="summary-grid">
-            <div class="summary-item">
-              <strong>Total Farmers Engaged</strong>
-              <p id="totalFarmers">Loading...</p>
-            </div>
-            <div class="summary-item">
-              <strong>Total Wheat Acres</strong>
-              <p id="totalAcres">Loading...</p>
-            </div>
-            <div class="summary-item">
-              <strong>Average Awareness Rate</strong>
-              <p id="avgAwareness">Loading...</p>
-            </div>
-            <div class="summary-item">
-              <strong>Definite Use Conversion</strong>
-              <p id="definiteUse">Loading...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Session Details -->
-      <section class="session-details fade-in">
-        <h2>🎯 Session Breakdown by Day</h2>
-        <div class="session-list" id="sessionList">
-          <!-- Dynamically populated -->
-        </div>
-      </section>
-
-      <!-- Charts Section -->
-      <section class="chart-container fade-in">
-        <h2>📊 Performance Analysis</h2>
-        <div class="charts-grid">
-          <div>
-            <canvas id="engagementChart" width="400" height="300"></canvas>
-          </div>
-          <div>
-            <canvas id="conversionChart" width="400" height="300"></canvas>
-          </div>
-          <div>
-            <canvas id="reasonsChart" width="400" height="300"></canvas>
-          </div>
-          <div>
-            <canvas id="distanceChart" width="400" height="300"></canvas>
-          </div>
-        </div>
-      </section>
-
-      <!-- Detailed Data Table -->
-      <section class="card fade-in" style="margin-top: 2rem;">
-        <h3>📋 Detailed Session Data</h3>
-        <div class="table-container">
-          <table class="data-table" id="dataTable">
-            <!-- Dynamically populated -->
-          </table>
-        </div>
-      </section>
-
-      <!-- Insights Section -->
-      <section class="card fade-in" style="margin-top: 2rem;">
-        <h3>💡 Key Insights & Recommendations</h3>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <strong>Top Success Factor</strong>
-            <p>Trust in Bayer brand consistently emerges as the primary reason for product adoption across sessions.</p>
-          </div>
-          <div class="summary-item">
-            <strong>Main Challenge</strong>
-            <p>Price sensitivity remains the biggest barrier to adoption. Consider targeted pricing strategies and value storytelling.</p>
-          </div>
-          <div class="summary-item">
-            <strong>Opportunity Areas</strong>
-            <p>High "Maybe" rates indicate potential for conversion through follow-up engagement and dealer support.</p>
-          </div>
-          <div class="summary-item">
-            <strong>Recommendation</strong>
-            <p>Focus on communicating value versus generics through demonstrations, testimonials and local influencer advocacy.</p>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <p>© 2024 Buctril Engagement Analysis Report | Data as of December 12, 2024</p>
-      <p style="margin-top: 0.5rem; opacity: 0.8;">Generated from field session data | Interactive map & analytics dashboard</p>
-      <p style="margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.6;">
-        Report ID: <span id="reportId">BUCTRIL-W1-2024</span> | 
-        Version: 1.0.1
-      </p>
-    </footer>
-  </div>
-
-  <script>
-    // Use a simpler CSV file name without spaces
-    const CSV_FILE = "sum_sheet.csv"; // Rename your file to this, or encode the space
-    
-    // Alternative: Use encodeURIComponent for spaces
-    // const CSV_FILE = encodeURIComponent("sum sheet.csv");
-
-    // --- Simplified CSV parser for GitHub Pages compatibility ---
-    function parseCSV(text) {
-      const rows = [];
-      let currentRow = [];
-      let currentField = "";
-      let inQuotes = false;
-      
-      for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        
-        if (inQuotes) {
-          if (char === '"') {
-            // Check for double quotes (escaped quotes)
-            if (i + 1 < text.length && text[i + 1] === '"') {
-              currentField += '"';
-              i++; // Skip the next quote
-            } else {
-              inQuotes = false;
-            }
-          } else {
-            currentField += char;
-          }
-        } else {
-          if (char === '"') {
-            inQuotes = true;
-          } else if (char === ',') {
-            currentRow.push(currentField.trim());
-            currentField = "";
-          } else if (char === '\n' || char === '\r') {
-            // Handle Windows line endings (\r\n)
-            if (char === '\r' && i + 1 < text.length && text[i + 1] === '\n') {
-              i++;
-            }
-            currentRow.push(currentField.trim());
-            currentField = "";
-            
-            // Only add non-empty rows
-            if (currentRow.length > 0 && currentRow.some(cell => cell !== "")) {
-              rows.push(currentRow);
-            }
-            currentRow = [];
-          } else {
-            currentField += char;
-          }
-        }
-      }
-      
-      // Add the last row if there's any data
-      if (currentField.trim() !== "") {
-        currentRow.push(currentField.trim());
-      }
-      if (currentRow.length > 0 && currentRow.some(cell => cell !== "")) {
-        rows.push(currentRow);
-      }
-      
-      return rows;
-    }
-
-    // --- Helper functions ---
-    function toNumber(value) {
-      if (value === undefined || value === null || value === "") return 0;
-      // Remove commas and convert to number
-      const clean = String(value).replace(/[^0-9.-]/g, "");
-      const num = parseFloat(clean);
-      return isNaN(num) ? 0 : num;
-    }
-
-    function safePercent(value) {
-      const num = toNumber(value);
-      return isFinite(num) ? num : 0;
-    }
-
-    function extractLatLngFromCoordinates(coordText) {
-      if (!coordText) return null;
-      
-      // Try to match patterns like "28°09'13.2\"N 69°48'59.7\"E"
-      const regex = /(\d+)°\s*(\d+)'\s*([\d.]+)"\s*([NS])\s*(\d+)°\s*(\d+)'\s*([\d.]+)"\s*([EW])/i;
-      const match = coordText.match(regex);
-      
-      if (match) {
-        const latDeg = parseFloat(match[1]);
-        const latMin = parseFloat(match[2]);
-        const latSec = parseFloat(match[3]);
-        const latDir = match[4].toUpperCase();
-        
-        const lngDeg = parseFloat(match[5]);
-        const lngMin = parseFloat(match[6]);
-        const lngSec = parseFloat(match[7]);
-        const lngDir = match[8].toUpperCase();
-        
-        let lat = latDeg + latMin/60 + latSec/3600;
-        let lng = lngDeg + lngMin/60 + lngSec/3600;
-        
-        if (latDir === 'S') lat = -lat;
-        if (lngDir === 'W') lng = -lng;
-        
-        return [lat, lng];
-      }
-      
-      // Fallback: Try to extract decimal numbers
-      const numbers = coordText.match(/[-+]?\d*\.\d+|\d+/g);
-      if (numbers && numbers.length >= 2) {
-        return [parseFloat(numbers[0]), parseFloat(numbers[1])];
-      }
-      
-      return null;
-    }
-
-    // --- Global variables ---
-    let map;
-    let sessionMarkers = [];
-    let sessionData = [];
-    let charts = [];
-
-    // --- Initialize application ---
-    function initApp() {
-      // Show loading
-      document.getElementById('dataStatus').textContent = 'Loading data...';
-      document.getElementById('loadingOverlay').style.display = 'flex';
-      document.getElementById('errorMessage').style.display = 'none';
-      
-      // Initialize map
-      initMap();
-      
-      // Load data
-      loadData();
-    }
-
-    function initMap() {
-      if (!map) {
-        map = L.map('map').setView([28.0, 69.0], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-      }
-    }
-
-    async function loadData() {
-      try {
-        console.log('Loading CSV data from:', CSV_FILE);
-        
-        // Try multiple potential file paths
-        const possiblePaths = [
-          CSV_FILE,
-          'sum%20sheet.csv',
-          'data/sum_sheet.csv',
-          'data/sum%20sheet.csv',
-          './sum_sheet.csv',
-          './sum%20sheet.csv'
-        ];
-        
-        let data = null;
-        let lastError = null;
-        
-        for (const path of possiblePaths) {
-          try {
-            console.log('Trying path:', path);
-            const response = await fetch(path);
-            if (response.ok) {
-              const text = await response.text();
-              console.log('Successfully loaded data from:', path);
-              console.log('First 500 chars:', text.substring(0, 500));
-              data = text;
-              break;
-            }
-          } catch (err) {
-            lastError = err;
-            console.warn('Failed to load from', path, ':', err.message);
-          }
-        }
-        
-        if (!data) {
-          throw new Error(`Failed to load CSV from any path. Last error: ${lastError?.message || 'Unknown error'}`);
-        }
-        
-        // Parse CSV
-        const rows = parseCSV(data);
-        console.log('Total rows parsed:', rows.length);
-        
-        if (rows.length === 0) {
-          throw new Error('No data found in CSV file');
-        }
-        
-        // Find header row (look for "SN" in first column)
-        let headerIndex = -1;
-        for (let i = 0; i < Math.min(rows.length, 10); i++) {
-          if (rows[i][0] && rows[i][0].trim().toUpperCase() === 'SN') {
-            headerIndex = i;
-            break;
-          }
-        }
-        
-        if (headerIndex === -1) {
-          // Use first row as headers
-          headerIndex = 0;
-        }
-        
-        const headers = rows[headerIndex].map(h => (h || '').trim());
-        console.log('Headers found:', headers);
-        
-        // Process data rows
-        sessionData = [];
-        for (let i = headerIndex + 1; i < rows.length; i++) {
-          const row = rows[i];
-          if (row.length === 0 || row.every(cell => !cell || cell.trim() === '')) {
-            continue;
-          }
-          
-          const obj = {};
-          headers.forEach((header, idx) => {
-            obj[header] = row[idx] || '';
-          });
-          
-          // Only include rows that have session data
-          if (obj['Session Sheet Ref'] && obj['Session Sheet Ref'].trim()) {
-            sessionData.push(obj);
-          }
-        }
-        
-        console.log('Processed sessions:', sessionData.length);
-        
-        if (sessionData.length === 0) {
-          throw new Error('No session data found in CSV');
-        }
-        
-        // Update UI
-        updateUI();
-        
-        // Hide loading, show success
-        document.getElementById('dataStatus').textContent = `Loaded ${sessionData.length} sessions`;
-        document.getElementById('dataStatus').style.background = '#2ecc71';
-        document.getElementById('loadingOverlay').style.display = 'none';
-        document.getElementById('sessionCount').textContent = sessionData.length;
-        document.getElementById('updateTime').textContent = new Date().toLocaleTimeString();
-        
-      } catch (error) {
-        console.error('Error loading data:', error);
-        
-        // Show error
-        document.getElementById('dataStatus').textContent = 'Error loading data';
-        document.getElementById('dataStatus').style.background = '#e74c3c';
-        document.getElementById('loadingOverlay').style.display = 'none';
-        document.getElementById('errorMessage').style.display = 'block';
-        document.getElementById('errorMessage').innerHTML = `
-          <p>Error: ${error.message}</p>
-          <p>Please check that the CSV file exists at: ${CSV_FILE}</p>
-          <button onclick="retryLoad()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer;">
-            Retry Loading
-          </button>
-        `;
-      }
-    }
-
-    function updateUI() {
-      updateDashboard();
-      updateSessionList();
-      updateDataTable();
-      plotMapMarkers();
-      createCharts();
-    }
-
-    function updateDashboard() {
-      if (sessionData.length === 0) return;
-      
-      const totalFarmers = sessionData.reduce((sum, s) => sum + toNumber(s['Total Farmers']), 0);
-      const totalAcres = sessionData.reduce((sum, s) => sum + toNumber(s['Total Wheat Acres']), 0);
-      
-      const awarenessRates = sessionData
-        .map(s => safePercent(s['Awareness Rate']))
-        .filter(r => r > 0);
-      
-      const definiteRates = sessionData
-        .map(s => safePercent(s['Definite Use Rate']))
-        .filter(r => r > 0);
-      
-      const avgAwareness = awarenessRates.length > 0 
-        ? (awarenessRates.reduce((a, b) => a + b, 0) / awarenessRates.length).toFixed(1)
-        : 'N/A';
-      
-      const avgDefinite = definiteRates.length > 0
-        ? (definiteRates.reduce((a, b) => a + b, 0) / definiteRates.length).toFixed(1)
-        : 'N/A';
-      
-      document.getElementById('totalFarmers').textContent = totalFarmers.toLocaleString();
-      document.getElementById('totalAcres').textContent = totalAcres.toLocaleString() + ' acres';
-      document.getElementById('avgAwareness').textContent = avgAwareness + '%';
-      document.getElementById('definiteUse').textContent = avgDefinite + '%';
-      
-      // Update KPI metrics
-      const avgAcresPerFarmer = totalFarmers > 0 ? (totalAcres / totalFarmers).toFixed(1) : '0';
-      const highMaybeSessions = sessionData.filter(s => safePercent(s['Maybe Rate']) > 30).length;
-      
-      document.getElementById('kpiMetrics').innerHTML = `
-        <div class="kpi-item">
-          <div class="kpi-value">${sessionData.length}</div>
-          <div class="kpi-label">Sessions Held</div>
-        </div>
-        <div class="kpi-item">
-          <div class="kpi-value">${avgAcresPerFarmer}</div>
-          <div class="kpi-label">Avg Acres/Farmer</div>
-        </div>
-        <div class="kpi-item">
-          <div class="kpi-value">${Math.round((awarenessRates.reduce((a, b) => a + b, 0) / awarenessRates.length) || 0)}%</div>
-          <div class="kpi-label">Avg Awareness</div>
-        </div>
-        <div class="kpi-item">
-          <div class="kpi-value">${highMaybeSessions}</div>
-          <div class="kpi-label">High Potential Sessions</div>
-        </div>
-      `;
-    }
-
-    function updateSessionList() {
-      const container = document.getElementById('sessionList');
-      if (sessionData.length === 0) {
-        container.innerHTML = '<div class="session-item">No session data available</div>';
-        return;
-      }
-      
-      // Group by day
-      const groupedByDay = {};
-      sessionData.forEach(session => {
-        const day = session['Day'] || 'Unknown';
-        if (!groupedByDay[day]) groupedByDay[day] = [];
-        groupedByDay[day].push(session);
-      });
-      
-      let html = '';
-      Object.keys(groupedByDay).sort().forEach(day => {
-        const sessions = groupedByDay[day];
-        const totalFarmers = sessions.reduce((sum, s) => sum + toNumber(s['Total Farmers']), 0);
-        const totalAcres = sessions.reduce((sum, s) => sum + toNumber(s['Total Wheat Acres']), 0);
-        
-        html += `
-          <div class="session-item">
-            <strong>Day ${day}</strong>
-            <p>Sessions: ${sessions.length}</p>
-            <p>Farmers: ${totalFarmers.toLocaleString()}</p>
-            <p>Acres: ${totalAcres.toLocaleString()}</p>
-            <p>Locations: ${sessions
-              .map(s => s['Session Location'] || s['Village / Mauza'] || 'N/A')
-              .filter(Boolean)
-              .slice(0, 3)
-              .join(', ')}${sessions.length > 3 ? '...' : ''}</p>
-          </div>
-        `;
-      });
-      
-      container.innerHTML = html;
-    }
-
-    function updateDataTable() {
-      const table = document.getElementById('dataTable');
-      if (sessionData.length === 0) {
-        table.innerHTML = '<tr><td colspan="15" style="text-align: center; padding: 2rem;">No data available</td></tr>';
-        return;
-      }
-      
-      // Show key columns
-      const keyColumns = [
-        'SN', 'Day', 'City', 'Session Location', 'Total Farmers', 
-        'Total Wheat Acres', 'Awareness Rate', 'Definite Use Rate',
-        'Maybe Rate', 'Top Reason Use', 'Top Reason Not to Use in past'
-      ];
-      
-      let html = '<thead><tr>';
-      keyColumns.forEach(col => {
-        html += `<th>${col}</th>`;
-      });
-      html += '</tr></thead><tbody>';
-      
-      // Show first 10 sessions
-      sessionData.slice(0, 10).forEach(session => {
-        html += '<tr>';
-        keyColumns.forEach(col => {
-          const value = session[col] || '';
-          html += `<td title="${col}: ${value}">${value}</td>`;
-        });
-        html += '</tr>';
-      });
-      
-      if (sessionData.length > 10) {
-        html += `<tr><td colspan="${keyColumns.length}" style="text-align: center; font-style: italic;">
-          ... and ${sessionData.length - 10} more sessions
-        </td></tr>`;
-      }
-      
-      html += '</tbody>';
-      table.innerHTML = html;
-    }
-
-    function plotMapMarkers() {
-      // Clear existing markers
-      sessionMarkers.forEach(marker => map.removeLayer(marker));
-      sessionMarkers = [];
-      
-      if (sessionData.length === 0) return;
-      
-      const bounds = [];
-      
-      sessionData.forEach(session => {
-        const coordText = session['Spot Coordinates'] || '';
-        const coords = extractLatLngFromCoordinates(coordText);
-        
-        if (!coords) {
-          console.log('No coordinates for:', session['Session Location']);
-          return;
-        }
-        
-        const [lat, lng] = coords;
-        const farmers = toNumber(session['Total Farmers']);
-        const acres = toNumber(session['Total Wheat Acres']);
-        const location = session['Session Location'] || session['Village / Mauza'] || 'Session';
-        const day = session['Day'] || 'Unknown';
-        const awareness = safePercent(session['Awareness Rate']);
-        const definite = safePercent(session['Definite Use Rate']);
-        
-        // Create marker with size based on farmers
-        const radius = Math.min(Math.max(farmers / 5, 8), 30);
-        const marker = L.circleMarker([lat, lng], {
-          radius: radius,
-          fillColor: getColorByAwareness(awareness),
-          color: '#2c3e50',
-          weight: 2,
-          opacity: 0.8,
-          fillOpacity: 
+<p class="p1">&lt;!DOCTYPE html&gt;</p>
+<p class="p1">&lt;html lang="en"&gt;</p>
+<p class="p1">&lt;head&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;meta charset="UTF-8" /&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"/&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;title&gt;Buctril Engagement Session Analysis Report&lt;/title&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="https://cdn.jsdelivr.net/npm/chart.js"&gt;&lt;/script&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;style&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>* {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin: 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>box-sizing: border-box;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>body {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #f8f9fa;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: #333;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>line-height: 1.6;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>position: relative;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>min-height: 100vh;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Video Background - Configured for loop and zoom (object-fit: cover) */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.video-background {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>position: fixed;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>top: 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>left: 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>width: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>height: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>z-index: -1;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>overflow: hidden;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.video-background video {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>width: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>height: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>object-fit: cover; /* Ensures video is zoomed and covers the whole viewport */</p>
+<p class="p1"><span class="Apple-converted-space">      </span>opacity: 0.18;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>filter: blur(3px) brightness(0.8);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.overlay {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>position: relative;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: rgba(255, 255, 255, 0.96);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>backdrop-filter: blur(10px);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>min-height: 100vh;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Header */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.header {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #2c3e50, #3498db);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>text-align: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-bottom: 5px solid #e74c3c;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.header h1 {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 2.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 0.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>text-shadow: 2px 2px 4px rgba(0,0,0,0.3);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.header p {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 1.1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>opacity: 0.9;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Status Indicator */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.status-indicator {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #f39c12;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 0.5rem 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 20px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 0.9rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 0.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: inline-block;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Loading Overlay */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.loading-overlay {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>position: fixed;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>top: 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>left: 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>width: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>height: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: rgba(255, 255, 255, 0.95);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: flex;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>flex-direction: column;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>justify-content: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>align-items: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>z-index: 9999;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>transition: opacity 0.3s;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.loading-spinner {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>width: 50px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>height: 50px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border: 5px solid #f3f3f3;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-top: 5px solid #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 50%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>animation: spin 1s linear infinite;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>@keyframes spin {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>0% { transform: rotate(0deg); }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>100% { transform: rotate(360deg); }</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Error Message */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.error-message {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #e74c3c;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 10px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: none;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>text-align: center;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Main Container */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.container {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>max-width: 1400px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin: 0 auto;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Dashboard Layout */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.dashboard {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: grid;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>grid-template-columns: 1fr 1fr;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>@media (max-width: 1024px) {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>.dashboard {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>grid-template-columns: 1fr;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Map Container */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-container {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>grid-column: 1 / -1;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 15px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>box-shadow: 0 10px 30px rgba(0,0,0,0.1);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>overflow: hidden;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border: 1px solid #e0e0e0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-container h2 {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: #2c3e50;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding-bottom: 0.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-bottom: 2px solid #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>#map {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>height: 500px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>width: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 10px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>overflow: hidden;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border: 1px solid #ddd;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Map Controls */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-controls {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: flex;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>flex-wrap: wrap;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>align-items: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-controls select,</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-controls button {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 0.5rem 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border: 2px solid #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: #2c3e50;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 5px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>cursor: pointer;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-weight: 600;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>transition: all 0.3s ease;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-controls select:hover,</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.map-controls button:hover {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Cards */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.card {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 15px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border: 1px solid #e0e0e0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>transition: transform 0.3s ease;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.card:hover {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>transform: translateY(-5px);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.card h3 {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: #2c3e50;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-bottom: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: flex;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>align-items: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 0.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Summary Section */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.summary-grid {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: grid;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 1.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.summary-item {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #f8f9fa, #e9ecef);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 10px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-left: 4px solid #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.summary-item strong {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: #2c3e50;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 1.1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.summary-item p {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: #666;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 0.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Charts */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.chart-container {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 15px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.charts-grid {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: grid;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Table */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.data-table {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>width: 100%;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-collapse: collapse;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 10px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>overflow: hidden;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>box-shadow: 0 0 15px rgba(0,0,0,0.05);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.data-table th {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #3498db, #2980b9);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>text-align: left;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-weight: 600;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.data-table td {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 0.8rem 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-bottom: 1px solid #eee;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 0.9rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.data-table tr:hover {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #f8f9fa;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.data-table tbody tr:last-child td {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>border-bottom: none;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.table-container {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>overflow-x: auto;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Session Details */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.session-details {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 15px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.session-list {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: grid;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.session-item {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #f8f9fa, #e9ecef);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 10px;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-left: 4px solid #e74c3c;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* KPI Metrics */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.kpi-grid {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>display: grid;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));</p>
+<p class="p1"><span class="Apple-converted-space">      </span>gap: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.kpi-item {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>text-align: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #2c3e50, #34495e);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 10px;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.kpi-value {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-weight: bold;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin: 0.5rem 0;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>.kpi-label {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>font-size: 0.9rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>opacity: 0.9;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Data Info */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.data-info {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #e8f4fc;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-left: 4px solid #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 1rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin: 1rem 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-radius: 5px;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Footer */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.footer {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>text-align: center;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>padding: 2rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>margin-top: 3rem;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>background: #2c3e50;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>color: white;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>border-top: 5px solid #3498db;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Animations */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>@keyframes fadeIn {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>from { opacity: 0; transform: translateY(20px); }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>to { opacity: 1; transform: translateY(0); }</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>.fade-in {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>animation: fadeIn 0.6s ease forwards;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>/* Responsive Design */</p>
+<p class="p1"><span class="Apple-converted-space">    </span>@media (max-width: 768px) {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>.container { padding: 1rem; }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>.header h1 { font-size: 2rem; }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>.charts-grid { grid-template-columns: 1fr; }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>#map { height: 300px; }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>.map-controls { flex-direction: column; align-items: stretch; }</p>
+<p class="p1"><span class="Apple-converted-space">      </span>.map-controls select, .map-controls button, .status-indicator { width: 100%; }</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/style&gt;</p>
+<p class="p1">&lt;/head&gt;</p>
+<p class="p1">&lt;body&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;div class="loading-overlay" id="loadingOverlay"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="loading-spinner"&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;p&gt;Loading engagement data and initializing map...&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;p class="status-indicator" id="dataStatus"&gt;Awaiting data&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;div class="error-message" id="errorMessage"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;p&gt;Error loading data. Please check console for details.&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;button onclick="retryLoad()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer;"&gt; Retry &lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;div class="video-background"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;video autoplay muted loop playsinline&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;source src="tmp.mp4" type="video/mp4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>Your browser does not support the video tag.</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/video&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;div class="overlay"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;header class="header"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;h1&gt;Buctril Engagement Session Impact Report&lt;/h1&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;p&gt;Interactive analysis of farmer engagement, product awareness, and market conversion.&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;p style="font-size: 0.8rem; margin-top: 10px;"&gt;Sessions Loaded: &lt;strong id="sessionCount"&gt;0&lt;/strong&gt; | Last Update: &lt;span id="updateTime"&gt;N/A&lt;/span&gt;&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/header&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;section class="map-container fade-in"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📍 Interactive Session Map&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;p class="data-info"&gt;Markers are sized by **Total Farmers** and colored by **Awareness Rate**. Use the filters below for day/week-wise view.&lt;/p&gt;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="map-controls"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;select id="dayFilter"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;option value="All"&gt;Filter by Day&lt;/option&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;select id="weekFilter"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;option value="All"&gt;Filter by Week&lt;/option&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;span class="status-indicator" id="currentFilterDisplay"&gt;Showing: All Sessions&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div id="map"&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;div class="dashboard fade-in"&gt;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;h3&gt;📊 Current Filter Summary&lt;/h3&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="summary-grid" id="currentSummaryGrid"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="summary-item"&gt; &lt;strong&gt;Total Sessions&lt;/strong&gt; &lt;p id="totalSessions"&gt;Loading...&lt;/p&gt; &lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="summary-item"&gt; &lt;strong&gt;Total Farmers Engaged&lt;/strong&gt; &lt;p id="totalFarmers"&gt;Loading...&lt;/p&gt; &lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="summary-item"&gt; &lt;strong&gt;Total Wheat Acres&lt;/strong&gt; &lt;p id="totalAcres"&gt;Loading...&lt;/p&gt; &lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="summary-item"&gt; &lt;strong&gt;Definite Use Conversion&lt;/strong&gt; &lt;p id="definiteUse"&gt;Loading...&lt;/p&gt; &lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;h3&gt;🗓️ All Weeks Impact Overview&lt;/h3&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;p class="data-info"&gt;Compare sessions and conversion across all weeks.&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="table-container"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;table class="data-table" id="weekSummaryTable"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;thead&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;tr&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;th&gt;Week&lt;/th&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;th&gt;Sessions&lt;/th&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;th&gt;Farmers&lt;/th&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;th&gt;Total Acres&lt;/th&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;th&gt;Definite Use Rate&lt;/th&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/tr&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/thead&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;tbody id="weekSummaryBody"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/tbody&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/table&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;section class="session-details fade-in"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;🎯 Session Breakdown by Day&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="session-list" id="sessionList"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;section class="chart-container fade-in"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📈 Performance Analysis&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;p class="data-info"&gt;Charts reflect the currently selected filter (Day, Week, or All Sessions).&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="charts-grid"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;canvas id="engagementChart" width="400" height="300"&gt;&lt;/canvas&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;canvas id="conversionChart" width="400" height="300"&gt;&lt;/canvas&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;canvas id="reasonsChart" width="400" height="300"&gt;&lt;/canvas&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;canvas id="distanceChart" width="400" height="300"&gt;&lt;/canvas&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;section class="session-details fade-in"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📋 Detailed Session Data&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="table-container"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;table class="data-table" id="dataTable"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/table&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;footer class="footer"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;p&gt;&amp;copy; 2025 Engagement Reporting. Data provided by Buctril Super Campaign.&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/footer&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Configuration ---</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const CSV_FILE = 'sum sheet.csv';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const ATTRIBUTION = '© OpenStreetMap contributors';</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Global State ---</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let map = null;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let sessionMarkers = [];</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let allSessionData = [];</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let sessionData = []; // Data currently shown (filtered)</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let charts = [];</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let currentFilter = 'All';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let currentFilterType = 'Day';</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- CSV Parsing Utility (Robust version to handle header offset and quoted fields) ---</p>
+<p class="p1"><span class="Apple-converted-space">    </span>function parseCSV(text) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Find the line that starts with "SN" to locate the header</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const lines = text.trim().split('\n');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>let headerIndex = lines.findIndex(line =&gt; line.startsWith('SN,') || line.startsWith('"SN",'));</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (headerIndex === -1) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>console.error("CSV header 'SN' not found. Assuming first line is header.");</p>
+<p class="p1"><span class="Apple-converted-space">            </span>headerIndex = 0;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const dataText = lines.slice(headerIndex).join('\n');</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const rows = [];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>let currentRow = [];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>let currentField = "";</p>
+<p class="p1"><span class="Apple-converted-space">        </span>let inQuotes = false;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>for (let i = 0; i &lt; dataText.length; i++) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const char = dataText[i];</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (inQuotes) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (char === '"') {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>// Check for double quotes (escaped quotes)</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (i + 1 &lt; dataText.length &amp;&amp; dataText[i + 1] === '"') {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>currentField += '"';</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>i++; // Skip the next quote</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>inQuotes = false;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentField += char;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (char === '"') {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>inQuotes = true;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>} else if (char === ',') {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentRow.push(currentField.trim());</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentField = "";</p>
+<p class="p1"><span class="Apple-converted-space">                </span>} else if (char === '\n' || char === '\r') {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>// Handle Windows line endings (\r\n)</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (char === '\r' &amp;&amp; i + 1 &lt; dataText.length &amp;&amp; dataText[i + 1] === '\n') {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>i++;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentRow.push(currentField.trim());</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentField = "";</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>// Only add non-empty rows</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (currentRow.length &gt; 0 &amp;&amp; currentRow.some(cell =&gt; cell !== "")) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>rows.push(currentRow);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentRow = [];</p>
+<p class="p1"><span class="Apple-converted-space">                </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>currentField += char;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Add the last row if there's any data</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (currentField.trim() !== "") {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>currentRow.push(currentField.trim());</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (currentRow.length &gt; 0 &amp;&amp; currentRow.some(cell =&gt; cell !== "")) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>rows.push(currentRow);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>return rows;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Helper functions ---</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function toNumber(value) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (value === undefined || value === null || value === "") return 0;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Remove commas, trim, and parse float</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const cleanValue = String(value).replace(/,/g, '').trim();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>return parseFloat(cleanValue) || 0;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function safePercent(value) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const num = toNumber(value);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (num &gt; 100) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Assume rate is a count if &gt; 100 and farmers count is available</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const totalFarmers = toNumber(sessionData[0]['Total Farmers']); // This is fragile, better to do in pre-processing</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return num;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>return num;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function extractLatLngFromCoordinates(coordText) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (!coordText) return null;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Pattern matches: 28°09'13.2""N 69°48'59.7""E</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const dmsRegex = /(\d+)°(\d+)'([\d.]+)\s*""([NnSs])\s*(\d+)°(\d+)'([\d.]+)\s*""([EeWw])/;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const match = coordText.match(dmsRegex);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (match) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const [_, latDeg, latMin, latSec, latDir, lngDeg, lngMin, lngSec, lngDir] = match;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const dmsToDecimal = (deg, min, sec, dir) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>let decimal = toNumber(deg) + toNumber(min) / 60 + toNumber(sec) / 3600;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (dir.toUpperCase() === 'S' || dir.toUpperCase() === 'W') {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>decimal *= -1;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return decimal;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const lat = dmsToDecimal(latDeg, latMin, latSec, latDir);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const lng = dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (isNaN(lat) || isNaN(lng)) return null;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return [lat, lng];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}<span class="Apple-converted-space"> </span></p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Fallback for simple decimal coordinates (unlikely for this dataset but good practice)</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const decimalRegex = /(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const decimalMatch = coordText.match(decimalRegex);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (decimalMatch) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const lat = parseFloat(decimalMatch[1]);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const lng = parseFloat(decimalMatch[2]);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!isNaN(lat) &amp;&amp; !isNaN(lng)) return [lat, lng];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>return null;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function getColorByAwareness(awarenessRate) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (awarenessRate &gt;= 75) return '#27ae60'; // High (Green)</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (awarenessRate &gt;= 50) return '#f39c12'; // Medium (Orange)</p>
+<p class="p1"><span class="Apple-converted-space">        </span>return '#c0392b'; // Low (Red)</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Initialize application ---</p>
+<p class="p1"><span class="Apple-converted-space">    </span>function initApp() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Show loading</p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('dataStatus').textContent = 'Loading data...';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('loadingOverlay').style.display = 'flex';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('errorMessage').style.display = 'none';</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Initialize map</p>
+<p class="p1"><span class="Apple-converted-space">        </span>initMap();</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Load data</p>
+<p class="p1"><span class="Apple-converted-space">        </span>loadData();</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function initMap() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (!map) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Initial view over the region of interest (e.g., Pakistan)</p>
+<p class="p1"><span class="Apple-converted-space">            </span>map = L.map('map').setView([29.0, 70.0], 6);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>L.tileLayer(TILE_URL, { attribution: ATTRIBUTION }).addTo(map);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>async function loadData() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>console.log('Loading CSV data from:', CSV_FILE);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Try multiple potential file paths including the exact name and encoded versions</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const possiblePaths = [<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>CSV_FILE,<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>CSV_FILE.replace(/ /g, '%20'),<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>'sum_sheet.csv',</p>
+<p class="p1"><span class="Apple-converted-space">                </span>'sum%20sheet.csv'<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>];</p>
+<p class="p1"><span class="Apple-converted-space">            </span>let data = null;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>let lastError = null;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>for (const path of possiblePaths) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>console.log('Trying path:', path);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const response = await fetch(path);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (response.ok) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>const text = await response.text();</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>console.log('Successfully loaded data from:', path);</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>data = text;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>break;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>} catch (err) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>lastError = err;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>console.warn('Failed to load from', path, ':', err.message);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!data) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>throw new Error(`Failed to load CSV from any path. Last error: ${lastError ? lastError.message : 'Unknown'}`);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Parse and process data</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const parsedRows = parseCSV(data);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (parsedRows.length &lt; 2) throw new Error('CSV is empty or only contains header.');</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const headers = parsedRows[0];</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const dataRows = parsedRows.slice(1);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const startDate = new Date('2023-11-24'); // Fixed campaign start date from CSV data (24-Nov)</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>allSessionData = dataRows.map(row =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const session = {};</p>
+<p class="p1"><span class="Apple-converted-space">                </span>headers.forEach((header, i) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>session[header.trim()] = row[i] ? row[i].trim() : '';</p>
+<p class="p1"><span class="Apple-converted-space">                </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// Add Week Number and Filterable Day</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const dateStr = session['Date'];</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (dateStr &amp;&amp; dateStr.match(/^\d{1,2}-\w{3}$/)) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>// Assuming all data is from 2023 for consistent date objects</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const date = new Date(`${dateStr}-2023`);<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (!isNaN(date)) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>const diffTime = Math.abs(date.getTime() - startDate.getTime());</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>session.Week = `Week ${Math.max(1, Math.floor(diffDays / 7) + 1)}`;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p2"><span class="Apple-converted-space">                </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// Remove extra quotes from coordinates if necessary</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (session['Spot Coordinates']) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>session['Spot Coordinates'] = session['Spot Coordinates'].replace(/^"|"$/g, '').trim();</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>return session;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}).filter(s =&gt; s['Total Farmers'] &amp;&amp; toNumber(s['Total Farmers']) &gt; 0 &amp;&amp; s['Day'] !== 'Start'); // Filter out travel logs and empty sessions</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>sessionData = [...allSessionData]; // Initial state is all data</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (allSessionData.length === 0) throw new Error('No valid session data found after filtering.');</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Update status and UI</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('dataStatus').textContent = `Loaded ${allSessionData.length} sessions`;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('dataStatus').style.background = '#2ecc71';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('loadingOverlay').style.display = 'none';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('sessionCount').textContent = allSessionData.length;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('updateTime').textContent = new Date().toLocaleTimeString();</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>populateFilters();</p>
+<p class="p1"><span class="Apple-converted-space">            </span>updateUI();</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>} catch (error) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>console.error('Error loading data:', error);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Show error</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('dataStatus').textContent = 'Error loading data';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('dataStatus').style.background = '#e74c3c';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('loadingOverlay').style.display = 'none';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('errorMessage').style.display = 'block';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('errorMessage').innerHTML = `</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;p&gt;Error: ${error.message}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;p&gt;Please ensure 'sum sheet.csv' is correctly formatted and available.&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;button onclick="retryLoad()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer;"&gt; Retry Loading &lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function retryLoad() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>initApp();</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Filtering and UI Control ---</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function populateFilters() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const daySelect = document.getElementById('dayFilter');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const weekSelect = document.getElementById('weekFilter');</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Clear previous options</p>
+<p class="p1"><span class="Apple-converted-space">        </span>daySelect.innerHTML = '&lt;option value="All"&gt;Filter by Day&lt;/option&gt;';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>weekSelect.innerHTML = '&lt;option value="All"&gt;Filter by Week&lt;/option&gt;';</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Get unique days and sort them by their date</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const uniqueDayNames = [...new Set(allSessionData.map(s =&gt; s['Day']).filter(Boolean))];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const daySortMap = allSessionData.reduce((map, s) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!map[s['Day']]) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>map[s['Day']] = new Date(`${s['Date']}-2023`).getTime();</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return map;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}, {});</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>uniqueDayNames.sort((a, b) =&gt; daySortMap[a] - daySortMap[b]);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>uniqueDayNames.forEach(day =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>daySelect.innerHTML += `&lt;option value="${day}"&gt;${day}&lt;/option&gt;`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const uniqueWeeks = [...new Set(allSessionData.map(s =&gt; s.Week).filter(Boolean))].sort();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>uniqueWeeks.forEach(week =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>weekSelect.innerHTML += `&lt;option value="${week}"&gt;${week}&lt;/option&gt;`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>daySelect.onchange = (e) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>weekSelect.value = 'All'; // Reset other filter</p>
+<p class="p1"><span class="Apple-converted-space">            </span>filterData('Day', e.target.value);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>};</p>
+<p class="p1"><span class="Apple-converted-space">        </span>weekSelect.onchange = (e) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>daySelect.value = 'All'; // Reset other filter</p>
+<p class="p1"><span class="Apple-converted-space">            </span>filterData('Week', e.target.value);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>};</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function filterData(filterType, filterValue) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>currentFilterType = filterType;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>currentFilter = filterValue;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (filterValue === 'All') {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>sessionData = [...allSessionData];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>} else if (filterType === 'Day') {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>sessionData = allSessionData.filter(s =&gt; s['Day'] === filterValue);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>} else if (filterType === 'Week') {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>sessionData = allSessionData.filter(s =&gt; s.Week === filterValue);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>updateUI();</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function updateFilterDisplay() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const displayEl = document.getElementById('currentFilterDisplay');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (currentFilter === 'All') {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>displayEl.textContent = 'Showing: All Sessions';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>displayEl.style.background = '#f39c12';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>displayEl.textContent = `Showing: ${currentFilterType} - ${currentFilter}`;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>displayEl.style.background = '#3498db';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function updateUI() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>updateFilteredSummary();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>updateWeeklySummaryTable(); // This is static, but update it once data is loaded</p>
+<p class="p1"><span class="Apple-converted-space">        </span>updateSessionList();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>updateDataTable();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>plotMapMarkers();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>createCharts();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>updateFilterDisplay();</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Data Presentation Functions ---</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function updateFilteredSummary() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (sessionData.length === 0) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('totalSessions').textContent = 0;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('totalFarmers').textContent = 'N/A';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('totalAcres').textContent = 'N/A';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>document.getElementById('definiteUse').textContent = 'N/A';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const totalFarmers = sessionData.reduce((sum, s) =&gt; sum + toNumber(s['Total Farmers']), 0);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const totalAcres = sessionData.reduce((sum, s) =&gt; sum + toNumber(s['Total Wheat Acres']), 0);</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const definiteUseRates = sessionData</p>
+<p class="p1"><span class="Apple-converted-space">            </span>.map(s =&gt; safePercent(s['Definite Use Rate']))</p>
+<p class="p1"><span class="Apple-converted-space">            </span>.filter(r =&gt; r &gt; 0 &amp;&amp; r &lt;= 100);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const avgDefiniteRate = definiteUseRates.length &gt; 0<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>? (definiteUseRates.reduce((sum, rate) =&gt; sum + rate, 0) / definiteUseRates.length)</p>
+<p class="p1"><span class="Apple-converted-space">            </span>: 0;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('totalSessions').textContent = sessionData.length;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('totalFarmers').textContent = totalFarmers.toLocaleString();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('totalAcres').textContent = totalAcres.toLocaleString();</p>
+<p class="p1"><span class="Apple-converted-space">        </span>document.getElementById('definiteUse').textContent = `${avgDefiniteRate.toFixed(1)}%`;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function updateWeeklySummaryTable() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const tableBody = document.getElementById('weekSummaryBody');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>tableBody.innerHTML = '';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (allSessionData.length === 0) return;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// 1. Group data by Week</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const weeklyData = allSessionData.reduce((acc, session) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const week = session.Week;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!week) return acc;</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!acc[week]) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>acc[week] = {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>sessions: [],</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>definiteUseRates: []</p>
+<p class="p1"><span class="Apple-converted-space">                </span>};</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const farmers = toNumber(session['Total Farmers']);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const acres = toNumber(session['Total Wheat Acres']);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const definiteRate = safePercent(session['Definite Use Rate']);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>acc[week].sessions.push(session);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Sum up farmers and acres for the week</p>
+<p class="p1"><span class="Apple-converted-space">            </span>acc[week].totalFarmers = (acc[week].totalFarmers || 0) + farmers;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>acc[week].totalAcres = (acc[week].totalAcres || 0) + acres;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (definiteRate &gt; 0 &amp;&amp; definiteRate &lt;= 100) acc[week].definiteUseRates.push(definiteRate);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>return acc;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}, {});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// 2. Calculate Averages and create rows</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const weekSummaries = Object.keys(weeklyData).sort().map(week =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const data = weeklyData[week];</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const avgDefiniteRate = data.definiteUseRates.length &gt; 0<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>? (data.definiteUseRates.reduce((sum, rate) =&gt; sum + rate, 0) / data.definiteUseRates.length)</p>
+<p class="p1"><span class="Apple-converted-space">                </span>: 0;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>return {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>week: week,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>sessionsCount: data.sessions.length,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>farmers: data.totalFarmers.toLocaleString(),</p>
+<p class="p1"><span class="Apple-converted-space">                </span>acres: data.totalAcres.toLocaleString(),</p>
+<p class="p1"><span class="Apple-converted-space">                </span>definiteUseRate: `${avgDefiniteRate.toFixed(1)}%`</p>
+<p class="p1"><span class="Apple-converted-space">            </span>};</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// 3. Populate Table</p>
+<p class="p1"><span class="Apple-converted-space">        </span>let html = '';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>weekSummaries.forEach(summary =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>html += `</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;&lt;strong&gt;${summary.week}&lt;/strong&gt;&lt;/td&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;${summary.sessionsCount}&lt;/td&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;${summary.farmers}&lt;/td&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;${summary.acres}&lt;/td&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;${summary.definiteUseRate}&lt;/td&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>tableBody.innerHTML = html;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function updateSessionList() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const container = document.getElementById('sessionList');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>container.innerHTML = '';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (sessionData.length === 0) {</p>
+<p class="p1"><span class="Apple-converted-space">             </span>container.innerHTML = '&lt;p class="data-info" style="border-left-color: #f39c12;"&gt;No sessions to display for the current filter.&lt;/p&gt;';</p>
+<p class="p1"><span class="Apple-converted-space">             </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>let html = '';</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Group by Day (even if the filter is by Week, show sessions grouped by day)</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const sessionsByDay = sessionData.reduce((acc, s) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const dayKey = s['Date'] || 'Unknown Date';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!acc[dayKey]) acc[dayKey] = [];</p>
+<p class="p1"><span class="Apple-converted-space">            </span>acc[dayKey].push(s);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return acc;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}, {});</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>Object.keys(sessionsByDay).sort().forEach(date =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const sessions = sessionsByDay[date];</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const totalFarmers = sessions.reduce((sum, s) =&gt; sum + toNumber(s['Total Farmers']), 0);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const totalAcres = sessions.reduce((sum, s) =&gt; sum + toNumber(s['Total Wheat Acres']), 0);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const definiteRate = sessions</p>
+<p class="p1"><span class="Apple-converted-space">                </span>.map(s =&gt; safePercent(s['Definite Use Rate']))</p>
+<p class="p1"><span class="Apple-converted-space">                </span>.filter(r =&gt; r &gt; 0 &amp;&amp; r &lt;= 100)</p>
+<p class="p1"><span class="Apple-converted-space">                </span>.reduce((sum, rate) =&gt; sum + rate, 0) / sessions.length;</p>
+<p class="p2"><br></p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>html += `</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="session-item"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;h4&gt;🗓️ ${sessions[0]['Day']} (${date}) - ${sessions.length} Sessions&lt;/h4&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;p&gt;&lt;strong&gt;Farmers Engaged:&lt;/strong&gt; ${totalFarmers.toLocaleString()}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;p&gt;&lt;strong&gt;Total Acres:&lt;/strong&gt; ${totalAcres.toLocaleString()}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;p&gt;&lt;strong&gt;Avg Definite Use:&lt;/strong&gt; ${definiteRate.toFixed(1)}%&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;p style="font-size: 0.85rem; margin-top: 5px; opacity: 0.8;"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>Locations: ${sessions</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>.map(s =&gt; s['Session Location'] || s['Village / Mauza'] || 'N/A')</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>.filter(Boolean)</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>.slice(0, 3)</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>.join(', ')}${sessions.length &gt; 3 ? '...' : ''}</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>container.innerHTML = html;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function updateDataTable() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const table = document.getElementById('dataTable');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>table.innerHTML = '';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (sessionData.length === 0) return;</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const headers = ['Day', 'Date', 'Village / Mauza', 'Total Farmers', 'Total Wheat Acres', 'Definite Use Rate', 'Top Reason Use', 'Top Reason Not to Use in past'];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const csvHeaders = ['Day', 'Date', 'Village / Mauza', 'Total Farmers', 'Total Wheat Acres', 'Definite Use Rate', 'Top Reason Use', 'Top Reason Not to Use in past'];</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>let html = '&lt;thead&gt;&lt;tr&gt;' + headers.map(h =&gt; `&lt;th&gt;${h}&lt;/th&gt;`).join('') + '&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;';</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Limit display to a reasonable number of rows for performance/viewability</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const maxRows = 20;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const displayData = sessionData.slice(0, maxRows);</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>displayData.forEach(session =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>html += '&lt;tr&gt;';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>csvHeaders.forEach(csvKey =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>let value = session[csvKey] || '-';</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (csvKey === 'Definite Use Rate' &amp;&amp; value !== '-') {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>value = `${safePercent(value).toFixed(1)}%`;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>html += `&lt;td&gt;${value}&lt;/td&gt;`;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>});</p>
+<p class="p1"><span class="Apple-converted-space">            </span>html += '&lt;/tr&gt;';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (sessionData.length &gt; maxRows) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>html += `&lt;tr&gt;&lt;td colspan="${headers.length}" style="text-align: center; font-style: italic; opacity: 0.7;"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>... and ${sessionData.length - maxRows} more sessions (Apply filter or see full CSV for all data)</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/td&gt;&lt;/tr&gt;`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>html += '&lt;/tbody&gt;';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>table.innerHTML = html;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function plotMapMarkers() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Clear existing markers</p>
+<p class="p1"><span class="Apple-converted-space">        </span>sessionMarkers.forEach(marker =&gt; map.removeLayer(marker));</p>
+<p class="p1"><span class="Apple-converted-space">        </span>sessionMarkers = [];</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (sessionData.length === 0) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Reset map view to a default location (e.g., Pakistan center)</p>
+<p class="p1"><span class="Apple-converted-space">            </span>map.setView([29.0, 70.0], 6);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const bounds = [];</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>sessionData.forEach(session =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const coordText = session['Spot Coordinates'] || '';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const coords = extractLatLngFromCoordinates(coordText);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!coords) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>// console.log('No coordinates for:', session['Session Location']);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const [lat, lng] = coords;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const farmers = toNumber(session['Total Farmers']);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const acres = toNumber(session['Total Wheat Acres']);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const location = session['Session Location'] || session['Village / Mauza'] || 'Session';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const day = session['Day'] || 'Unknown';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const date = session['Date'] || 'Unknown Date';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const awareness = safePercent(session['Awareness Rate']);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const definite = safePercent(session['Definite Use Rate']);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Create marker with size based on farmers</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const radius = Math.min(Math.max(farmers / 8, 8), 30); // Radius min 8, max 30</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const marker = L.circleMarker([lat, lng], {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>radius: radius,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>fillColor: getColorByAwareness(awareness), // Color based on Awareness Rate</p>
+<p class="p1"><span class="Apple-converted-space">                </span>color: '#2c3e50',</p>
+<p class="p1"><span class="Apple-converted-space">                </span>weight: 2,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>opacity: 0.8,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>fillOpacity: 0.7</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}).addTo(map);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>marker.bindPopup(`</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;strong&gt;${location}&lt;/strong&gt; (${day}, ${date})&lt;br&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Farmers: ${farmers.toLocaleString()}&lt;br&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Acres: ${acres.toLocaleString()}&lt;br&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Awareness: ${awareness.toFixed(1)}%&lt;br&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Definite Use: ${definite.toFixed(1)}%</p>
+<p class="p1"><span class="Apple-converted-space">            </span>`);</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>sessionMarkers.push(marker);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>bounds.push([lat, lng]);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Fit map to markers</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (bounds.length &gt; 0) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>map.fitBounds(bounds, { padding: [50, 50] });</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Charting Functions ---</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function createCharts() {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>charts.forEach(chart =&gt; chart.destroy());</p>
+<p class="p1"><span class="Apple-converted-space">        </span>charts = [];</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (sessionData.length === 0) return;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// --- Chart 1: Engagement vs. Acres ---</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const engagementLabels = sessionData.map(s =&gt; s['Session Location'] || s['Village / Mauza']);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const farmersData = sessionData.map(s =&gt; toNumber(s['Total Farmers']));</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const acresData = sessionData.map(s =&gt; toNumber(s['Total Wheat Acres']));</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const engagementChart = new Chart(document.getElementById('engagementChart').getContext('2d'), {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>type: 'bar',</p>
+<p class="p1"><span class="Apple-converted-space">            </span>data: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>labels: engagementLabels,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>datasets: [</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>{</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>label: 'Farmers Engaged',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>data: farmersData,</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>backgroundColor: 'rgba(52, 152, 219, 0.7)', // Blue</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>yAxisID: 'y'</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>},</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>{</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>label: 'Total Wheat Acres',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>data: acresData,</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>backgroundColor: 'rgba(44, 62, 80, 0.7)', // Dark Blue</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>type: 'line',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>yAxisID: 'y1'</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>]</p>
+<p class="p1"><span class="Apple-converted-space">            </span>},</p>
+<p class="p1"><span class="Apple-converted-space">            </span>options: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>responsive: true,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>plugins: { title: { display: true, text: 'Farmer Engagement vs. Wheat Acres' } },</p>
+<p class="p1"><span class="Apple-converted-space">                </span>scales: {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Farmers' } },</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Acres' }, grid: { drawOnChartArea: false } }</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>charts.push(engagementChart);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// --- Chart 2: Conversion Rates ---</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const conversionLabels = sessionData.map(s =&gt; s['Session Location'] || s['Village / Mauza']);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const awarenessData = sessionData.map(s =&gt; safePercent(s['Awareness Rate']));</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const definiteUseData = sessionData.map(s =&gt; safePercent(s['Definite Use Rate']));</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const conversionChart = new Chart(document.getElementById('conversionChart').getContext('2d'), {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>type: 'line',</p>
+<p class="p1"><span class="Apple-converted-space">            </span>data: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>labels: conversionLabels,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>datasets: [</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>{</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>label: 'Awareness Rate (%)',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>data: awarenessData,</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>borderColor: '#2ecc71', // Green</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>backgroundColor: 'rgba(46, 204, 113, 0.1)',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>fill: true,</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>tension: 0.3</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>},</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>{</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>label: 'Definite Use Rate (%)',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>data: definiteUseData,</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>borderColor: '#e74c3c', // Red</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>backgroundColor: 'rgba(231, 76, 60, 0.1)',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>fill: false,</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>tension: 0.3</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>]</p>
+<p class="p1"><span class="Apple-converted-space">            </span>},</p>
+<p class="p1"><span class="Apple-converted-space">            </span>options: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>responsive: true,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>plugins: { title: { display: true, text: 'Awareness and Definite Use Rates' } },</p>
+<p class="p1"><span class="Apple-converted-space">                </span>scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) =&gt; v + '%' } } }</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>charts.push(conversionChart);</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// --- Chart 3: Top Reasons for Use (Bar Chart) ---</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const reasons = sessionData.flatMap(s =&gt; s['Top Reason Use']).filter(r =&gt; r &amp;&amp; r !== '-');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const reasonCounts = reasons.reduce((acc, r) =&gt; { acc[r] = (acc[r] || 0) + 1; return acc; }, {});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const reasonLabels = Object.keys(reasonCounts);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const reasonValues = Object.values(reasonCounts);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const reasonsChart = new Chart(document.getElementById('reasonsChart').getContext('2d'), {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>type: 'pie',</p>
+<p class="p1"><span class="Apple-converted-space">            </span>data: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>labels: reasonLabels,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>datasets: [{</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>label: 'Sessions Reporting Top Reason',</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>data: reasonValues,</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>backgroundColor: [</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>'#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#e74c3c', '#1abc9c'</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>],</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>hoverOffset: 4</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}]</p>
+<p class="p1"><span class="Apple-converted-space">            </span>},</p>
+<p class="p1"><span class="Apple-converted-space">            </span>options: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>responsive: true,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>plugins: { title: { display: true, text: 'Top Reasons to Use (By Sessions)' } }</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>charts.push(reasonsChart);</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// --- Chart 4: Average Understanding Scores (Bar Chart) ---</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const scoreHeaders = [</p>
+<p class="p1"><span class="Apple-converted-space">            </span>'Score Understood: Yield Loss 20-40%',<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>'Score Understood: Golden Period',<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>'Score Understood: Buctril Broadleaf',<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>'Score Understood Combine Benefit: Buctril+Atlantis',<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>'Score: Safety PPE'</p>
+<p class="p1"><span class="Apple-converted-space">        </span>];</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const avgScores = scoreHeaders.map(header =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const scores = sessionData.map(s =&gt; toNumber(s[header])).filter(v =&gt; v &gt; 0);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return scores.length &gt; 0 ? (scores.reduce((a, b) =&gt; a + b, 0) / scores.length).toFixed(2) : 0;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const distanceChart = new Chart(document.getElementById('distanceChart').getContext('2d'), {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>type: 'bar',</p>
+<p class="p1"><span class="Apple-converted-space">            </span>data: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>labels: scoreHeaders.map(h =&gt; h.replace('Score Understood: ', '').replace('Score: ', '').replace('Combine Benefit: ', '')),</p>
+<p class="p1"><span class="Apple-converted-space">                </span>datasets: [{</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>label: 'Average Score (Max 3)',</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>data: avgScores,</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>backgroundColor: 'rgba(155, 89, 182, 0.7)',</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>borderColor: '#9b59b6',</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>borderWidth: 1</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}]</p>
+<p class="p1"><span class="Apple-converted-space">            </span>},</p>
+<p class="p1"><span class="Apple-converted-space">            </span>options: {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>responsive: true,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>plugins: { title: { display: true, text: 'Average Understanding Scores' } },</p>
+<p class="p1"><span class="Apple-converted-space">                </span>scales: { y: { beginAtZero: true, max: 3 } }</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>charts.push(distanceChart);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// --- Initial Call ---</p>
+<p class="p1"><span class="Apple-converted-space">    </span>document.addEventListener('DOMContentLoaded', initApp);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</p>
+<p class="p1">&lt;/body&gt;</p>
+<p class="p1">&lt;/html&gt;</p>
+</body>
+</html>
