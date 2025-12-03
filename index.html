@@ -3,48 +3,1004 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Buctril Week 1 Report</title>
+  <title>Buctril Engagement Session Analysis Report</title>
+
+  <!-- Chart.js for charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Leaflet for map -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    table { border-collapse: collapse; margin-top: 20px; }
-    td, th { padding: 8px 12px; border: 1px solid #ccc; }
-    h1, h2 { margin-top: 40px; }
-    iframe { margin-top: 20px; max-width: 100%; height: 300px; }
-    canvas { max-width: 100%; margin-top: 20px; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f8f9fa;
+      color: #333;
+      line-height: 1.6;
+      position: relative;
+      min-height: 100vh;
+    }
+
+    /* Video Background */
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .video-background video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.18;
+      filter: blur(3px) brightness(0.8);
+    }
+
+    .overlay {
+      position: relative;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(10px);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #2c3e50, #3498db);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+      border-bottom: 5px solid #e74c3c;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .header p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    /* Status Indicator */
+    .status-indicator {
+      background: #f39c12;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      display: inline-block;
+    }
+
+    /* Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.3s;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Error Message */
+    .error-message {
+      background: #e74c3c;
+      color: white;
+      padding: 1rem;
+      border-radius: 10px;
+      margin: 1rem;
+      display: none;
+      text-align: center;
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Dashboard Layout */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Map Container */
+    .map-container {
+      grid-column: 1 / -1;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      overflow: hidden;
+      padding: 1.5rem;
+      border: 1px solid #e0e0e0;
+    }
+
+    .map-container h2 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #3498db;
+    }
+
+    #map {
+      height: 500px;
+      width: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #ddd;
+    }
+
+    /* Map Controls */
+    .map-controls {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .map-controls select,
+    .map-controls button {
+      padding: 0.5rem 1rem;
+      border: 2px solid #3498db;
+      background: white;
+      color: #2c3e50;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .map-controls select:hover,
+    .map-controls button:hover {
+      background: #3498db;
+      color: white;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 1.5rem;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+      border: 1px solid #e0e0e0;
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+    }
+
+    .card h3 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Summary Section */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .summary-item {
+      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+      padding: 1rem;
+      border-radius: 10px;
+      border-left: 4px solid #3498db;
+    }
+
+    .summary-item strong {
+      color: #2c3e50;
+      font-size: 1.1rem;
+    }
+
+    .summary-item p {
+      color: #666;
+      margin-top: 0.5rem;
+    }
+
+    /* Charts */
+    .chart-container {
+      background: white;
+      border-radius: 15px;
+      padding: 1.5rem;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+      margin-top: 2rem;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    /* Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+
+    .data-table th {
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      color: white;
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .data-table td {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid #eee;
+      font-size: 0.9rem;
+    }
+
+    .data-table tr:hover {
+      background: #f8f9fa;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+
+    /* Session Details */
+    .session-details {
+      background: white;
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    }
+
+    .session-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .session-item {
+      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+      padding: 1rem;
+      border-radius: 10px;
+      border-left: 4px solid #e74c3c;
+    }
+
+    /* KPI Metrics */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .kpi-item {
+      text-align: center;
+      padding: 1rem;
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      color: white;
+      border-radius: 10px;
+    }
+
+    .kpi-value {
+      font-size: 2rem;
+      font-weight: bold;
+      margin: 0.5rem 0;
+    }
+
+    .kpi-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    /* Data Info */
+    .data-info {
+      background: #e8f4fc;
+      border-left: 4px solid #3498db;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 5px;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      margin-top: 3rem;
+      background: #2c3e50;
+      color: white;
+      border-top: 5px solid #3498db;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease forwards;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #map {
+        height: 300px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Buctril Week 1 Report</h1>
-
-  <h2>Embedded Field Video</h2>
-  <video controls width="640">
-    <source src="tmp.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-
-  <h2>Data Overview Table</h2>
-  <div id="output"></div>
-
-  <h2>Day-Wise Summary</h2>
-  <div id="summary">
-    <ul>
-      <li><strong>Day 1:</strong> Surveyed northern plots, mapped coordinates.</li>
-      <li><strong>Day 2:</strong> Herbicide applied; initial data collected.</li>
-      <li><strong>Day 3:</strong> Crop growth observed; mapped effectiveness zones.</li>
-      <li><strong>Day 4:</strong> Weed response documented; data tabulated.</li>
-      <li><strong>Day 5:</strong> Team coordination with GIS tags completed.</li>
-    </ul>
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <p>Loading session data...</p>
   </div>
 
-  <h2>Growth Progress Chart</h2>
-  <canvas id="growthChart" width="600" height="300"></canvas>
-
-  <h2>Map & Field Coordinates</h2>
-  <div id="map" style="width:100%; height:300px; background:#eef; display:flex; align-items:center; justify-content:center;">
-    <em>Map showing coordinates and progress flow will appear here (GIS integration placeholder).</em>
+  <!-- Error Message -->
+  <div class="error-message" id="errorMessage">
+    <p>Error loading data. Please check console for details.</p>
+    <button onclick="retryLoad()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer;">
+      Retry
+    </button>
   </div>
 
-  <script src="data_processor.js"></script>
-</body>
-</html>
+  <!-- Video Background -->
+  <div class="video-background">
+    <video autoplay muted loop playsinline>
+      <source src="tmp.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </div>
+
+  <div class="overlay">
+    <!-- Header -->
+    <header class="header">
+      <h1>🌾 Buctril Engagement Session Analysis Report</h1>
+      <p>Comprehensive analysis of farmer engagement sessions & impact assessment</p>
+      <p style="margin-top: 0.5rem; font-size: 1rem; opacity: 0.8;">Week 1 | November 23 – December 12</p>
+      <div class="status-indicator" id="dataStatus">Loading data...</div>
+    </header>
+
+    <div class="container">
+      <!-- Data Info -->
+      <div class="data-info fade-in">
+        <strong>Data Source:</strong> sum sheet.csv | 
+        <strong>Loaded Sessions:</strong> <span id="sessionCount">0</span> | 
+        <strong>Last Updated:</strong> <span id="updateTime">Loading...</span>
+      </div>
+
+      <!-- Map Section -->
+      <section class="map-container fade-in">
+        <h2>📍 Engagement Session Locations</h2>
+        <div id="map"></div>
+        <div class="map-controls">
+          <select id="dayFilter">
+            <option value="all">All Days</option>
+            <option value="1">Day 1 – Multan → Ubaro</option>
+            <option value="2">Day 2 – Ubaro → Dharki</option>
+            <option value="3">Day 3 – Dharki → Ghotki</option>
+            <option value="4">Day 4 – Ghotki → Sukkur</option>
+            <option value="5">Day 5 – Sukkur → Jaferabad</option>
+            <option value="6">Day 6 – Jaferabad → Mehrabpur</option>
+            <option value="7">Day 7 – Mehrabpur → Dadu</option>
+            <option value="8">Day 8 – Dadu → …</option>
+          </select>
+          <select id="metricFilter">
+            <option value="farmers">Number of Farmers</option>
+            <option value="acres">Wheat Acres</option>
+            <option value="awareness">Awareness Rate</option>
+            <option value="definite">Definite Use Rate</option>
+          </select>
+          <button type="button" onclick="showHeatmap()">Show Heat Map</button>
+          <button type="button" onclick="showRoute()">Show Travel Route</button>
+          <button type="button" onclick="resetMap()">Reset View</button>
+          <button type="button" onclick="refreshData()">Refresh Data</button>
+        </div>
+      </section>
+
+      <!-- Dashboard -->
+      <div class="dashboard fade-in">
+        <!-- KPI Metrics -->
+        <div class="card">
+          <h3>📊 Key Performance Indicators</h3>
+          <div class="kpi-grid" id="kpiMetrics">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Weekly Summary -->
+        <div class="card">
+          <h3>📈 Week 1 Summary</h3>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <strong>Total Farmers Engaged</strong>
+              <p id="totalFarmers">Loading...</p>
+            </div>
+            <div class="summary-item">
+              <strong>Total Wheat Acres</strong>
+              <p id="totalAcres">Loading...</p>
+            </div>
+            <div class="summary-item">
+              <strong>Average Awareness Rate</strong>
+              <p id="avgAwareness">Loading...</p>
+            </div>
+            <div class="summary-item">
+              <strong>Definite Use Conversion</strong>
+              <p id="definiteUse">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Details -->
+      <section class="session-details fade-in">
+        <h2>🎯 Session Breakdown by Day</h2>
+        <div class="session-list" id="sessionList">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- Charts Section -->
+      <section class="chart-container fade-in">
+        <h2>📊 Performance Analysis</h2>
+        <div class="charts-grid">
+          <div>
+            <canvas id="engagementChart" width="400" height="300"></canvas>
+          </div>
+          <div>
+            <canvas id="conversionChart" width="400" height="300"></canvas>
+          </div>
+          <div>
+            <canvas id="reasonsChart" width="400" height="300"></canvas>
+          </div>
+          <div>
+            <canvas id="distanceChart" width="400" height="300"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Detailed Data Table -->
+      <section class="card fade-in" style="margin-top: 2rem;">
+        <h3>📋 Detailed Session Data</h3>
+        <div class="table-container">
+          <table class="data-table" id="dataTable">
+            <!-- Dynamically populated -->
+          </table>
+        </div>
+      </section>
+
+      <!-- Insights Section -->
+      <section class="card fade-in" style="margin-top: 2rem;">
+        <h3>💡 Key Insights & Recommendations</h3>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <strong>Top Success Factor</strong>
+            <p>Trust in Bayer brand consistently emerges as the primary reason for product adoption across sessions.</p>
+          </div>
+          <div class="summary-item">
+            <strong>Main Challenge</strong>
+            <p>Price sensitivity remains the biggest barrier to adoption. Consider targeted pricing strategies and value storytelling.</p>
+          </div>
+          <div class="summary-item">
+            <strong>Opportunity Areas</strong>
+            <p>High "Maybe" rates indicate potential for conversion through follow-up engagement and dealer support.</p>
+          </div>
+          <div class="summary-item">
+            <strong>Recommendation</strong>
+            <p>Focus on communicating value versus generics through demonstrations, testimonials and local influencer advocacy.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>© 2024 Buctril Engagement Analysis Report | Data as of December 12, 2024</p>
+      <p style="margin-top: 0.5rem; opacity: 0.8;">Generated from field session data | Interactive map & analytics dashboard</p>
+      <p style="margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.6;">
+        Report ID: <span id="reportId">BUCTRIL-W1-2024</span> | 
+        Version: 1.0.1
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    // Use a simpler CSV file name without spaces
+    const CSV_FILE = "sum_sheet.csv"; // Rename your file to this, or encode the space
+    
+    // Alternative: Use encodeURIComponent for spaces
+    // const CSV_FILE = encodeURIComponent("sum sheet.csv");
+
+    // --- Simplified CSV parser for GitHub Pages compatibility ---
+    function parseCSV(text) {
+      const rows = [];
+      let currentRow = [];
+      let currentField = "";
+      let inQuotes = false;
+      
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        
+        if (inQuotes) {
+          if (char === '"') {
+            // Check for double quotes (escaped quotes)
+            if (i + 1 < text.length && text[i + 1] === '"') {
+              currentField += '"';
+              i++; // Skip the next quote
+            } else {
+              inQuotes = false;
+            }
+          } else {
+            currentField += char;
+          }
+        } else {
+          if (char === '"') {
+            inQuotes = true;
+          } else if (char === ',') {
+            currentRow.push(currentField.trim());
+            currentField = "";
+          } else if (char === '\n' || char === '\r') {
+            // Handle Windows line endings (\r\n)
+            if (char === '\r' && i + 1 < text.length && text[i + 1] === '\n') {
+              i++;
+            }
+            currentRow.push(currentField.trim());
+            currentField = "";
+            
+            // Only add non-empty rows
+            if (currentRow.length > 0 && currentRow.some(cell => cell !== "")) {
+              rows.push(currentRow);
+            }
+            currentRow = [];
+          } else {
+            currentField += char;
+          }
+        }
+      }
+      
+      // Add the last row if there's any data
+      if (currentField.trim() !== "") {
+        currentRow.push(currentField.trim());
+      }
+      if (currentRow.length > 0 && currentRow.some(cell => cell !== "")) {
+        rows.push(currentRow);
+      }
+      
+      return rows;
+    }
+
+    // --- Helper functions ---
+    function toNumber(value) {
+      if (value === undefined || value === null || value === "") return 0;
+      // Remove commas and convert to number
+      const clean = String(value).replace(/[^0-9.-]/g, "");
+      const num = parseFloat(clean);
+      return isNaN(num) ? 0 : num;
+    }
+
+    function safePercent(value) {
+      const num = toNumber(value);
+      return isFinite(num) ? num : 0;
+    }
+
+    function extractLatLngFromCoordinates(coordText) {
+      if (!coordText) return null;
+      
+      // Try to match patterns like "28°09'13.2\"N 69°48'59.7\"E"
+      const regex = /(\d+)°\s*(\d+)'\s*([\d.]+)"\s*([NS])\s*(\d+)°\s*(\d+)'\s*([\d.]+)"\s*([EW])/i;
+      const match = coordText.match(regex);
+      
+      if (match) {
+        const latDeg = parseFloat(match[1]);
+        const latMin = parseFloat(match[2]);
+        const latSec = parseFloat(match[3]);
+        const latDir = match[4].toUpperCase();
+        
+        const lngDeg = parseFloat(match[5]);
+        const lngMin = parseFloat(match[6]);
+        const lngSec = parseFloat(match[7]);
+        const lngDir = match[8].toUpperCase();
+        
+        let lat = latDeg + latMin/60 + latSec/3600;
+        let lng = lngDeg + lngMin/60 + lngSec/3600;
+        
+        if (latDir === 'S') lat = -lat;
+        if (lngDir === 'W') lng = -lng;
+        
+        return [lat, lng];
+      }
+      
+      // Fallback: Try to extract decimal numbers
+      const numbers = coordText.match(/[-+]?\d*\.\d+|\d+/g);
+      if (numbers && numbers.length >= 2) {
+        return [parseFloat(numbers[0]), parseFloat(numbers[1])];
+      }
+      
+      return null;
+    }
+
+    // --- Global variables ---
+    let map;
+    let sessionMarkers = [];
+    let sessionData = [];
+    let charts = [];
+
+    // --- Initialize application ---
+    function initApp() {
+      // Show loading
+      document.getElementById('dataStatus').textContent = 'Loading data...';
+      document.getElementById('loadingOverlay').style.display = 'flex';
+      document.getElementById('errorMessage').style.display = 'none';
+      
+      // Initialize map
+      initMap();
+      
+      // Load data
+      loadData();
+    }
+
+    function initMap() {
+      if (!map) {
+        map = L.map('map').setView([28.0, 69.0], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+      }
+    }
+
+    async function loadData() {
+      try {
+        console.log('Loading CSV data from:', CSV_FILE);
+        
+        // Try multiple potential file paths
+        const possiblePaths = [
+          CSV_FILE,
+          'sum%20sheet.csv',
+          'data/sum_sheet.csv',
+          'data/sum%20sheet.csv',
+          './sum_sheet.csv',
+          './sum%20sheet.csv'
+        ];
+        
+        let data = null;
+        let lastError = null;
+        
+        for (const path of possiblePaths) {
+          try {
+            console.log('Trying path:', path);
+            const response = await fetch(path);
+            if (response.ok) {
+              const text = await response.text();
+              console.log('Successfully loaded data from:', path);
+              console.log('First 500 chars:', text.substring(0, 500));
+              data = text;
+              break;
+            }
+          } catch (err) {
+            lastError = err;
+            console.warn('Failed to load from', path, ':', err.message);
+          }
+        }
+        
+        if (!data) {
+          throw new Error(`Failed to load CSV from any path. Last error: ${lastError?.message || 'Unknown error'}`);
+        }
+        
+        // Parse CSV
+        const rows = parseCSV(data);
+        console.log('Total rows parsed:', rows.length);
+        
+        if (rows.length === 0) {
+          throw new Error('No data found in CSV file');
+        }
+        
+        // Find header row (look for "SN" in first column)
+        let headerIndex = -1;
+        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+          if (rows[i][0] && rows[i][0].trim().toUpperCase() === 'SN') {
+            headerIndex = i;
+            break;
+          }
+        }
+        
+        if (headerIndex === -1) {
+          // Use first row as headers
+          headerIndex = 0;
+        }
+        
+        const headers = rows[headerIndex].map(h => (h || '').trim());
+        console.log('Headers found:', headers);
+        
+        // Process data rows
+        sessionData = [];
+        for (let i = headerIndex + 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (row.length === 0 || row.every(cell => !cell || cell.trim() === '')) {
+            continue;
+          }
+          
+          const obj = {};
+          headers.forEach((header, idx) => {
+            obj[header] = row[idx] || '';
+          });
+          
+          // Only include rows that have session data
+          if (obj['Session Sheet Ref'] && obj['Session Sheet Ref'].trim()) {
+            sessionData.push(obj);
+          }
+        }
+        
+        console.log('Processed sessions:', sessionData.length);
+        
+        if (sessionData.length === 0) {
+          throw new Error('No session data found in CSV');
+        }
+        
+        // Update UI
+        updateUI();
+        
+        // Hide loading, show success
+        document.getElementById('dataStatus').textContent = `Loaded ${sessionData.length} sessions`;
+        document.getElementById('dataStatus').style.background = '#2ecc71';
+        document.getElementById('loadingOverlay').style.display = 'none';
+        document.getElementById('sessionCount').textContent = sessionData.length;
+        document.getElementById('updateTime').textContent = new Date().toLocaleTimeString();
+        
+      } catch (error) {
+        console.error('Error loading data:', error);
+        
+        // Show error
+        document.getElementById('dataStatus').textContent = 'Error loading data';
+        document.getElementById('dataStatus').style.background = '#e74c3c';
+        document.getElementById('loadingOverlay').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorMessage').innerHTML = `
+          <p>Error: ${error.message}</p>
+          <p>Please check that the CSV file exists at: ${CSV_FILE}</p>
+          <button onclick="retryLoad()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer;">
+            Retry Loading
+          </button>
+        `;
+      }
+    }
+
+    function updateUI() {
+      updateDashboard();
+      updateSessionList();
+      updateDataTable();
+      plotMapMarkers();
+      createCharts();
+    }
+
+    function updateDashboard() {
+      if (sessionData.length === 0) return;
+      
+      const totalFarmers = sessionData.reduce((sum, s) => sum + toNumber(s['Total Farmers']), 0);
+      const totalAcres = sessionData.reduce((sum, s) => sum + toNumber(s['Total Wheat Acres']), 0);
+      
+      const awarenessRates = sessionData
+        .map(s => safePercent(s['Awareness Rate']))
+        .filter(r => r > 0);
+      
+      const definiteRates = sessionData
+        .map(s => safePercent(s['Definite Use Rate']))
+        .filter(r => r > 0);
+      
+      const avgAwareness = awarenessRates.length > 0 
+        ? (awarenessRates.reduce((a, b) => a + b, 0) / awarenessRates.length).toFixed(1)
+        : 'N/A';
+      
+      const avgDefinite = definiteRates.length > 0
+        ? (definiteRates.reduce((a, b) => a + b, 0) / definiteRates.length).toFixed(1)
+        : 'N/A';
+      
+      document.getElementById('totalFarmers').textContent = totalFarmers.toLocaleString();
+      document.getElementById('totalAcres').textContent = totalAcres.toLocaleString() + ' acres';
+      document.getElementById('avgAwareness').textContent = avgAwareness + '%';
+      document.getElementById('definiteUse').textContent = avgDefinite + '%';
+      
+      // Update KPI metrics
+      const avgAcresPerFarmer = totalFarmers > 0 ? (totalAcres / totalFarmers).toFixed(1) : '0';
+      const highMaybeSessions = sessionData.filter(s => safePercent(s['Maybe Rate']) > 30).length;
+      
+      document.getElementById('kpiMetrics').innerHTML = `
+        <div class="kpi-item">
+          <div class="kpi-value">${sessionData.length}</div>
+          <div class="kpi-label">Sessions Held</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${avgAcresPerFarmer}</div>
+          <div class="kpi-label">Avg Acres/Farmer</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${Math.round((awarenessRates.reduce((a, b) => a + b, 0) / awarenessRates.length) || 0)}%</div>
+          <div class="kpi-label">Avg Awareness</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${highMaybeSessions}</div>
+          <div class="kpi-label">High Potential Sessions</div>
+        </div>
+      `;
+    }
+
+    function updateSessionList() {
+      const container = document.getElementById('sessionList');
+      if (sessionData.length === 0) {
+        container.innerHTML = '<div class="session-item">No session data available</div>';
+        return;
+      }
+      
+      // Group by day
+      const groupedByDay = {};
+      sessionData.forEach(session => {
+        const day = session['Day'] || 'Unknown';
+        if (!groupedByDay[day]) groupedByDay[day] = [];
+        groupedByDay[day].push(session);
+      });
+      
+      let html = '';
+      Object.keys(groupedByDay).sort().forEach(day => {
+        const sessions = groupedByDay[day];
+        const totalFarmers = sessions.reduce((sum, s) => sum + toNumber(s['Total Farmers']), 0);
+        const totalAcres = sessions.reduce((sum, s) => sum + toNumber(s['Total Wheat Acres']), 0);
+        
+        html += `
+          <div class="session-item">
+            <strong>Day ${day}</strong>
+            <p>Sessions: ${sessions.length}</p>
+            <p>Farmers: ${totalFarmers.toLocaleString()}</p>
+            <p>Acres: ${totalAcres.toLocaleString()}</p>
+            <p>Locations: ${sessions
+              .map(s => s['Session Location'] || s['Village / Mauza'] || 'N/A')
+              .filter(Boolean)
+              .slice(0, 3)
+              .join(', ')}${sessions.length > 3 ? '...' : ''}</p>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+    }
+
+    function updateDataTable() {
+      const table = document.getElementById('dataTable');
+      if (sessionData.length === 0) {
+        table.innerHTML = '<tr><td colspan="15" style="text-align: center; padding: 2rem;">No data available</td></tr>';
+        return;
+      }
+      
+      // Show key columns
+      const keyColumns = [
+        'SN', 'Day', 'City', 'Session Location', 'Total Farmers', 
+        'Total Wheat Acres', 'Awareness Rate', 'Definite Use Rate',
+        'Maybe Rate', 'Top Reason Use', 'Top Reason Not to Use in past'
+      ];
+      
+      let html = '<thead><tr>';
+      keyColumns.forEach(col => {
+        html += `<th>${col}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+      
+      // Show first 10 sessions
+      sessionData.slice(0, 10).forEach(session => {
+        html += '<tr>';
+        keyColumns.forEach(col => {
+          const value = session[col] || '';
+          html += `<td title="${col}: ${value}">${value}</td>`;
+        });
+        html += '</tr>';
+      });
+      
+      if (sessionData.length > 10) {
+        html += `<tr><td colspan="${keyColumns.length}" style="text-align: center; font-style: italic;">
+          ... and ${sessionData.length - 10} more sessions
+        </td></tr>`;
+      }
+      
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    function plotMapMarkers() {
+      // Clear existing markers
+      sessionMarkers.forEach(marker => map.removeLayer(marker));
+      sessionMarkers = [];
+      
+      if (sessionData.length === 0) return;
+      
+      const bounds = [];
+      
+      sessionData.forEach(session => {
+        const coordText = session['Spot Coordinates'] || '';
+        const coords = extractLatLngFromCoordinates(coordText);
+        
+        if (!coords) {
+          console.log('No coordinates for:', session['Session Location']);
+          return;
+        }
+        
+        const [lat, lng] = coords;
+        const farmers = toNumber(session['Total Farmers']);
+        const acres = toNumber(session['Total Wheat Acres']);
+        const location = session['Session Location'] || session['Village / Mauza'] || 'Session';
+        const day = session['Day'] || 'Unknown';
+        const awareness = safePercent(session['Awareness Rate']);
+        const definite = safePercent(session['Definite Use Rate']);
+        
+        // Create marker with size based on farmers
+        const radius = Math.min(Math.max(farmers / 5, 8), 30);
+        const marker = L.circleMarker([lat, lng], {
+          radius: radius,
+          fillColor: getColorByAwareness(awareness),
+          color: '#2c3e50',
+          weight: 2,
+          opacity: 0.8,
+          fillOpacity: 
