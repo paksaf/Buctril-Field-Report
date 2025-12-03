@@ -1,50 +1,640 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Buctril Week 1 Report</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    table { border-collapse: collapse; margin-top: 20px; }
-    td, th { padding: 8px 12px; border: 1px solid #ccc; }
-    h1, h2 { margin-top: 40px; }
-    iframe { margin-top: 20px; max-width: 100%; height: 300px; }
-    canvas { max-width: 100%; margin-top: 20px; }
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #d7dae0; -webkit-text-stroke: #d7dae0}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #d7dae0; -webkit-text-stroke: #d7dae0; min-height: 14.0px}
+    span.s1 {font-kerning: none}
   </style>
 </head>
 <body>
-  <h1>Buctril Week 1 Report</h1>
-
-  <h2>Embedded Field Video</h2>
-  <video controls width="640">
-    <source src="tmp.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-
-  <h2>Data Overview Table</h2>
-  <div id="output"></div>
-
-  <h2>Day-Wise Summary</h2>
-  <div id="summary">
-    <ul>
-      <li><strong>Day 1:</strong> Surveyed northern plots, mapped coordinates.</li>
-      <li><strong>Day 2:</strong> Herbicide applied; initial data collected.</li>
-      <li><strong>Day 3:</strong> Crop growth observed; mapped effectiveness zones.</li>
-      <li><strong>Day 4:</strong> Weed response documented; data tabulated.</li>
-      <li><strong>Day 5:</strong> Team coordination with GIS tags completed.</li>
-    </ul>
-  </div>
-
-  <h2>Growth Progress Chart</h2>
-  <canvas id="growthChart" width="600" height="300"></canvas>
-
-  <h2>Map & Field Coordinates</h2>
-  <div id="map" style="width:100%; height:300px; background:#eef; display:flex; align-items:center; justify-content:center;">
-    <em>Map showing coordinates and progress flow will appear here (GIS integration placeholder).</em>
-  </div>
-
-  <script src="data_processor.js"></script>
+<video autoplay muted loop id="bg-video" style="position:fixed; z-index:-5; width:100%; height:100%; object-fit:cover;">
+  <source src="tmp.mp4" type="video/mp4" />
+</video>
+<p class="p1"><span class="s1">&lt;!DOCTYPE html&gt;</span></p>
+<p class="p1"><span class="s1">&lt;html lang="en"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;head&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta charset="UTF-8" /&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;title&gt;Buctril Super Activation – Interactive Dashboard&lt;/title&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- Leaflet CSS for the map --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;link<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>rel="stylesheet"<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>crossorigin=""</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;style&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>:root {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--bg: #020617;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--card: rgba(15, 23, 42, 0.96);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--card-soft: rgba(15, 23, 42, 0.85);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--accent: #16a34a;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--accent-soft: #22c55e;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--accent-blue: #0ea5e9;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--accent-gold: #eab308;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--border: rgba(148, 163, 184, 0.5);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--text-main: #e5e7eb;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>--text-sub: #9ca3af;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>* {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-sizing: border-box;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin: 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>body {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: var(--text-main);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 22px 12px 40px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: transparent;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Background video styles */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>#bg-video {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>position: fixed;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>inset: 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>object-fit: cover;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>z-index: -3;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>filter: saturate(1.1) brightness(0.75);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bg-overlay {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>position: fixed;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>inset: 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>z-index: -2;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background:</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>radial-gradient(circle at top, rgba(15,23,42,0.82), rgba(15,23,42,0.95)),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>linear-gradient(to bottom right, rgba(15,23,42,0.95), rgba(15,23,42,0.97));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.page {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>max-width: 1180px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin: 0 auto;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>h1 {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 26px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 4px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>letter-spacing: 0.03em;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.subtitle {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 13px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: var(--text-sub);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 18px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-row {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 12px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 18px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-card {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: radial-gradient(circle at top left, rgba(234, 179, 8, 0.18), rgba(15, 23, 42, 0.96));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 14px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 12px 14px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border: 1px solid rgba(250, 250, 249, 0.18);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 16px 40px rgba(0,0,0,0.55);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>position: relative;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>overflow: hidden;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-card::after {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>content: "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>position: absolute;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 120px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 120px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: radial-gradient(circle, rgba(34,197,94,0.3), transparent);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>right: -40px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>top: -40px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>opacity: 0.6;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-label {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 11px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-transform: uppercase;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>letter-spacing: 0.12em;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: var(--text-sub);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 4px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-value {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 20px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-weight: 600;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 2px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-sub {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 12px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: var(--text-sub);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.layout {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 16px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.panel {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: var(--card);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 16px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 14px 16px 16px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border: 1px solid var(--border);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 18px 32px rgba(0,0,0,0.65);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 13px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>backdrop-filter: blur(10px);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.panel h2 {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 16px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 8px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: flex;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>align-items: center;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.panel h2 span.emoji {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 17px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>#map {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 420px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 16px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>overflow: hidden;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 18px 32px rgba(0,0,0,0.65);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border: 1px solid var(--border);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.legend {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 11px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: var(--text-sub);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: var(--card-soft);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 6px 10px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: inline-flex;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>align-items: center;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 10px 25px rgba(0,0,0,0.6);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border: 1px solid var(--border);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.legend-dot {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: inline-block;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 8px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 8px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>/* We override the default green color to match marker color */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: #0ea5e9;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bar-row {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: flex;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>align-items: center;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 4px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bar-label {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>flex: 1;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bar {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>flex: 3;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: var(--border);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin: 0 8px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>overflow: hidden;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bar-fill {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(90deg, var(--accent-blue), var(--accent-soft));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bar-fill-grey {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(90deg, #4b5563, #9ca3af);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bar-value {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 46px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-align: right;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.mini-bar {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 4px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: var(--border);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 2px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>overflow: hidden;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.mini-bar-fill {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 100%;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 999px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: var(--accent-soft);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.pill {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: inline-block;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 2px 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 8px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 12px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 6px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-right: 4px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>white-space: nowrap;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.pill.green { background: rgba(34,197,94,0.15); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.pill.red <span class="Apple-converted-space">  </span>{ background: rgba(220,38,38,0.2); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.emoji { font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.takeaways-list { list-style: none; padding-left: 0; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.takeaways-bullet { font-family: "Apple Color Emoji"; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.text { vertical-align: middle; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.small { font-size: 12px; color: var(--text-sub); }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Responsive adjustments */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>@media (max-width: 900px) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>.layout { grid-template-columns: 1fr; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>#map { height: 360px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/style&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;body&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- Looping background video with dark overlay --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;video id="bg-video" autoplay muted loop playsinline&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;source src="tmp.mov" type="video/mp4" /&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- If available, you could add an alternate source for better compatibility --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/video&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="bg-overlay"&gt;&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="page"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;h1&gt;Buctril Super Activation – Route &amp;amp; Key Highlights&lt;/h1&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;p class="subtitle"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>Farmer education campaign snapshot for brand &amp;amp; sales teams. The map shows<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>the APV van’s session locations, and the panels summarise campaign KPIs<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>pulled dynamically from the data file.</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/p&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- Top-level KPI summary cards --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="kpi-row"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="kpi-card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-label"&gt;Activation Period&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-value" id="period-range"&gt;Loading...&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-sub"&gt;Field work window&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="kpi-card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-label"&gt;Coverage&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-value"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;span id="total-towns"&gt;0&lt;/span&gt; towns · &lt;span id="total-sessions"&gt;0&lt;/span&gt; sessions</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-sub" id="towns-list"&gt;Loading towns…&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="kpi-card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-label"&gt;Engagement&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-value"&gt;&lt;span id="total-farmers"&gt;0&lt;/span&gt; farmers&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-sub"&gt;&lt;span id="wheat-farmers"&gt;0&lt;/span&gt; wheat farmers reached&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="kpi-card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-label"&gt;Crop Area&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-value"&gt;&lt;span id="total-acres"&gt;0&lt;/span&gt; wheat acres&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-sub"&gt;&lt;span id="buctril-acres"&gt;0&lt;/span&gt; acres estimated on Buctril&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="layout"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Map container --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="map"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="legend"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;span class="legend-dot"&gt;&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;span&gt;Session locations (click markers for details)&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Side panel with performance summary and insights --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="panel"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;&lt;span class="emoji"&gt;📊&lt;/span&gt; Performance Snapshot&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="bar-row"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar-label"&gt;Definite use&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar"&gt;&lt;div class="bar-fill" id="bar-def"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar-value" id="pct-def"&gt;0%&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="bar-row"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar-label"&gt;Maybe / Not sure&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar"&gt;&lt;div class="bar-fill-grey" id="bar-maybe"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar-value" id="pct-maybe"&gt;0%&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="bar-row"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar-label"&gt;Not interested&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar"&gt;&lt;div class="bar-fill-grey" id="bar-no"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="bar-value" id="pct-no"&gt;0%&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;p class="small" style="margin-top:6px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>Out of &lt;strong id="out-of-farmers"&gt;0&lt;/strong&gt; farmers,<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;strong id="def-count"&gt;0&lt;/strong&gt; say they will definitely use Buctril,<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;strong id="maybe-count"&gt;0&lt;/strong&gt; are undecided and only<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;strong id="no-count"&gt;0&lt;/strong&gt; are not interested.</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/p&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="section-card" style="margin-top:10px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;h2 style="margin-top:0;"&gt;&lt;span class="emoji"&gt;🌾&lt;/span&gt; Awareness &amp;amp; Usage&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="awareness-grid"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="aw-item-label"&gt;Already know Buctril&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="aw-item-value" id="know-count"&gt;0 farmers&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="mini-bar"&gt;&lt;div class="mini-bar-fill" id="bar-know"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="aw-item-label"&gt;Used Buctril last year&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="aw-item-value" id="used-count"&gt;0 farmers&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="mini-bar"&gt;&lt;div class="mini-bar-fill" id="bar-used"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="tag-row"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span class="pill green" id="top-reasons"&gt;&lt;span class="emoji"&gt;👍&lt;/span&gt;Top reasons: ...&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span class="pill red" id="top-barrier"&gt;&lt;span class="emoji"&gt;💰&lt;/span&gt;Top barrier: ...&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="section-card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;h2 style="margin-top:0;"&gt;&lt;span class="emoji"&gt;✨&lt;/span&gt; Influencers &amp;amp; Takeaways&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="small" style="margin-bottom:4px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;strong id="key-influencers"&gt;0 key farmers&lt;/strong&gt; identified as influencers with follow-up plans<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>(&lt;span id="influencer-yes"&gt;0&lt;/span&gt; Yes / &lt;span id="influencer-maybe"&gt;0&lt;/span&gt; Maybe / &lt;span id="influencer-no"&gt;0&lt;/span&gt; No).</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;ul class="takeaways-list"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="takeaways-bullet"&gt;🚀&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="text"&gt;&lt;strong&gt;Momentum is strong:&lt;/strong&gt; intent to use is high with very low outright rejection.&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="takeaways-bullet"&gt;💹&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="text"&gt;&lt;strong&gt;Protect price premium:&lt;/strong&gt; show ROI through yield stories, demo plots and dealer advocacy.&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="takeaways-bullet"&gt;🎯&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="text"&gt;&lt;strong&gt;Convert undecided farmers:&lt;/strong&gt; treat the undecided farmers as a focused follow‑up list.&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="takeaways-bullet"&gt;📚&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="text"&gt;&lt;strong&gt;Reinforce complex messages:&lt;/strong&gt; emphasize Buctril+Atlantis positioning and safety/PPE behavior.&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="takeaways-bullet"&gt;📣&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="text"&gt;&lt;strong&gt;Use influencers as amplifiers:&lt;/strong&gt; leverage local meetings, testimonials and social content to spread confidence.&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/li&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/ul&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;p class="small" style="margin-top:6px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>This page is generated from the &lt;em&gt;Buctril Super Activation&lt;/em&gt; data file so<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>leadership can review performance and route in a single view without opening Excel.</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- External libraries: Leaflet and PapaParse --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>crossorigin=""&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js" crossorigin=""&gt;&lt;/script&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- Main script to load CSV data, initialize map, and populate UI --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// Initialize the Leaflet map</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const map = L.map('map');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>maxZoom: 18,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>attribution: '&amp;copy; OpenStreetMap contributors'</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}).addTo(map);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// Style for session location markers (blue circles)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const markerOptions = {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>radius: 6,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: '#0ea5e9',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>fillColor: '#0ea5e9',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>fillOpacity: 0.9,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>weight: 1</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// Helper function to parse DMS (degrees°minutes'seconds") coordinate string to decimal</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function dmsToDecimal(dmsStr) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>// Example input: 28°09'13.2"N</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const parts = /(\d+)°(\d+)'([\d.]+)"([NSEW])/.exec(dmsStr.trim());</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!parts) return null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const deg = parseFloat(parts[1]), min = parseFloat(parts[2]), sec = parseFloat(parts[3]);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>let decimal = deg + (min/60) + (sec/3600);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const dir = parts[4];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (dir === 'S' || dir === 'W') {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>decimal = -decimal;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return decimal;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// Load and parse the CSV data using PapaParse</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>Papa.parse('Buctril_Super_DS.csv', {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>download: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>header: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>complete: function(results) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const data = results.data;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const markers = [];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Aggregation variables for summary</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let firstDate = null, lastDate = null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const townsSet = new Set();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let totalFarmers = 0, totalWheatFarmers = 0, totalWheatAcres = 0, totalBuctrilAcres = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let sumDefUse = 0, sumMaybe = 0, sumNotInt = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let sumKnow = 0, sumUsedPrev = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let influencersYes = 0, influencersMaybe = 0, influencersNo = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const reasonUseCount = {}, reasonNotCount = {};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>data.forEach(row =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Only consider rows that have a session location (skip travel-only entries or empty rows)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const locName = row['Session Location']?.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (!locName || locName === '-' || locName.toLowerCase().includes('start')) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const latLonStr = row['Spot Coordinates']?.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Parse coordinates to numeric lat/lon</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (!latLonStr || latLonStr === '-') return;<span class="Apple-converted-space">  </span>// skip if no coordinates</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// The coordinate string might contain both lat and lon together, e.g. '28°09'13.2"N 69°48'59.7"E'</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>let lat = null, lon = null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (latLonStr.includes('N') || latLonStr.includes('S')) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// Split at the latitude's N/S and a space after it to get two parts</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let latPart, lonPart;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (latLonStr.includes('N')) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>const [latSec, lonSec] = latLonStr.split('N');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>latPart = latSec + 'N';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>lonPart = lonSec;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>} else if (latLonStr.includes('S')) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>const [latSec, lonSec] = latLonStr.split('S');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>latPart = latSec + 'S';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>lonPart = lonSec;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// Remove any leading whitespace from lonPart</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>lonPart = lonPart.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// Now ensure lon part ends with E or W</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!lonPart.endsWith('E') &amp;&amp; !lonPart.endsWith('W')) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>// It might already exclude the letter if split removed it. Instead, find the last character that is a letter.</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>const lastChar = lonPart.slice(-1);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>if (lastChar === 'E' || lastChar === 'W') {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>// It's fine</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>// If somehow lost direction, skip</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// Parse each part</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>lat = dmsToDecimal(latPart);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>lon = dmsToDecimal(lonPart);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (lat === null || lon === null) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// If parsing failed, skip this point</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Add marker to map</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const marker = L.circleMarker([lat, lon], markerOptions).addTo(map);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>markers.push([lat, lon]);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Prepare popup content for this session</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const dateStr = row['Date'] ? row['Date'].trim() + ' 2025' : '';<span class="Apple-converted-space">  </span>// Append year for clarity</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const farmers = parseInt(row['Total Farmers']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const know = parseInt(row['Know Buctril']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const usedPrev = parseInt(row['Used Last Year']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const defUse = parseInt(row['Will Definitely Use']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const maybe = parseInt(row['Maybe']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const notInt = parseInt(row['Not Interested']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const acres = parseInt((row['Estimated Buctril Acres from this Session'] || "").replace(/,/g, '')) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Determine whether to show top reason to use or top barrier</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>let reasonLine = '';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (notInt &gt; 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// Not interested farmers present – show top barrier</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const topBarrier = row['Top Reason Not to Use in past'] || row['Top Reason Not to Use'] || '';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (topBarrier.trim()) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>reasonLine = `&lt;strong&gt;Top Barrier:&lt;/strong&gt; ${topBarrier.trim()}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// No one outright not interested – show top reason to use</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const topReason = row['Top Reason Use'] || '';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (topReason.trim()) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>reasonLine = `&lt;strong&gt;Top Reason to Use:&lt;/strong&gt; ${topReason.trim()}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Compose HTML for popup</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const popupHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div style="font-size:12px; line-height:1.4em;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;strong&gt;Date:&lt;/strong&gt; ${dateStr}&lt;br/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;strong&gt;Location:&lt;/strong&gt; ${locName}&lt;br/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;strong&gt;Farmers:&lt;/strong&gt; ${farmers}<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>(${know} aware; ${usedPrev} used last year)&lt;br/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;strong&gt;Conversion Intent:&lt;/strong&gt; ${defUse} will use, ${maybe} maybe, ${notInt} not&lt;br/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>${reasonLine}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>marker.bindPopup(popupHTML);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Aggregate data for summary</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (farmers &gt; 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>totalFarmers += farmers;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>totalWheatFarmers += parseInt(row['Total Wheat Farmers']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>totalWheatAcres += parseInt((row['Total Wheat Acres'] || "").replace(/,/g, '')) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>totalBuctrilAcres += acres;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>sumDefUse += defUse;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>sumMaybe += maybe;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>sumNotInt += notInt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>sumKnow += know;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>sumUsedPrev += usedPrev;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Track top reasons for overall tag summary (count occurrences)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const reasonUse = row['Top Reason Use']?.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const reasonNot = row['Top Reason Not to Use in past']?.trim() || row['Top Reason Not to Use']?.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (reasonUse) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>reasonUseCount[reasonUse] = (reasonUseCount[reasonUse] || 0) + 1;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (reasonNot) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>reasonNotCount[reasonNot] = (reasonNotCount[reasonNot] || 0) + 1;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Track date range</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (row['Date']) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>// Assuming all dates are in 2025</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const [day, mon] = row['Date'].trim().split('-');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const dateObj = new Date(`2025-${mon}-${day}`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!firstDate || dateObj &lt; firstDate) firstDate = dateObj;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!lastDate || dateObj &gt; lastDate) lastDate = dateObj;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Track towns (Tehsil/District)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (row['Tehsil / District']) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>townsSet.add(row['Tehsil / District'].trim());</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// Influencers (if provided in data – if not available, these remain 0)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (row['Plan Yes Count']) influencersYes += parseInt(row['Plan Yes Count']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (row['Plan Maybe Count']) influencersMaybe += parseInt(row['Plan Maybe Count']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>if (row['Plan No Count']) influencersNo += parseInt(row['Plan No Count']) || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}); // end forEach</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Fit map view to all markers</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (markers.length &gt; 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const bounds = L.latLngBounds(markers);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>map.fitBounds(bounds.pad(0.2));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>// If no markers, set a default view</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>map.setView([27.5, 69.0], 7);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Populate the KPI summary fields with aggregated data</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (firstDate &amp;&amp; lastDate) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const options = { month: 'short', day: 'numeric', year: 'numeric' };</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const startStr = firstDate.toLocaleDateString('en-US', options).replace(',', '');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>const endStr <span class="Apple-converted-space">  </span>= lastDate.toLocaleDateString('en-US', options).replace(',', '');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>document.getElementById('period-range').textContent = `${startStr} – ${endStr}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('total-towns').textContent = townsSet.size;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('total-sessions').textContent = markers.length;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('towns-list').textContent = Array.from(townsSet).join(', ');</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('total-farmers').textContent = totalFarmers;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('wheat-farmers').textContent = totalWheatFarmers;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('total-acres').textContent = totalWheatAcres.toLocaleString();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('buctril-acres').textContent = totalBuctrilAcres.toLocaleString();</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Calculate percentages for conversion intent</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const defPct = totalFarmers ? (sumDefUse / totalFarmers * 100) : 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const maybePct = totalFarmers ? (sumMaybe / totalFarmers * 100) : 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const noPct = totalFarmers ? (sumNotInt / totalFarmers * 100) : 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('pct-def').textContent = `${Math.round(defPct)}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('pct-maybe').textContent = `${Math.round(maybePct)}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('pct-no').textContent = `${Math.round(noPct)}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('bar-def').style.width = `${defPct}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('bar-maybe').style.width = `${maybePct}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('bar-no').style.width = `${noPct}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('out-of-farmers').textContent = totalFarmers;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('def-count').textContent = sumDefUse;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('maybe-count').textContent = sumMaybe;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('no-count').textContent = sumNotInt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Awareness &amp; Usage rates</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const knowPct = totalFarmers ? Math.round((sumKnow / totalFarmers) * 100) : 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const usedPct = totalFarmers ? Math.round((sumUsedPrev / totalFarmers) * 100) : 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('know-count').textContent = `${sumKnow} farmers (${knowPct}%)`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('used-count').textContent = `${sumUsedPrev} farmers (${usedPct}%)`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('bar-know').style.width = `${knowPct}%`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('bar-used').style.width = `${usedPct}%`;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Top reasons and barriers (overall)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Find the most common reason to use and not to use from the data</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let topReasonUse = null, topReasonNot = null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (Object.keys(reasonUseCount).length &gt; 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>topReasonUse = Object.entries(reasonUseCount).reduce((a, b) =&gt; b[1] &gt; a[1] ? b : a)[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (Object.keys(reasonNotCount).length &gt; 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>topReasonNot = Object.entries(reasonNotCount).reduce((a, b) =&gt; b[1] &gt; a[1] ? b : a)[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (topReasonUse) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>document.getElementById('top-reasons').innerHTML = `&lt;span class="emoji"&gt;👍&lt;/span&gt;Top reasons: ${topReasonUse}${reasonUseCount[topReasonUse] &gt; 1 ? ' (common in sessions)' : ''}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>document.getElementById('top-reasons').style.display = 'none';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (topReasonNot) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>document.getElementById('top-barrier').innerHTML = `&lt;span class="emoji"&gt;💰&lt;/span&gt;Top barrier: ${topReasonNot}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>document.getElementById('top-barrier').style.display = 'none';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Influencer counts (if available in data, else these stay zero)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('key-influencers').textContent = `${influencersYes + influencersMaybe + influencersNo} key farmers`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('influencer-yes').textContent = influencersYes;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('influencer-maybe').textContent = influencersMaybe;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('influencer-no').textContent = influencersNo;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>} // end complete()</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
 </body>
 </html>
