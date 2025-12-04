@@ -27,7 +27,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"&gt;&lt;/script&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- PapaParse for robust CSV parsing --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- PapaParse for CSV --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"&gt;&lt;/script&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;style&gt;</span></p>
@@ -73,40 +73,34 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-align: center;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-bottom: 5px solid #e74c3c;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.header h1 {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 2.5rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 0.5rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-shadow: 2px 2px 4px rgba(0,0,0,0.3);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.header p {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 1.1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>opacity: 0.9;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Main Container */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Container &amp; layout */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.container {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>max-width: 1400px;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin: 0 auto;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 2rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Dashboard Layout */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.dashboard {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: 1fr 1fr;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 2rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 2rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>@media (max-width: 1024px) {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>.dashboard {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>grid-template-columns: 1fr;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>.dashboard { grid-template-columns: 1fr; }</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Map Container */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Map */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-container {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-column: 1 / -1;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: white;</span></p>
@@ -116,14 +110,12 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border: 1px solid #e0e0e0;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-container h2 {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: #2c3e50;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding-bottom: 0.5rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-bottom: 2px solid #3498db;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>#map {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>height: 500px;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 100%;</span></p>
@@ -131,14 +123,12 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>overflow: hidden;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Map Controls */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-controls {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: flex;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>flex-wrap: wrap;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-controls select,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-controls button {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 0.5rem 1rem;</span></p>
@@ -150,7 +140,6 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-weight: 600;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>transition: all 0.3s ease;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-controls select:hover,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.map-controls button:hover {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: #3498db;</span></p>
@@ -166,9 +155,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border: 1px solid #e0e0e0;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>transition: transform 0.3s ease;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.card:hover { transform: translateY(-5px); }</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.card h3 {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: #2c3e50;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-bottom: 1rem;</span></p>
@@ -177,23 +164,65 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 0.5rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Summary Section */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Summary &amp; KPIs */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.summary-grid {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 1.5rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.summary-item {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #f8f9fa, #e9ecef);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 10px;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-left: 4px solid #3498db;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.summary-item strong { color: #2c3e50; font-size: 1.1rem; }</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.summary-item p { color: #666; margin-top: 0.5rem; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-grid {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 1rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-item {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-align: center;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #2c3e50, #34495e);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: white;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 10px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-value {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 2rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-weight: bold;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin: 0.5rem 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-label {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 0.9rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>opacity: 0.9;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Session list */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.session-details {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: white;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 15px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 2rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.session-list {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 1rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.session-item {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #f8f9fa, #e9ecef);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1rem;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 10px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-left: 4px solid #e74c3c;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Charts */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.chart-container {</span></p>
@@ -203,7 +232,6 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 2rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.charts-grid {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));</span></p>
@@ -212,6 +240,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Table */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.table-container { overflow-x: auto; margin-top: 1rem; }</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.data-table {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>width: 100%;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-collapse: collapse;</span></p>
@@ -221,7 +250,6 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>overflow: hidden;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 15px rgba(0,0,0,0.05);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.data-table th {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #3498db, #2980b9);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: white;</span></p>
@@ -229,65 +257,11 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-align: left;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-weight: 600;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.data-table td {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 0.8rem 1rem;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-bottom: 1px solid #eee;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.data-table tr:hover { background: #f8f9fa; }</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.table-container { overflow-x: auto; margin-top: 1rem; }</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Session Details */</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.session-details {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: white;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 15px;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1.5rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 2rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.session-list {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 1rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.session-item {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #f8f9fa, #e9ecef);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 10px;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-left: 4px solid #e74c3c;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* KPI Metrics */</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-grid {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>display: grid;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>gap: 1rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin-top: 1rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-item {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>text-align: center;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>padding: 1rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>background: linear-gradient(135deg, #2c3e50, #34495e);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>color: white;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-radius: 10px;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-value {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 2rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-weight: bold;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>margin: 0.5rem 0;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.kpi-label {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>font-size: 0.9rem;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>opacity: 0.9;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Footer */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.footer {</span></p>
@@ -299,14 +273,13 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>border-top: 5px solid #3498db;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Animations */</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Fade-in */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>@keyframes fadeIn {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>from { opacity: 0; transform: translateY(20px); }</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>to <span class="Apple-converted-space">  </span>{ opacity: 1; transform: translateY(0); }</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.fade-in { animation: fadeIn 0.6s ease forwards; }</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>/* Responsive Design */</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>@media (max-width: 768px) {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>.container { padding: 1rem; }</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>.header h1 { font-size: 2rem; }</span></p>
@@ -328,14 +301,14 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- Header --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;header class="header"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;h1&gt;🌾 Buctril Engagement Session Analysis Report&lt;/h1&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p&gt;Comprehensive analysis of wheat field engagement sessions &amp; their impact&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p&gt;Comprehensive analysis of wheat field engagement sessions &amp;amp; their impact&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p style="margin-top: 0.5rem; font-size: 1rem; opacity: 0.8;"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>Auto-updated from &lt;strong&gt;sum sheet.csv&lt;/strong&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/header&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Map Section --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Map --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;section class="map-container fade-in"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📍 Engagement Session Locations&lt;/h2&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="map"&gt;&lt;/div&gt;</span></p>
@@ -349,7 +322,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="awareness"&gt;Awareness Rate&lt;/option&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="definite"&gt;Definite Use Rate&lt;/option&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/select&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button type="button" onclick="alert('Heat map layer can be added here later.')"&gt;Show Heat Map&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button type="button" onclick="alert('Heatmap layer can be added here later.')"&gt;Show Heat Map&lt;/button&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button type="button" onclick="alert('Travel route polyline can be added here later.')"&gt;Show Travel Route&lt;/button&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button type="button" onclick="resetMap()"&gt;Reset View&lt;/button&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
@@ -357,15 +330,11 @@
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Dashboard --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="dashboard fade-in"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;!-- KPI Metrics --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="card"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;h3&gt;📊 Key Performance Indicators&lt;/h3&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-grid" id="kpiMetrics"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;!-- filled by JS --&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-grid" id="kpiMetrics"&gt;&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;!-- Week / Overall Summary --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="card"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;h3&gt;📈 Week Summary&lt;/h3&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="summary-grid"&gt;</span></p>
@@ -389,15 +358,13 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Session Details --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Session breakdown --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;section class="session-details fade-in"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;🎯 Session Breakdown by Day&lt;/h2&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="session-list" id="sessionList"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;!-- filled by JS --&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="session-list" id="sessionList"&gt;&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Charts Section --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Charts --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;section class="chart-container fade-in"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📊 Performance Analysis&lt;/h2&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="charts-grid"&gt;</span></p>
@@ -408,7 +375,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Detailed Data Table --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Data table --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;section class="card fade-in" style="margin-top: 2rem;"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;📋 Detailed Session Data&lt;/h3&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="table-container"&gt;</span></p>
@@ -416,25 +383,25 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Insights Section --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Insights --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;section class="card fade-in" style="margin-top: 2rem;"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;💡 Key Insights &amp; Recommendations&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;💡 Key Insights &amp;amp; Recommendations&lt;/h3&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="summary-grid"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="summary-item"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;strong&gt;Top Success Factor&lt;/strong&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Trust in Bayer brand is a recurring driver of Buctril adoption.&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Trust in Bayer brand consistently drives Buctril adoption across sessions.&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="summary-item"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;strong&gt;Main Challenge&lt;/strong&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Price sensitivity remains the biggest barrier to adoption.&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Price sensitivity is the biggest barrier to adoption. Consider targeted pricing &amp;amp; schemes.&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="summary-item"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;strong&gt;Opportunity Areas&lt;/strong&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;High “Maybe” responses indicate strong conversion potential with follow-ups.&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;High “Maybe” share shows strong potential for conversion via follow-up engagement.&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="summary-item"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;strong&gt;Recommendation&lt;/strong&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Emphasise value vs. price through demos, testimonials, and clear weed-control benefits.&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Emphasise value vs price through demos, testimonials and clear weed-control benefits.&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/section&gt;</span></p>
@@ -444,7 +411,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;footer class="footer"&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p&gt;© 2024 Buctril Engagement Analysis Report&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p style="margin-top: 0.5rem; opacity: 0.8;"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>Data source: &lt;strong&gt;sum sheet.csv&lt;/strong&gt; | Interactive Map &amp; Analytics Dashboard</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>Data source: &lt;strong&gt;sum sheet.csv&lt;/strong&gt; | Interactive Map &amp;amp; Analytics Dashboard</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/p&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/footer&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
@@ -460,7 +427,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>engagement: null,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>conversion: null,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>reasons: null,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>distance: null</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>distance: null,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>};</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function parseNumber(value) {</span></p>
@@ -469,359 +436,48 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return isNaN(num) ? 0 : num;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function parseRateToPercent(value) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function parseRate(value) {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const num = parseFloat(String(value).trim());</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (isNaN(num)) return null;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return num &lt;= 1 ? num * 100 : num;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>async function loadData() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>try {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const response = await fetch(CSV_FILE);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const text = await response.text();</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const parsed = Papa.parse(text, {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>header: true,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>skipEmptyLines: true</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// Keep only real session rows</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>allSessions = parsed.data.filter(row =&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>row["Session Location"] &amp;&amp; row["Total Farmers"]</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>filteredSessions = allSessions;</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>populateDayFilter();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>initMap();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>updateAll();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>} catch (err) {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>console.error("Error loading CSV:", err);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>alert("Could not load sum sheet.csv. Make sure it is in the same folder as index.html.");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function populateDayFilter() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const select = document.getElementById("dayFilter");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const dates = [...new Set(allSessions.map(r =&gt; r["Date"]).filter(Boolean))];</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>dates.forEach(date =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const opt = document.createElement("option");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>opt.value = date;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>opt.textContent = date;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>select.appendChild(opt);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>select.addEventListener("change", () =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const value = select.value;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>filteredSessions = (value === "all")</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>? allSessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>: allSessions.filter(r =&gt; r["Date"] === value);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>updateAll();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateAll() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateDashboard();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateSessionList();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateDataTable();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateCharts();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateMapMarkers();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateDashboard() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const totalFarmers = filteredSessions.reduce(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>(sum, s) =&gt; sum + parseNumber(s["Total Farmers"]), 0);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const totalAcres = filteredSessions.reduce(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>(sum, s) =&gt; sum + parseNumber(s["Total Wheat Acres"]), 0);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const awarenessValues = filteredSessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.map(s =&gt; parseRateToPercent(s["Awareness Rate"]))</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.filter(v =&gt; v !== null);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const definiteValues = filteredSessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.map(s =&gt; parseRateToPercent(s["Definite Use Rate"]))</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.filter(v =&gt; v !== null);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const avgAwareness = awarenessValues.length</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>? (awarenessValues.reduce((a, b) =&gt; a + b, 0) / awarenessValues.length).toFixed(1)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>: "N/A";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const avgDefinite = definiteValues.length</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>? (definiteValues.reduce((a, b) =&gt; a + b, 0) / definiteValues.length).toFixed(1)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>: "N/A";</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("totalFarmers").textContent =</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>totalFarmers.toLocaleString();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("totalAcres").textContent =</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>totalAcres.toLocaleString() + " acres";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("avgAwareness").textContent =</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>(avgAwareness === "N/A" ? "N/A" : avgAwareness + "%");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("definiteUse").textContent =</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>(avgDefinite === "N/A" ? "N/A" : avgDefinite + "%");</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const kpiContainer = document.getElementById("kpiMetrics");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const cities = new Set(filteredSessions.map(s =&gt; s["City"]).filter(Boolean));</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const avgAcresPerFarmer = totalFarmers</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>? (totalAcres / totalFarmers).toFixed(1)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>: "0";</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>kpiContainer.innerHTML = `</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${filteredSessions.length}&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Sessions Held&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${totalFarmers.toLocaleString()}&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Farmers Reached&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${cities.size}&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Cities / Tehsils Covered&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${avgAcresPerFarmer}&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Avg Wheat Acres / Farmer&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>`;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateSessionList() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const container = document.getElementById("sessionList");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>container.innerHTML = "";</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const byDate = {};</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>filteredSessions.forEach(s =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const date = s["Date"] || "Unknown";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (!byDate[date]) byDate[date] = [];</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>byDate[date].push(s);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>Object.entries(byDate).forEach(([date, sessions]) =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const totalFarmers = sessions.reduce(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>(sum, s) =&gt; sum + parseNumber(s["Total Farmers"]), 0);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const totalAcres = sessions.reduce(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>(sum, s) =&gt; sum + parseNumber(s["Total Wheat Acres"]), 0);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const locations = sessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.map(s =&gt; s["Session Location"])</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(Boolean)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.join(", ");</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const div = document.createElement("div");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>div.className = "session-item";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>div.innerHTML = `</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;strong&gt;${date}&lt;/strong&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;p&gt;Sessions: ${sessions.length}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;p&gt;Farmers: ${totalFarmers.toLocaleString()}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;p&gt;Acres: ${totalAcres.toLocaleString()}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;p&gt;Locations: ${locations}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>`;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>container.appendChild(div);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateDataTable() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const table = document.getElementById("dataTable");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!filteredSessions.length) {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>table.innerHTML = "&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;No data&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>return;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const headers = [</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"SN",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Date",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Day",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"From City",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"City",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Session Location",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Total Farmers",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Total Wheat Acres",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Awareness Rate",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Definite Use Rate",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Maybe Rate",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Top Reason Use",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Top Reason Not to Use in past"</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>];</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>let html = "&lt;thead&gt;&lt;tr&gt;";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>headers.forEach(h =&gt; { html += `&lt;th&gt;${h}&lt;/th&gt;`; });</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>html += "&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;";</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>filteredSessions.forEach(row =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += "&lt;tr&gt;";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>headers.forEach(h =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>html += `&lt;td&gt;${row[h] || ""}&lt;/td&gt;`;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += "&lt;/tr&gt;";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>html += "&lt;/tbody&gt;";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>table.innerHTML = html;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateCharts() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const dates = [...new Set(filteredSessions.map(s =&gt; s["Date"]).filter(Boolean))];</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const farmersByDate = dates.map(date =&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>filteredSessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(s =&gt; s["Date"] === date)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.reduce((sum, s) =&gt; sum + parseNumber(s["Total Farmers"]), 0)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const acresByDate = dates.map(date =&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>filteredSessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(s =&gt; s["Date"] === date)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.reduce((sum, s) =&gt; sum + parseNumber(s["Total Wheat Acres"]), 0)</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const conversionByDate = dates.map(date =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const sessions = filteredSessions.filter(s =&gt; s["Date"] === date);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const vals = sessions</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.map(s =&gt; parseRateToPercent(s["Definite Use Rate"]))</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(v =&gt; v !== null);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (!vals.length) return 0;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>return vals.reduce((a, b) =&gt; a + b, 0) / vals.length;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const reasonCounts = {};</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>filteredSessions.forEach(s =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const useReason = (s["Top Reason Use"] || "").trim();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const notUseReason = (s["Top Reason Not to Use in past"] || "").trim();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (useReason) {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>reasonCounts[useReason] = (reasonCounts[useReason] || 0) + 1;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (notUseReason) {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>reasonCounts[notUseReason] = (reasonCounts[notUseReason] || 0) + 1;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const reasonLabels = Object.keys(reasonCounts);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const reasonValues = reasonLabels.map(l =&gt; reasonCounts[l]);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const distances = dates.map(date =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const sessions = filteredSessions.filter(s =&gt; s["Date"] === date);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>return sessions.reduce((sum, s) =&gt; sum + parseNumber(s["Approximate Distance (km)"]), 0);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>// Destroy old charts if any</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>Object.keys(charts).forEach(key =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (charts[key]) { charts[key].destroy(); charts[key] = null; }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.engagement = new Chart(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("engagementChart").getContext("2d"),</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>{</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>type: "bar",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>data: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>labels: dates,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>datasets: [</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>{ label: "Farmers Engaged", data: farmersByDate },</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>{ label: "Wheat Acres", data: acresByDate }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>]</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>options: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>responsive: true,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>plugins: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>title: { display: true, text: "Daily Engagement Overview" }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.conversion = new Chart(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("conversionChart").getContext("2d"),</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>{</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>type: "line",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>data: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>labels: dates,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>datasets: [{</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>label: "Definite Use Rate (%)",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: conversionByDate,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>fill: true,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>tension: 0.3</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}]</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>options: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>responsive: true,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>scales: { y: { beginAtZero: true, max: 100 } },</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>plugins: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>title: { display: true, text: "Conversion Rate Trend" }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.reasons = new Chart(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("reasonsChart").getContext("2d"),</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>{</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>type: "pie",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>data: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>labels: reasonLabels,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>datasets: [{ data: reasonValues }]</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>options: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>responsive: true,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>plugins: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>title: { display: true, text: "Top Adoption &amp; Rejection Reasons" }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.distance = new Chart(</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("distanceChart").getContext("2d"),</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>{</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>type: "bar",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>data: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>labels: dates,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>datasets: [{</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>label: "Travel Distance (km)",</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: distances</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}]</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>options: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>responsive: true,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>plugins: {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>title: { display: true, text: "Total Travel Distance per Day" }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return isNaN(num) ? null : num;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function initMap() {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>map = L.map("map").setView([28.0, 69.0], 7);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>attribution: "© OpenStreetMap contributors"</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>attribution: "© OpenStreetMap contributors",</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}).addTo(map);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function getColorByAwareness(rateStr) {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const rate = parseRateToPercent(rateStr);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (rate === null) return "#95a5a6";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (rate &gt;= 80) return "#2ecc71";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (rate &gt;= 60) return "#f1c40f";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (rate &gt;= 40) return "#e67e22";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return "#e74c3c";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function resetMap() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (map) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>map.setView([28.0, 69.0], 7);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateMapMarkers() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!map) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function extractLatLng(coordText) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!coordText) return null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const match = String(coordText).match(/(-?\d+\.\d+)/g);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (match &amp;&amp; match.length &gt;= 2) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>return [parseFloat(match[0]), parseFloat(match[1])];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function plotMarkers(sessions) {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>markers.forEach(m =&gt; map.removeLayer(m));</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>markers = [];</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>filteredSessions.forEach(session =&gt; {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const coordText = session["Spot Coordinates"] || "";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const nums = coordText.match(/-?\d+\.?\d*/g);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (!nums || nums.length &lt; 2) return;</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const lat = parseFloat(nums[0]);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const lng = parseFloat(nums[1]);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (isNaN(lat) || isNaN(lng)) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>sessions.forEach(session =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const coords = extractLatLng(session["Spot Coordinates"]);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (!coords) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const [lat, lng] = coords;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const farmers = parseNumber(session["Total Farmers"]);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const acres = parseNumber(session["Total Wheat Acres"]);</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const city = session["City"] || "Unknown";</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const date = session["Date"] || "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const acres <span class="Apple-converted-space">  </span>= parseNumber(session["Total Wheat Acres"]);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const awareness = session["Awareness Rate"];</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const definite = session["Definite Use Rate"];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const definite<span class="Apple-converted-space">  </span>= session["Definite Use Rate"];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const city <span class="Apple-converted-space">  </span>= session["City"] || "Unknown";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const loc<span class="Apple-converted-space">    </span>= session["Session Location"] || "Session";</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const marker = L.circleMarker([lat, lng], {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>radius: Math.min(Math.sqrt(farmers) * 2, 20),</span></p>
@@ -829,28 +485,366 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>color: "#2c3e50",</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>weight: 2,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>opacity: 0.8,</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>fillOpacity: 0.7</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>fillOpacity: 0.7,</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}).addTo(map);</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>marker.bindPopup(`</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;strong&gt;${session["Session Location"] || "Session"}&lt;/strong&gt;&lt;br&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>Date: ${date}&lt;br&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>City: ${city}&lt;br&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>Farmers: ${farmers}&lt;br&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>Acres: ${acres.toLocaleString()}&lt;br&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>Awareness: ${awareness || "N/A"}&lt;br&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>Definite Use: ${definite || "N/A"}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>marker.bindPopup(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>`&lt;strong&gt;${loc}&lt;/strong&gt;&lt;br&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">           </span>City: ${city}&lt;br&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">           </span>Farmers: ${farmers}&lt;br&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">           </span>Acres: ${acres.toLocaleString()}&lt;br&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">           </span>Awareness: ${awareness || "N/A"}&lt;br&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">           </span>Definite Use: ${definite || "N/A"}`</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>);</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>markers.push(marker);</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function resetMap() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (map) map.setView([28.0, 69.0], 7);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function getColorByAwareness(rate) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const val = parseRate(rate);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (val === null) return "#95a5a6";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (val &gt;= 80) return "#2ecc71";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (val &gt;= 60) return "#f1c40f";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (val &gt;= 40) return "#e67e22";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>return "#e74c3c";</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.addEventListener("DOMContentLoaded", loadData);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function populateDayFilter() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const select = document.getElementById("dayFilter");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const days = [...new Set(allSessions.map(s =&gt; s["Day"]).filter(Boolean))];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>days.sort();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>days.forEach(day =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const opt = document.createElement("option");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>opt.value = day;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>opt.textContent = day;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>select.appendChild(opt);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateDashboard(sessions) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const totalFarmers = sessions.reduce(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>(sum, s) =&gt; sum + parseNumber(s["Total Farmers"]),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const totalAcres = sessions.reduce(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>(sum, s) =&gt; sum + parseNumber(s["Total Wheat Acres"]),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const awarenessRates = sessions</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.map(s =&gt; parseRate(s["Awareness Rate"]))</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.filter(v =&gt; v !== null);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const avgAwareness =</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>awarenessRates.length &gt; 0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>? (awarenessRates.reduce((a, b) =&gt; a + b, 0) / awarenessRates.length).toFixed(1)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>: "N/A";</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const definiteRates = sessions</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.map(s =&gt; parseRate(s["Definite Use Rate"]))</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.filter(v =&gt; v !== null);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const avgDefinite =</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>definiteRates.length &gt; 0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>? (definiteRates.reduce((a, b) =&gt; a + b, 0) / definiteRates.length).toFixed(1)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>: "N/A";</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("totalFarmers").textContent = totalFarmers.toLocaleString();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("totalAcres").textContent =</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>totalAcres.toLocaleString() + " acres";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("avgAwareness").textContent =</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>avgAwareness === "N/A" ? "N/A" : avgAwareness + "%";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("definiteUse").textContent =</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>avgDefinite === "N/A" ? "N/A" : avgDefinite + "%";</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const kpiContainer = document.getElementById("kpiMetrics");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const repeatSessions = sessions.filter(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>s =&gt; parseRate(s["Used Last Year Rate"]) &gt; 0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>).length;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const maybeHigh = sessions.filter(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>s =&gt; parseRate(s["Maybe Rate"]) &gt; 30</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>).length;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>kpiContainer.innerHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${sessions.length}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Sessions Held&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>totalFarmers ? (totalAcres / totalFarmers).toFixed(1) : "0.0"</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Avg Acres / Farmer&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>sessions.length ? Math.round((repeatSessions / sessions.length) * 100) : 0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>}%&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;Repeat Users&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="kpi-item"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-value"&gt;${maybeHigh}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="kpi-label"&gt;High-Potential Sessions&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateSessionList(sessions) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const container = document.getElementById("sessionList");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const grouped = {};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>sessions.forEach(s =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const day = s["Day"] || "Unknown";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (!grouped[day]) grouped[day] = [];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>grouped[day].push(s);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>let html = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>Object.entries(grouped).forEach(([day, list]) =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const totalFarmers = list.reduce(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>(sum, s) =&gt; sum + parseNumber(s["Total Farmers"]),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const totalAcres = list.reduce(</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>(sum, s) =&gt; sum + parseNumber(s["Total Wheat Acres"]),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>0</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const locs = list</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.map(s =&gt; s["Session Location"] || "")</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(Boolean)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.join(", ");</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="session-item"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;strong&gt;${day}&lt;/strong&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Sessions: ${list.length}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Farmers: ${totalFarmers}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Acres: ${totalAcres.toLocaleString()}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p&gt;Locations: ${locs}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>container.innerHTML = html;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function updateDataTable(sessions) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const table = document.getElementById("dataTable");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!sessions.length) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>table.innerHTML = "&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;No data&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const headers = Object.keys(sessions[0]);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>let html = "&lt;thead&gt;&lt;tr&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>headers.forEach(h =&gt; (html += `&lt;th&gt;${h}&lt;/th&gt;`));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>html += "&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;";</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>sessions.forEach(s =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += "&lt;tr&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>headers.forEach(h =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>html += `&lt;td&gt;${s[h] || ""}&lt;/td&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += "&lt;/tr&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>html += "&lt;/tbody&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>table.innerHTML = html;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function destroyChart(chart) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (chart) chart.destroy();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function createCharts(sessions) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const ctxEng = document.getElementById("engagementChart").getContext("2d");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const ctxConv = document.getElementById("conversionChart").getContext("2d");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const ctxReason = document.getElementById("reasonsChart").getContext("2d");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const ctxDist = document.getElementById("distanceChart").getContext("2d");</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>destroyChart(charts.engagement);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>destroyChart(charts.conversion);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>destroyChart(charts.reasons);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>destroyChart(charts.distance);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const days = [...new Set(sessions.map(s =&gt; s["Day"]).filter(Boolean))];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>days.sort();</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const farmersByDay = days.map(day =&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>sessions</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(s =&gt; s["Day"] === day)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.reduce((sum, s) =&gt; sum + parseNumber(s["Total Farmers"]), 0)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const acresByDay = days.map(day =&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>sessions</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(s =&gt; s["Day"] === day)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.reduce((sum, s) =&gt; sum + parseNumber(s["Total Wheat Acres"]), 0)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.engagement = new Chart(ctxEng, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>type: "bar",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>data: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>labels: days,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>datasets: [</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>label: "Farmers Engaged",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: farmersByDay,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>backgroundColor: "#3498db",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>label: "Wheat Acres",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: acresByDay,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>backgroundColor: "#2ecc71",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>options: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>responsive: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>plugins: { title: { display: true, text: "Daily Engagement Overview" } },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const conversionRates = days.map(day =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const list = sessions.filter(s =&gt; s["Day"] === day);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const rates = list</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.map(s =&gt; parseRate(s["Definite Use Rate"]))</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>.filter(v =&gt; v !== null);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>return rates.length</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>? (rates.reduce((a, b) =&gt; a + b, 0) / rates.length).toFixed(1)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>: 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.conversion = new Chart(ctxConv, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>type: "line",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>data: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>labels: days,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>datasets: [</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>label: "Definite Use Rate (%)",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: conversionRates,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>borderColor: "#e74c3c",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>backgroundColor: "rgba(231,76,60,0.1)",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>tension: 0.3,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>fill: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>options: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>responsive: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>scales: { y: { beginAtZero: true, max: 100 } },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>plugins: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>title: { display: true, text: "Conversion Rate Trend" },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const reasons = [</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Reason to<span class="Apple-converted-space">  </span>Use: Better Weed Control",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Reason to Use: Safe on Crop",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Reason to use: Have Trust in Bayer",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Reason Not to Use: Price Too High",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const labels = [</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Better Weed Control",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Safe on Crop",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Trust in Bayer",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>"Price Too High",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const counts = reasons.map(rKey =&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>sessions.filter(s =&gt; String(s[rKey] || "").trim()).length</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.reasons = new Chart(ctxReason, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>type: "pie",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>data: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>labels,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>datasets: [</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: counts,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>backgroundColor: ["#3498db", "#2ecc71", "#9b59b6", "#e74c3c"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>options: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>responsive: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>plugins: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>title: { display: true, text: "Top Adoption / Rejection Reasons" },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const distances = sessions</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.map(s =&gt; parseNumber(s["Approximate Distance (km)"]))</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.filter(d =&gt; d &gt; 0);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>charts.distance = new Chart(ctxDist, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>type: "radar",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>data: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>labels: days.slice(0, distances.length),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>datasets: [</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>label: "Travel Distance (km)",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>data: distances.slice(0, days.length),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>borderColor: "#f39c12",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>backgroundColor: "rgba(243,156,18,0.2)",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>options: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>responsive: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>plugins: {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>title: { display: true, text: "Travel Distance per Day" },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function applyFilters() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const dayFilter = document.getElementById("dayFilter").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (dayFilter === "all") {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>filteredSessions = [...allSessions];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>filteredSessions = allSessions.filter(s =&gt; s["Day"] === dayFilter);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateDashboard(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateSessionList(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>updateDataTable(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>plotMarkers(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>createCharts(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>function loadCSV() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>Papa.parse(CSV_FILE, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>download: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>header: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>skipEmptyLines: true,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>complete: (results) =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>allSessions = results.data;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>filteredSessions = [...allSessions];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>populateDayFilter();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>updateDashboard(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>updateSessionList(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>updateDataTable(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>plotMarkers(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>createCharts(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>error: (err) =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>console.error("Error loading CSV:", err);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>alert("Error loading CSV data. Check file name and GitHub path.");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.addEventListener("DOMContentLoaded", () =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>initMap();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>loadCSV();</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("dayFilter").addEventListener("change", applyFilters);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("metricFilter").addEventListener("change", () =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// currently metric filter only changes map colour indirectly – can be expanded later</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>plotMarkers(filteredSessions);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</span></p>
 <p class="p1"><span class="s1">&lt;/body&gt;</span></p>
 <p class="p1"><span class="s1">&lt;/html&gt;</span></p>
