@@ -1,229 +1,299 @@
-// ---------- CONFIG ----------
-const CSV_FILE = "sum-sheet.csv";
+// data_processor.js
+// Reads sum_sheet.csv and drives the map, KPIs, charts and table.
 
-// Map column headers from your CSV.
-// EDIT THESE STRINGS to match your actual header row exactly.
-const COLS = {
-  day: "Day", // e.g. "Day 1", "Day 2"
-  city: "City / Tehsil",
-  location: "Session Location",
-  farmers: "Total Farmers",
-  acres: "Total Wheat Acres",
-  awareness: "Awareness Rate",
-  definite: "Definite Use Rate",
-  maybe: "Maybe Rate",
-  usedLastYear: "Used Last Year Rate",
-  coords: "Spot Coordinates",
-  distanceKm: "Approximate Distance (km)"
-};
-// -----------------------------
+const CSV_FILE = "sum_sheet.csv";
 
 let allSessions = [];
-let filteredSessions = [];
 let map;
 let markers = [];
-const charts = {};
+let routeLine = null;
+let charts = {};
 
-// Utility
-function parseNumber(value) {
+/* ---------- Helpers ---------- */
+
+function numFromStr(value) {
   if (value === undefined || value === null) return 0;
-  const num = parseFloat(String(value).replace(/,/g, "").trim());
-  return isNaN(num) ? 0 : num;
+  const cleaned = String(value).replace(/,/g, "").trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
 }
 
-function parseRate(value) {
-  const num = parseFloat(String(value).toString().replace("%", "").trim());
-  return isNaN(num) ? null : num;
+function percentFromStr(value) {
+  if (!value) return NaN;
+  const cleaned = String(value).replace(/[%\s]/g, "");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? NaN : n;
 }
 
-function extractLatLng(coordText) {
-  if (!coordText) return null;
-  const match = String(coordText).match(/(-?\d+\.\d+)/g);
-  if (match && match.length >= 2) {
-    return [parseFloat(match[0]), parseFloat(match[1])];
-  }
-  return null;
+function parseCoords(text) {
+  if (!text) return null;
+  const matches = String(text).match(/-?\d+(\.\d+)?/g);
+  if (!matches || matches.length < 2) return null;
+  return [parseFloat(matches[0]), parseFloat(matches[1])];
 }
 
-// Map init
+/* ---------- Map setup ---------- */
+
 function initMap() {
-  map = L.map("map").setView([28.0, 69.0], 7);
+  map = L.map("map").setView([28.0, 69.0], 6);
+
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap contributors"
+    attribution: "© OpenStreetMap contributors",
   }).addTo(map);
 }
 
-function resetMap() {
-  if (map) map.setView([28.0, 69.0], 7);
+function clearMarkers() {
+  markers.forEach((m) => map.removeLayer(m));
+  markers = [];
+  if (routeLine) {
+    map.removeLayer(routeLine);
+    routeLine = null;
+  }
 }
 
-// Load + parse CSV
-function loadData() {
-  Papa.parse(CSV_FILE, {
-    download: true,
-    header: true,
-    dynamicTyping: false,
-    complete: (results) => {
-      allSessions = results.data.filter((row) => Object.keys(row).length > 1);
-      filteredSessions = allSessions;
-      initFilters();
-      updateDashboard();
-      updateSessionList();
-      updateTable();
-      initMap();
-      updateMap();
-      initCharts();
-    },
-    error: (err) => {
-      console.error("Error loading CSV:", err);
+function refreshMarkers() {
+  const dayFilter = document.getElementById("dayFilter").value;
+  const metricFilter = document.getElementById("metricFilter").value;
+
+  clearMarkers();
+
+  const filtered =
+    dayFilter === "all"
+      ? allSessions
+      : allSessions.filter((s) => s.dayKey === dayFilter);
+
+  const coordsForRoute = [];
+
+  filtered.forEach((session) => {
+    if (!session.lat || !session.lng) return;
+
+    let radius = 8;
+    if (metricFilter === "farmers") {
+      radius = Math.max(4, Math.sqrt(session.totalFarmers) * 1.8);
+    } else if (metricFilter === "acres") {
+      radius = Math.max(4, Math.sqrt(session.totalWheatAcres) * 0.9);
     }
+
+    let fillColor = "#3498db";
+    let rate = session.awarenessRate;
+
+    if (metricFilter === "definite") {
+      rate = session.definiteUseRate;
+    }
+    if (!isNaN(rate)) {
+      if (rate >= 80) fillColor = "#2ecc71";
+      else if (rate >= 60) fillColor = "#f1c40f";
+      else if (rate >= 40) fillColor = "#e67e22";
+      else fillColor = "#e74c3c";
+    }
+
+    const marker = L.circleMarker([session.lat, session.lng], {
+      radius,
+      fillColor,
+      color: "#123456",
+      weight: 2,
+      opacity: 0.9,
+      fillOpacity: 0.7,
+    }).addTo(map);
+
+    const popupHtml = `
+      <strong>${session.sessionLocation || "Session"}</strong><br/>
+      City: ${session.city || "-"}<br/>
+      Date: ${session.activityDate || "-"}<br/>
+      Farmers: ${session.totalFarmers}<br/>
+      Wheat acres: ${session.totalWheatAcres.toLocaleString()}<br/>
+      Awareness: ${
+        isNaN(session.awarenessRate) ? "N/A" : session.awarenessRate + "%"
+      }<br/>
+      Definite use: ${
+        isNaN(session.definiteUseRate) ? "N/A" : session.definiteUseRate + "%"
+      }
+    `;
+
+    marker.bindPopup(popupHtml);
+    markers.push(marker);
+    coordsForRoute.push([session.lat, session.lng]);
+  });
+
+  // Optionally update travel route polyline if "Show Travel Route" already clicked
+  if (routeLine && coordsForRoute.length > 1) {
+    routeLine.setLatLngs(coordsForRoute);
+  }
+}
+
+/* ---------- Data loading & shaping ---------- */
+
+function processCsvRows(rows) {
+  if (!rows || rows.length < 2) return;
+
+  const headerRow = rows[1]; // first row is "Summary", second is header
+  const colIndex = {};
+  headerRow.forEach((h, idx) => {
+    colIndex[h.trim()] = idx;
+  });
+
+  function get(row, colName) {
+    const idx = colIndex[colName];
+    if (idx === undefined) return "";
+    return row[idx];
+  }
+
+  const dataRows = rows.slice(2).filter((row) =>
+    row.some((c) => c !== null && c !== undefined && String(c).trim() !== "")
+  );
+
+  allSessions = dataRows.map((row) => {
+    const coordStr = get(row, "Spot Coordinates");
+    const coords = parseCoords(coordStr);
+
+    return {
+      sn: get(row, "SN"),
+      fromCity: get(row, "From City"),
+      city: get(row, "City"),
+      dateText: get(row, "Date"),
+      roadDay: get(row, "Day"),
+      sessionLocation: get(row, "Session Location"),
+      activityDate: get(row, "Activity Date"),
+      activityDay: get(row, "Day"), // same name, later in header, but OK
+      salesRep: get(row, "Sales Rep Name"),
+      tehsil: get(row, "Tehsil / District"),
+      coordinatesRaw: coordStr,
+      totalFarmers: numFromStr(get(row, "Total Farmers")),
+      totalWheatFarmers: numFromStr(get(row, "Total Wheat Farmers")),
+      totalWheatAcres: numFromStr(get(row, "Total Wheat Acres")),
+      awarenessRate: percentFromStr(get(row, "Awareness Rate")),
+      usedLastYearRate: percentFromStr(get(row, "Used Last Year Rate")),
+      definiteUseRate: percentFromStr(get(row, "Definite Use Rate")),
+      maybeRate: percentFromStr(get(row, "Maybe Rate")),
+      notInterestedRate: percentFromStr(get(row, "Not Interested Rate")),
+      estBuctrilAcres: numFromStr(
+        get(row, "Estimated Buctril Acres from this Session")
+      ),
+      topReasonUse: get(row, "Top Reason Use"),
+      topReasonNotUse: get(row, "Top Reason Not to Use in past"),
+      distanceKm: numFromStr(get(row, "Approximate Distance (km)")),
+      lat: coords ? coords[0] : null,
+      lng: coords ? coords[1] : null,
+    };
+  });
+
+  // Day key used in dropdown (Activity Date + City)
+  allSessions.forEach((s) => {
+    const label =
+      (s.activityDate || s.dateText || "") +
+      (s.city ? " – " + s.city : "");
+    s.dayLabel = label.trim() || "Day " + s.sn;
+    s.dayKey = s.dayLabel;
   });
 }
 
-// Filters
-function initFilters() {
-  const daySelect = document.getElementById("dayFilter");
-  const days = [...new Set(allSessions.map((s) => s[COLS.day]).filter(Boolean))];
+/* ---------- KPIs, sessions list, table ---------- */
 
-  // Add day options
-  days.forEach((day) => {
-    const opt = document.createElement("option");
-    opt.value = day;
-    opt.textContent = day;
-    daySelect.appendChild(opt);
-  });
+function updateKpis() {
+  if (!allSessions.length) return;
 
-  daySelect.addEventListener("change", () => {
-    const val = daySelect.value;
-    filteredSessions =
-      val === "all"
-        ? allSessions
-        : allSessions.filter((s) => s[COLS.day] === val);
-    updateEverything();
-  });
-
-  document
-    .getElementById("metricFilter")
-    .addEventListener("change", updateMap);
-}
-
-function updateEverything() {
-  updateDashboard();
-  updateSessionList();
-  updateTable();
-  updateMap();
-  updateCharts();
-}
-
-// Dashboard numbers
-function updateDashboard() {
-  const totalFarmers = filteredSessions.reduce(
-    (sum, s) => sum + parseNumber(s[COLS.farmers]),
+  const totalFarmers = allSessions.reduce(
+    (sum, s) => sum + (s.totalFarmers || 0),
     0
   );
-  const totalAcres = filteredSessions.reduce(
-    (sum, s) => sum + parseNumber(s[COLS.acres]),
+  const totalAcres = allSessions.reduce(
+    (sum, s) => sum + (s.totalWheatAcres || 0),
     0
   );
 
-  const awarenessRates = filteredSessions
-    .map((s) => parseRate(s[COLS.awareness]))
-    .filter((x) => x !== null);
-  const definiteRates = filteredSessions
-    .map((s) => parseRate(s[COLS.definite]))
-    .filter((x) => x !== null);
+  const awarenessVals = allSessions
+    .map((s) => s.awarenessRate)
+    .filter((x) => !isNaN(x));
+  const definiteVals = allSessions
+    .map((s) => s.definiteUseRate)
+    .filter((x) => !isNaN(x));
 
   const avgAwareness =
-    awarenessRates.length === 0
-      ? null
-      : awarenessRates.reduce((a, b) => a + b, 0) / awarenessRates.length;
+    awarenessVals.length > 0
+      ? awarenessVals.reduce((a, b) => a + b, 0) / awarenessVals.length
+      : NaN;
   const avgDefinite =
-    definiteRates.length === 0
-      ? null
-      : definiteRates.reduce((a, b) => a + b, 0) / definiteRates.length;
+    definiteVals.length > 0
+      ? definiteVals.reduce((a, b) => a + b, 0) / definiteVals.length
+      : NaN;
 
   document.getElementById("totalFarmers").textContent =
     totalFarmers.toLocaleString();
   document.getElementById("totalAcres").textContent =
     totalAcres.toLocaleString() + " acres";
-  document.getElementById("avgAwareness").textContent =
-    avgAwareness === null ? "N/A" : avgAwareness.toFixed(1) + "%";
-  document.getElementById("definiteUse").textContent =
-    avgDefinite === null ? "N/A" : avgDefinite.toFixed(1) + "%";
+  document.getElementById("avgAwareness").textContent = isNaN(avgAwareness)
+    ? "N/A"
+    : avgAwareness.toFixed(1) + "%";
+  document.getElementById("definiteUse").textContent = isNaN(avgDefinite)
+    ? "N/A"
+    : avgDefinite.toFixed(1) + "%";
 
   const kpiContainer = document.getElementById("kpiMetrics");
-  const sessionsHeld = filteredSessions.length;
-  const avgAcresPerFarmer =
-    totalFarmers === 0 ? 0 : totalAcres / totalFarmers;
-
-  const repeatShare =
-    filteredSessions.length === 0
-      ? 0
-      : (filteredSessions.filter(
-          (s) => parseRate(s[COLS.usedLastYear]) > 0
-        ).length /
-          filteredSessions.length) *
-        100;
-
-  const highMaybe =
-    filteredSessions.filter((s) => parseRate(s[COLS.maybe]) > 30).length || 0;
+  const sessionsWithRepeat = allSessions.filter(
+    (s) => !isNaN(s.usedLastYearRate) && s.usedLastYearRate > 0
+  ).length;
+  const maybeHeavy = allSessions.filter(
+    (s) => !isNaN(s.maybeRate) && s.maybeRate > 30
+  ).length;
+  const avgAcPerFarmer =
+    totalFarmers > 0 ? (totalAcres / totalFarmers).toFixed(1) : "0.0";
 
   kpiContainer.innerHTML = `
     <div class="kpi-item">
-      <div class="kpi-value">${sessionsHeld}</div>
-      <div class="kpi-label">Sessions Held</div>
+      <div class="kpi-value">${allSessions.length}</div>
+      <div class="kpi-label">Sessions held</div>
     </div>
     <div class="kpi-item">
-      <div class="kpi-value">${avgAcresPerFarmer.toFixed(1)}</div>
-      <div class="kpi-label">Avg Acres / Farmer</div>
+      <div class="kpi-value">${totalFarmers.toLocaleString()}</div>
+      <div class="kpi-label">Farmers reached</div>
     </div>
     <div class="kpi-item">
-      <div class="kpi-value">${repeatShare.toFixed(0)}%</div>
-      <div class="kpi-label">Repeat Users</div>
+      <div class="kpi-value">${avgAcPerFarmer}</div>
+      <div class="kpi-label">Avg acres / farmer</div>
     </div>
     <div class="kpi-item">
-      <div class="kpi-value">${highMaybe}</div>
-      <div class="kpi-label">High Potential Sessions</div>
+      <div class="kpi-value">${sessionsWithRepeat}</div>
+      <div class="kpi-label">Sessions with strong repeat usage</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-value">${maybeHeavy}</div>
+      <div class="kpi-label">High “Maybe” sessions (follow-up)</div>
     </div>
   `;
 }
 
-// Session cards
 function updateSessionList() {
   const container = document.getElementById("sessionList");
-  const grouped = {};
+  const group = {};
 
-  filteredSessions.forEach((s) => {
-    const day = s[COLS.day] || "Unknown Day";
-    if (!grouped[day]) grouped[day] = [];
-    grouped[day].push(s);
+  allSessions.forEach((s) => {
+    const key = s.dayLabel;
+    if (!group[key]) group[key] = [];
+    group[key].push(s);
   });
 
   let html = "";
-  Object.entries(grouped).forEach(([day, sessions]) => {
+  Object.entries(group).forEach(([dayLabel, sessions]) => {
     const farmers = sessions.reduce(
-      (sum, s) => sum + parseNumber(s[COLS.farmers]),
+      (sum, s) => sum + (s.totalFarmers || 0),
       0
     );
     const acres = sessions.reduce(
-      (sum, s) => sum + parseNumber(s[COLS.acres]),
+      (sum, s) => sum + (s.totalWheatAcres || 0),
       0
     );
-    const locations = [
-      ...new Set(
-        sessions
-          .map((s) => s[COLS.location] || s[COLS.city] || "")
-          .filter(Boolean)
-      )
-    ].join(", ");
+    const locs = sessions
+      .map((s) => s.sessionLocation)
+      .filter(Boolean)
+      .join(", ");
 
     html += `
       <div class="session-item">
-        <strong>${day}</strong>
+        <strong>${dayLabel}</strong>
         <p>Sessions: ${sessions.length}</p>
         <p>Farmers: ${farmers}</p>
-        <p>Acres: ${acres.toLocaleString()}</p>
-        <p>Locations: ${locations}</p>
+        <p>Wheat acres: ${acres.toLocaleString()}</p>
+        <p>Locations: ${locs || "-"}</p>
       </div>
     `;
   });
@@ -231,24 +301,54 @@ function updateSessionList() {
   container.innerHTML = html;
 }
 
-// Table
 function updateTable() {
   const table = document.getElementById("dataTable");
-  if (!filteredSessions.length) {
+  if (!allSessions.length) {
     table.innerHTML = "<tbody><tr><td>No data</td></tr></tbody>";
     return;
   }
 
-  const headers = Object.keys(filteredSessions[0]);
+  const headers = [
+    "SN",
+    "Date",
+    "City",
+    "Session Location",
+    "Tehsil / District",
+    "Total Farmers",
+    "Total Wheat Acres",
+    "Awareness Rate",
+    "Definite Use Rate",
+    "Maybe Rate",
+    "Top Reason Use",
+    "Top Reason Not Use",
+  ];
+
   let html = "<thead><tr>";
-  headers.forEach((h) => (html += `<th>${h}</th>`));
+  headers.forEach((h) => {
+    html += `<th>${h}</th>`;
+  });
   html += "</tr></thead><tbody>";
 
-  filteredSessions.forEach((row) => {
+  allSessions.slice(0, 25).forEach((s) => {
     html += "<tr>";
-    headers.forEach((h) => {
-      html += `<td>${row[h] ?? ""}</td>`;
-    });
+    html += `<td>${s.sn || ""}</td>`;
+    html += `<td>${s.activityDate || s.dateText || ""}</td>`;
+    html += `<td>${s.city || ""}</td>`;
+    html += `<td>${s.sessionLocation || ""}</td>`;
+    html += `<td>${s.tehsil || ""}</td>`;
+    html += `<td>${s.totalFarmers}</td>`;
+    html += `<td>${s.totalWheatAcres.toLocaleString()}</td>`;
+    html += `<td>${
+      isNaN(s.awarenessRate) ? "" : s.awarenessRate.toFixed(1) + "%"
+    }</td>`;
+    html += `<td>${
+      isNaN(s.definiteUseRate) ? "" : s.definiteUseRate.toFixed(1) + "%"
+    }</td>`;
+    html += `<td>${
+      isNaN(s.maybeRate) ? "" : s.maybeRate.toFixed(1) + "%"
+    }</td>`;
+    html += `<td>${s.topReasonUse || ""}</td>`;
+    html += `<td>${s.topReasonNotUse || ""}</td>`;
     html += "</tr>";
   });
 
@@ -256,224 +356,260 @@ function updateTable() {
   table.innerHTML = html;
 }
 
-// Map markers
-function getColorByAwareness(rateStr) {
-  const rate = parseRate(rateStr);
-  if (rate === null) return "#95a5a6";
-  if (rate >= 80) return "#2ecc71";
-  if (rate >= 60) return "#f1c40f";
-  if (rate >= 40) return "#e67e22";
-  return "#e74c3c";
-}
+/* ---------- Charts ---------- */
 
-function clearMarkers() {
-  markers.forEach((m) => map.removeLayer(m));
-  markers = [];
-}
+function buildCharts() {
+  // Destroy old charts if any (for hot reloads)
+  Object.values(charts).forEach((c) => c && c.destroy());
+  charts = {};
 
-function updateMap() {
-  if (!map) return;
-  clearMarkers();
+  const ctxEng = document.getElementById("engagementChart").getContext("2d");
+  const ctxConv = document.getElementById("conversionChart").getContext("2d");
+  const ctxReasons = document.getElementById("reasonsChart").getContext("2d");
+  const ctxDist = document.getElementById("distanceChart").getContext("2d");
 
-  const metric = document.getElementById("metricFilter").value;
+  const dayLabels = [...new Set(allSessions.map((s) => s.dayLabel))];
 
-  filteredSessions.forEach((s) => {
-    const coords = extractLatLng(s[COLS.coords]);
-    if (!coords) return;
-
-    const farmers = parseNumber(s[COLS.farmers]);
-    const acres = parseNumber(s[COLS.acres]);
-    const awareness = s[COLS.awareness];
-    const definite = s[COLS.definite];
-
-    let radiusBase;
-    if (metric === "acres") radiusBase = Math.sqrt(acres);
-    else if (metric === "awareness") radiusBase = parseRate(awareness) || 5;
-    else if (metric === "definite") radiusBase = parseRate(definite) || 5;
-    else radiusBase = Math.sqrt(farmers);
-
-    const radius = Math.min(5 + radiusBase * 0.4, 25);
-
-    const marker = L.circleMarker(coords, {
-      radius,
-      fillColor: getColorByAwareness(awareness),
-      color: "#2c3e50",
-      weight: 2,
-      opacity: 0.8,
-      fillOpacity: 0.7
-    }).addTo(map);
-
-    const city = s[COLS.city] || "Unknown";
-    marker.bindPopup(
-      `<strong>${s[COLS.location] || "Session"}</strong><br/>
-       City: ${city}<br/>
-       Farmers: ${farmers}<br/>
-       Acres: ${acres.toLocaleString()}<br/>
-       Awareness: ${awareness || "N/A"}<br/>
-       Definite Use: ${definite || "N/A"}`
-    );
-
-    markers.push(marker);
-  });
-}
-
-// Charts
-function initCharts() {
-  charts.engagement = new Chart(
-    document.getElementById("engagementChart").getContext("2d"),
-    {
-      type: "bar",
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        plugins: { title: { display: true, text: "Daily Engagement Overview" } }
-      }
-    }
+  const farmersByDay = dayLabels.map((day) =>
+    allSessions
+      .filter((s) => s.dayLabel === day)
+      .reduce((sum, s) => sum + (s.totalFarmers || 0), 0)
   );
 
-  charts.conversion = new Chart(
-    document.getElementById("conversionChart").getContext("2d"),
-    {
-      type: "line",
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true, max: 100 } },
-        plugins: { title: { display: true, text: "Conversion Rate Trend" } }
-      }
-    }
+  const acresByDay = dayLabels.map((day) =>
+    allSessions
+      .filter((s) => s.dayLabel === day)
+      .reduce((sum, s) => sum + (s.totalWheatAcres || 0), 0)
   );
 
-  charts.reasons = new Chart(
-    document.getElementById("reasonsChart").getContext("2d"),
-    {
-      type: "pie",
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        plugins: {
-          title: { display: true, text: "Adoption / Rejection Signals" }
-        }
-      }
-    }
-  );
-
-  charts.distance = new Chart(
-    document.getElementById("distanceChart").getContext("2d"),
-    {
-      type: "radar",
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        plugins: {
-          title: { display: true, text: "Travel Distance per Day" }
-        }
-      }
-    }
-  );
-
-  updateCharts();
-}
-
-function updateCharts() {
-  if (!filteredSessions.length) return;
-
-  const days = [
-    ...new Set(filteredSessions.map((s) => s[COLS.day]).filter(Boolean))
-  ];
-
-  // Farmers & acres per day
-  const farmersByDay = days.map((d) =>
-    filteredSessions
-      .filter((s) => s[COLS.day] === d)
-      .reduce((sum, s) => sum + parseNumber(s[COLS.farmers]), 0)
-  );
-  const acresByDay = days.map((d) =>
-    filteredSessions
-      .filter((s) => s[COLS.day] === d)
-      .reduce((sum, s) => sum + parseNumber(s[COLS.acres]), 0)
-  );
-
-  charts.engagement.data.labels = days;
-  charts.engagement.data.datasets = [
-    {
-      label: "Farmers Engaged",
-      data: farmersByDay,
-      backgroundColor: "#3498db"
+  charts.engagement = new Chart(ctxEng, {
+    type: "bar",
+    data: {
+      labels: dayLabels,
+      datasets: [
+        {
+          label: "Farmers engaged",
+          data: farmersByDay,
+          backgroundColor: "#2780e3",
+        },
+        {
+          label: "Wheat acres",
+          data: acresByDay,
+          backgroundColor: "#2ecc71",
+        },
+      ],
     },
-    {
-      label: "Wheat Acres",
-      data: acresByDay,
-      backgroundColor: "#2ecc71"
-    }
-  ];
-  charts.engagement.update();
-
-  // Definite use per day
-  const definiteByDay = days.map((d) => {
-    const sessions = filteredSessions.filter((s) => s[COLS.day] === d);
-    const rates = sessions
-      .map((s) => parseRate(s[COLS.definite]))
-      .filter((x) => x !== null);
-    if (!rates.length) return 0;
-    return rates.reduce((a, b) => a + b, 0) / rates.length;
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: "Daily engagement overview",
+        },
+        legend: {
+          position: "bottom",
+        },
+      },
+      scales: {
+        x: { ticks: { autoSkip: false, maxRotation: 60, minRotation: 45 } },
+      },
+    },
   });
 
-  charts.conversion.data.labels = days;
-  charts.conversion.data.datasets = [
-    {
-      label: "Definite Use Rate (%)",
-      data: definiteByDay,
-      borderColor: "#e74c3c",
-      backgroundColor: "rgba(231, 76, 60, 0.15)",
-      tension: 0.3,
-      fill: true
+  // Conversion trend
+  const convByDay = dayLabels.map((day) => {
+    const vals = allSessions
+      .filter((s) => s.dayLabel === day)
+      .map((s) => s.definiteUseRate)
+      .filter((v) => !isNaN(v));
+    if (!vals.length) return 0;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  });
+
+  charts.conversion = new Chart(ctxConv, {
+    type: "line",
+    data: {
+      labels: dayLabels,
+      datasets: [
+        {
+          label: "Definite use rate (%)",
+          data: convByDay,
+          borderColor: "#e74c3c",
+          backgroundColor: "rgba(231, 76, 60, 0.15)",
+          tension: 0.3,
+          fill: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: { display: true, text: "Conversion trend" },
+        legend: { display: false },
+      },
+      scales: {
+        y: { beginAtZero: true, max: 100 },
+      },
+    },
+  });
+
+  // Reasons pie
+  const reasonCounts = {};
+  allSessions.forEach((s) => {
+    if (s.topReasonUse) {
+      reasonCounts[s.topReasonUse] =
+        (reasonCounts[s.topReasonUse] || 0) + 1;
     }
-  ];
-  charts.conversion.update();
+  });
 
-  // Simple reasons proxy: count of high awareness / high maybe / high price-resistance
-  const highAwareness = filteredSessions.filter(
-    (s) => parseRate(s[COLS.awareness]) >= 70
-  ).length;
-  const highMaybe = filteredSessions.filter(
-    (s) => parseRate(s[COLS.maybe]) >= 40
-  ).length;
-  const priceSensitive = filteredSessions.filter(
-    (s) => parseRate(s[COLS.definite]) < 40
-  ).length;
+  const reasonLabels = Object.keys(reasonCounts);
+  const reasonValues = Object.values(reasonCounts);
 
-  charts.reasons.data.labels = [
-    "Strong Awareness",
-    "High Maybe",
-    "Price-Sensitive"
-  ];
-  charts.reasons.data.datasets = [
-    {
-      data: [highAwareness, highMaybe, priceSensitive],
-      backgroundColor: ["#3498db", "#f1c40f", "#e74c3c"]
-    }
-  ];
-  charts.reasons.update();
+  charts.reasons = new Chart(ctxReasons, {
+    type: "pie",
+    data: {
+      labels: reasonLabels,
+      datasets: [
+        {
+          data: reasonValues,
+          backgroundColor: [
+            "#2780e3",
+            "#2ecc71",
+            "#9b59b6",
+            "#e67e22",
+            "#e74c3c",
+            "#f1c40f",
+            "#1abc9c",
+          ],
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: "Top adoption reasons" },
+      },
+    },
+  });
 
-  // Distance per day
-  const distanceByDay = days.map((d) =>
-    filteredSessions
-      .filter((s) => s[COLS.day] === d)
-      .reduce((sum, s) => sum + parseNumber(s[COLS.distanceKm]), 0)
+  // Distance radar – just show top 8 days by distance
+  const distByDay = dayLabels.map((day) =>
+    allSessions
+      .filter((s) => s.dayLabel === day)
+      .reduce((sum, s) => sum + (s.distanceKm || 0), 0)
   );
 
-  charts.distance.data.labels = days;
-  charts.distance.data.datasets = [
-    {
-      label: "Travel Distance (km)",
-      data: distanceByDay,
-      borderColor: "#f39c12",
-      backgroundColor: "rgba(243, 156, 18, 0.2)"
-    }
-  ];
-  charts.distance.update();
+  charts.distance = new Chart(ctxDist, {
+    type: "radar",
+    data: {
+      labels: dayLabels,
+      datasets: [
+        {
+          label: "Travel distance (km)",
+          data: distByDay,
+          borderColor: "#f39c12",
+          backgroundColor: "rgba(243, 156, 18, 0.2)",
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: "Travel distance per day" },
+      },
+    },
+  });
 }
 
-// Kickoff
-document.addEventListener("DOMContentLoaded", loadData);
+/* ---------- UI wiring ---------- */
+
+function populateDayFilter() {
+  const select = document.getElementById("dayFilter");
+  const existing = new Set(
+    Array.from(select.options).map((o) => o.value)
+  );
+
+  allSessions.forEach((s) => {
+    if (!existing.has(s.dayKey)) {
+      const opt = document.createElement("option");
+      opt.value = s.dayKey;
+      opt.textContent = s.dayLabel;
+      select.appendChild(opt);
+      existing.add(s.dayKey);
+    }
+  });
+}
+
+function attachControlHandlers() {
+  document
+    .getElementById("dayFilter")
+    .addEventListener("change", refreshMarkers);
+
+  document
+    .getElementById("metricFilter")
+    .addEventListener("change", refreshMarkers);
+
+  document.getElementById("btnReset").addEventListener("click", () => {
+    map.setView([28.0, 69.0], 6);
+    refreshMarkers();
+  });
+
+  document.getElementById("btnRoute").addEventListener("click", () => {
+    const coords = allSessions
+      .filter((s) => s.lat && s.lng)
+      .map((s) => [s.lat, s.lng]);
+
+    if (coords.length < 2) {
+      alert("Not enough coordinates to draw route.");
+      return;
+    }
+
+    if (routeLine) map.removeLayer(routeLine);
+    routeLine = L.polyline(coords, {
+      color: "#ff7a3c",
+      weight: 3,
+    }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+  });
+
+  document.getElementById("btnHeatMap").addEventListener("click", () => {
+    alert(
+      "Heat map layer is not implemented yet – but this is where engagement density would be visualised."
+    );
+  });
+}
+
+/* ---------- CSV load ---------- */
+
+function loadCsvAndBuild() {
+  Papa.parse(CSV_FILE, {
+    download: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      try {
+        processCsvRows(results.data);
+        populateDayFilter();
+        updateKpis();
+        updateSessionList();
+        updateTable();
+        refreshMarkers();
+        buildCharts();
+      } catch (err) {
+        console.error("Error processing CSV:", err);
+        alert(
+          "Error reading CSV data. Please check that sum_sheet.csv is present and not modified."
+        );
+      }
+    },
+    error: (err) => {
+      console.error("Error loading CSV:", err);
+      alert("Could not load sum_sheet.csv – check file name and location.");
+    },
+  });
+}
+
+/* ---------- Bootstrap ---------- */
+
+document.addEventListener("DOMContentLoaded", () => {
+  initMap();
+  attachControlHandlers();
+  loadCsvAndBuild();
+});
