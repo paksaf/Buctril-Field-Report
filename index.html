@@ -9,20 +9,24 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <!-- Leaflet -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- PapaParse for CSV -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background: #f8f9fa;
       color: #333;
       line-height: 1.6;
@@ -33,258 +37,331 @@
     /* Video Background */
     .video-background {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       z-index: -1;
       overflow: hidden;
     }
 
     .video-background video {
-      width: 100%; height: 100%;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      opacity: 0.15;
+      opacity: 0.28;        /* visible but subtle */
       filter: blur(3px) brightness(0.8);
-      transform: scale(1.1);
+      transform: scale(1.1); /* slightly zoomed in */
     }
 
     .overlay {
       position: relative;
-      background: rgba(255, 255, 255, 0.95);
+      background: rgba(255, 255, 255, 0.92); /* slightly transparent so video shows */
       backdrop-filter: blur(10px);
       min-height: 100vh;
     }
 
     /* Header */
     .header {
-      background: linear-gradient(135deg, #2c3e50, #3498db);
+      background: linear-gradient(135deg, #0052a6, #33a2ff);
       color: white;
-      padding: 2rem;
+      padding: 2rem 1rem 2.5rem;
       text-align: center;
-      border-bottom: 5px solid #e74c3c;
+      border-bottom: 5px solid #ffb200;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
     }
 
     .header h1 {
-      font-size: 2.5rem;
+      font-size: 2.6rem;
       margin-bottom: 0.5rem;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.35);
     }
 
-    .header p { font-size: 1.1rem; opacity: 0.9; }
+    .header p {
+      font-size: 1.05rem;
+      opacity: 0.95;
+    }
 
-    /* Layout */
+    .header .sub {
+      margin-top: 0.4rem;
+      font-size: 0.95rem;
+      opacity: 0.9;
+    }
+
+    .header .source {
+      margin-top: 0.3rem;
+      font-size: 0.9rem;
+      opacity: 0.85;
+    }
+
+    /* Main Container */
     .container {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 2rem 1.5rem 3rem;
     }
 
-    .dashboard {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
+    /* Map Container */
+    .map-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
       margin-bottom: 2rem;
-    }
-    @media (max-width: 1024px) {
-      .dashboard { grid-template-columns: 1fr; }
-    }
-
-    /* Map */
-    .map-container {
-      grid-column: 1 / -1;
-      background: white;
-      border-radius: 15px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      overflow: hidden;
-      padding: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
       border: 1px solid #e0e0e0;
     }
-    .map-container h2 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 2px solid #3498db;
-    }
-    #map {
-      height: 500px;
-      width: 100%;
-      border-radius: 10px;
-      overflow: hidden;
-    }
 
-    .map-controls {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-      flex-wrap: wrap;
-    }
-    .map-controls select,
-    .map-controls button {
-      padding: 0.5rem 1rem;
-      border: 2px solid #3498db;
-      background: white;
-      color: #2c3e50;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
-    }
-    .map-controls select:hover,
-    .map-controls button:hover {
-      background: #3498db;
-      color: white;
-    }
-
-    /* Cards */
-    .card {
-      background: white;
-      border-radius: 15px;
-      padding: 1.5rem;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-      border: 1px solid #e0e0e0;
-      transition: transform 0.3s ease;
-    }
-    .card:hover { transform: translateY(-5px); }
-
-    .card h3 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
+    .map-card h2 {
+      font-size: 1.3rem;
+      color: #123456;
+      margin-bottom: 0.75rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
 
-    /* Summary & KPIs */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-top: 1rem;
-    }
-    .summary-item {
-      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-      padding: 1rem;
+    #map {
+      width: 100%;
+      height: 480px;
       border-radius: 10px;
-      border-left: 4px solid #3498db;
-    }
-    .summary-item strong {
-      color: #2c3e50;
-      font-size: 1.1rem;
-    }
-    .summary-item p {
-      color: #666;
-      margin-top: 0.5rem;
+      overflow: hidden;
+      border: 1px solid #d0d0d0;
     }
 
+    .map-controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .map-controls select,
+    .map-controls button {
+      padding: 0.45rem 0.9rem;
+      border: 2px solid #2780e3;
+      background: white;
+      color: #14508a;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .map-controls select:hover,
+    .map-controls button:hover {
+      background: #2780e3;
+      color: white;
+    }
+
+    /* Dashboard layout */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.8rem;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e0e0e0;
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      color: #123456;
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* KPI grid */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 1rem;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
     }
+
     .kpi-item {
       text-align: center;
-      padding: 1rem;
-      background: linear-gradient(135deg, #2c3e50, #34495e);
+      padding: 0.8rem;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0052a6, #3478c6);
       color: white;
-      border-radius: 10px;
     }
+
     .kpi-value {
-      font-size: 2rem;
+      font-size: 1.9rem;
       font-weight: bold;
-      margin: 0.5rem 0;
     }
+
     .kpi-label {
       font-size: 0.9rem;
       opacity: 0.9;
     }
 
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .summary-item {
+      background: linear-gradient(135deg, #f8fafc, #e7edf6);
+      border-radius: 10px;
+      padding: 0.8rem 0.9rem;
+      border-left: 4px solid #2780e3;
+    }
+
+    .summary-item strong {
+      color: #123456;
+      font-size: 1.02rem;
+    }
+
+    .summary-item p {
+      margin-top: 0.4rem;
+      color: #555;
+      font-size: 0.92rem;
+    }
+
     /* Session list */
     .session-details {
-      background: white;
-      border-radius: 15px;
-      padding: 1.5rem;
       margin-top: 2rem;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
     }
+
     .session-list {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 1rem;
-      margin-top: 1rem;
+      margin-top: 0.6rem;
     }
+
     .session-item {
-      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-      padding: 1rem;
+      background: linear-gradient(135deg, #fff7f2, #ffe9dd);
+      border-left: 4px solid #ff7a3c;
+      padding: 0.8rem 0.9rem;
       border-radius: 10px;
-      border-left: 4px solid #e74c3c;
+      font-size: 0.9rem;
     }
 
     /* Charts */
     .chart-container {
-      background: white;
-      border-radius: 15px;
-      padding: 1.5rem;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-      margin-top: 2rem;
-    }
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 2rem;
       margin-top: 2rem;
     }
 
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 260px !important;
+    }
+
     /* Table */
-    .table-container { overflow-x: auto; margin-top: 1rem; }
-    .data-table {
+    .table-card {
+      margin-top: 2rem;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-top: 0.7rem;
+    }
+
+    table.data-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 1rem;
       background: white;
       border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+      box-shadow: 0 5px 18px rgba(0, 0, 0, 0.06);
+      font-size: 0.9rem;
     }
-    .data-table th {
-      background: linear-gradient(135deg, #3498db, #2980b9);
-      color: white;
-      padding: 1rem;
-      text-align: left;
-      font-weight: 600;
-    }
-    .data-table td {
-      padding: 0.8rem 1rem;
+
+    table.data-table th,
+    table.data-table td {
+      padding: 0.55rem 0.7rem;
       border-bottom: 1px solid #eee;
+      text-align: left;
+      white-space: nowrap;
     }
-    .data-table tr:hover { background: #f8f9fa; }
+
+    table.data-table th {
+      background: linear-gradient(135deg, #2780e3, #14508a);
+      color: white;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    table.data-table tr:nth-child(even) td {
+      background: #fafbff;
+    }
+
+    /* Insights */
+    .insights {
+      margin-top: 2rem;
+    }
 
     /* Footer */
     .footer {
       text-align: center;
-      padding: 2rem;
-      margin-top: 3rem;
-      background: #2c3e50;
+      padding: 1.8rem 1rem 2.2rem;
+      margin-top: 2.5rem;
+      background: #123456;
       color: white;
-      border-top: 5px solid #3498db;
+      border-top: 4px solid #2780e3;
+      font-size: 0.9rem;
     }
 
-    /* Fade-in */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
+    /* Small animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(15px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    .fade-in { animation: fadeIn 0.6s ease forwards; }
+
+    .fade-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
 
     @media (max-width: 768px) {
-      .container { padding: 1rem; }
-      .header h1 { font-size: 2rem; }
-      .charts-grid { grid-template-columns: 1fr; }
-      #map { height: 300px; }
+      .container {
+        padding: 1.4rem 1rem 2.5rem;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      #map {
+        height: 340px;
+      }
     }
   </style>
 </head>
 <body>
-  <!-- Video Background -->
+  <!-- Background video (tmp.mp4 must be in same folder) -->
   <div class="video-background">
     <video autoplay muted loop playsinline>
       <source src="tmp.mp4" type="video/mp4" />
@@ -297,77 +374,72 @@
     <header class="header">
       <h1>🌾 Buctril Engagement Session Analysis Report</h1>
       <p>Comprehensive analysis of wheat field engagement sessions &amp; their impact</p>
-      <p style="margin-top: 0.5rem; font-size: 1rem; opacity: 0.8;">
-        Auto-updated from <strong>sum_sheet.csv</strong>
-      </p>
+      <p class="sub">Week 1 – November Field Belt Journey</p>
+      <p class="source">Auto-updated from <strong>sum_sheet.csv</strong></p>
     </header>
 
-    <div class="container">
+    <main class="container">
       <!-- Map -->
-      <section class="map-container fade-in">
+      <section class="map-card fade-in">
         <h2>📍 Engagement Session Locations</h2>
         <div id="map"></div>
         <div class="map-controls">
           <select id="dayFilter">
             <option value="all">All Days</option>
           </select>
-
           <select id="metricFilter">
-            <option value="farmers">Number of Farmers</option>
-            <option value="acres">Wheat Acres</option>
-            <option value="awareness">Awareness Rate</option>
-            <option value="definite">Definite Use Rate</option>
+            <option value="farmers">Marker size: Farmers</option>
+            <option value="acres">Marker size: Wheat acres</option>
+            <option value="awareness">Marker colour: Awareness</option>
+            <option value="definite">Marker colour: Definite use</option>
           </select>
-
-          <button type="button" onclick="alert('Heatmap layer can be added later.')">
-            Show Heat Map
-          </button>
-          <button type="button" onclick="alert('Travel route polyline can be added later.')">
-            Show Travel Route
-          </button>
-          <button type="button" onclick="resetMap()">Reset View</button>
+          <button id="btnHeatMap" type="button">Show Heat Map</button>
+          <button id="btnRoute" type="button">Show Travel Route</button>
+          <button id="btnReset" type="button">Reset View</button>
         </div>
       </section>
 
-      <!-- Dashboard -->
-      <div class="dashboard fade-in">
-        <div class="card">
+      <!-- KPI + summary -->
+      <section class="dashboard fade-in">
+        <section class="card">
           <h3>📊 Key Performance Indicators</h3>
-          <div class="kpi-grid" id="kpiMetrics"></div>
-        </div>
+          <div id="kpiMetrics" class="kpi-grid">
+            <!-- Filled by JS -->
+          </div>
+        </section>
 
-        <div class="card">
-          <h3>📈 Week Summary</h3>
+        <section class="card">
+          <h3>📈 Week 1 Summary</h3>
           <div class="summary-grid">
             <div class="summary-item">
               <strong>Total Farmers Engaged</strong>
-              <p id="totalFarmers">Loading...</p>
+              <p id="totalFarmers">Loading…</p>
             </div>
             <div class="summary-item">
               <strong>Total Wheat Acres</strong>
-              <p id="totalAcres">Loading...</p>
+              <p id="totalAcres">Loading…</p>
             </div>
             <div class="summary-item">
               <strong>Average Awareness Rate</strong>
-              <p id="avgAwareness">Loading...</p>
+              <p id="avgAwareness">Loading…</p>
             </div>
             <div class="summary-item">
               <strong>Definite Use Conversion</strong>
-              <p id="definiteUse">Loading...</p>
+              <p id="definiteUse">Loading…</p>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </section>
 
       <!-- Session breakdown -->
-      <section class="session-details fade-in">
-        <h2>🎯 Session Breakdown by Day</h2>
-        <div class="session-list" id="sessionList"></div>
+      <section class="card session-details fade-in">
+        <h3>🎯 Session Breakdown by Day</h3>
+        <div id="sessionList" class="session-list"></div>
       </section>
 
       <!-- Charts -->
-      <section class="chart-container fade-in">
-        <h2>📊 Performance Analysis</h2>
+      <section class="card chart-container fade-in">
+        <h3>📊 Performance Analysis</h3>
         <div class="charts-grid">
           <div><canvas id="engagementChart"></canvas></div>
           <div><canvas id="conversionChart"></canvas></div>
@@ -376,48 +448,47 @@
         </div>
       </section>
 
-      <!-- Data table -->
-      <section class="card fade-in" style="margin-top: 2rem;">
-        <h3>📋 Detailed Session Data</h3>
+      <!-- Table -->
+      <section class="card table-card fade-in">
+        <h3>📋 Detailed Session Data (top rows)</h3>
         <div class="table-container">
-          <table class="data-table" id="dataTable"></table>
+          <table id="dataTable" class="data-table"></table>
         </div>
       </section>
 
       <!-- Insights -->
-      <section class="card fade-in" style="margin-top: 2rem;">
+      <section class="card insights fade-in">
         <h3>💡 Key Insights &amp; Recommendations</h3>
         <div class="summary-grid">
           <div class="summary-item">
             <strong>Top Success Factor</strong>
-            <p>Trust in Bayer brand consistently drives Buctril adoption across sessions.</p>
+            <p>Trust in Bayer brand and visible weed control are the strongest drivers of adoption.</p>
           </div>
           <div class="summary-item">
             <strong>Main Challenge</strong>
-            <p>Price sensitivity is the biggest barrier to adoption. Consider targeted pricing &amp; schemes.</p>
+            <p>Price sensitivity and loyalty to generics are the biggest barriers to conversion.</p>
           </div>
           <div class="summary-item">
             <strong>Opportunity Areas</strong>
-            <p>High “Maybe” share shows strong potential for conversion via follow-up engagement.</p>
+            <p>High “Maybe” share sessions can be converted with follow-up visits and trials.</p>
           </div>
           <div class="summary-item">
             <strong>Recommendation</strong>
-            <p>Emphasise value vs price through demos, testimonials and clear weed-control benefits.</p>
+            <p>Use farmer testimonials + demo plots to justify premium vs generics and lock-in repeat users.</p>
           </div>
         </div>
       </section>
-    </div>
+    </main>
 
-    <!-- Footer -->
     <footer class="footer">
-      <p>© 2024 Buctril Engagement Analysis Report</p>
-      <p style="margin-top: 0.5rem; opacity: 0.8;">
-        Data source: <strong>sum_sheet.csv</strong> | Interactive Map &amp; Analytics Dashboard
+      <p>© 2024 Buctril Engagement Analysis | Generated from field session data</p>
+      <p style="opacity: 0.8; margin-top: 0.3rem;">
+        Interactive report – map, KPIs and charts update automatically from <code>sum_sheet.csv</code>.
       </p>
     </footer>
   </div>
 
-  <!-- Dashboard logic lives here -->
+  <!-- Main logic -->
   <script src="data_processor.js"></script>
 </body>
 </html>
