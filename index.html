@@ -111,7 +111,7 @@
       margin-top: 4px;
       font-size: 14px;
       color: var(--text-muted);
-      max-width: 720px;
+      max-width: 780px;
     }
 
     .subtitle code {
@@ -241,7 +241,7 @@
       font-weight: 600;
     }
 
-    /* Table card */
+    /* Table cards */
 
     .table-card {
       margin-top: 6px;
@@ -311,6 +311,36 @@
       border-radius: 5px;
       border: 1px solid rgba(148, 163, 184, 0.4);
     }
+
+    /* Charts section */
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .chart-container {
+      background: rgba(13, 25, 48, 0.96);
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      padding: 10px 12px;
+    }
+
+    .chart-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 
@@ -328,18 +358,21 @@
         <h1>Buctril Farmer Engagement Summary 2025</h1>
       </div>
       <p class="subtitle">
-        This dashboard reads <code>sum_sheet.csv</code> directly from the repository and summarises farmer
-        engagement sessions, acres covered, and the travel route for the APV 2016. To update, overwrite
-        <code>sum_sheet.csv</code> with a new export using the same headers.
+        This dashboard reads <code>sum_sheet.csv</code> directly from the repository and summarises
+        farmer engagement by <strong>cities</strong>, <strong>villages/session locations</strong>,
+        <strong>dates</strong>, <strong>farmers reached</strong>, <strong>crop area (acres)</strong>,
+        and <strong>feedback / observations</strong>. Only these fields are used – fuel and APV
+        details are intentionally ignored.
       </p>
     </header>
 
+    <!-- Top layout: map + key metrics -->
     <main class="layout-main">
       <!-- Left: Map -->
       <section class="card">
         <div class="card-header">
           <div class="pill-icon">M</div>
-          <span class="card-title-text">Engagement Route Map</span>
+          <span class="card-title-text">Engagement Route Map (Circles by crop area)</span>
         </div>
         <div id="route-map"></div>
       </section>
@@ -348,7 +381,7 @@
       <section class="card">
         <div class="card-header">
           <div class="pill-icon">Σ</div>
-          <span class="card-title-text">Key Engagement Metrics</span>
+          <span class="card-title-text">Key Engagement Metrics (Filtered Range)</span>
         </div>
 
         <div class="metrics-grid">
@@ -357,13 +390,13 @@
               <div class="metric-label">Total Sessions</div>
               <div class="metric-value" id="metric-total-sessions">–</div>
               <div class="metric-sub">
-                Rows in CSV (unique SN):
+                Unique session IDs (SN):
                 <span id="metric-unique-sn">–</span>
               </div>
             </div>
 
             <div class="metric">
-              <div class="metric-label">Total Farmers Reached (Approx)</div>
+              <div class="metric-label">Total Farmers Reached</div>
               <div class="metric-value" id="metric-total-farmers">–</div>
               <div class="metric-sub">
                 Avg per session:
@@ -374,7 +407,7 @@
 
           <div class="metric-row">
             <div class="metric">
-              <div class="metric-label">Total Wheat Area (Acres)</div>
+              <div class="metric-label">Total Wheat / Crop Area (Acres)</div>
               <div class="metric-value" id="metric-total-acres">–</div>
               <div class="metric-sub">
                 Avg acres per session:
@@ -383,10 +416,12 @@
             </div>
 
             <div class="metric">
-              <div class="metric-label">Cities &amp; Villages Covered</div>
-              <div class="metric-value" id="metric-locations">–</div>
+              <div class="metric-label">Coverage</div>
+              <div class="metric-value" id="metric-villages">–</div>
               <div class="metric-sub">
-                Sessions with GPS coordinates:
+                Cities touched:
+                <span id="metric-cities">–</span>,
+                sessions with GPS:
                 <span id="metric-sessions-with-coords">–</span>
               </div>
             </div>
@@ -395,12 +430,12 @@
       </section>
     </main>
 
-    <!-- Table -->
+    <!-- Session-wise detail -->
     <section class="card table-card">
       <div class="card-header">
         <div class="pill-icon">T</div>
         <span class="card-title-text">
-          Session-wise Detail (from <code>sum_sheet.csv</code>)
+          Session-wise Detail (From <code>sum_sheet.csv</code> – filtered by date / city / village)
         </span>
       </div>
 
@@ -412,10 +447,11 @@
               <th>Date</th>
               <th>From City</th>
               <th>To City</th>
-              <th>Session Location</th>
+              <th>Session Location (Village)</th>
               <th>Total Farmers</th>
-              <th>Total Acres</th>
+              <th>Crop Area (Acres)</th>
               <th>Coordinates (lat, lon)</th>
+              <th>Feedback / Observations</th>
             </tr>
           </thead>
           <tbody id="session-rows">
@@ -425,10 +461,49 @@
       </div>
 
       <p class="footer-note">
-        All values above (map, metrics, table) are loaded each time from
-        <code>sum_sheet.csv</code>. To update the report, export a new CSV with the same headers and
-        overwrite the file in GitHub.
+        All values above are loaded from <code>sum_sheet.csv</code>. Only fields for date, cities,
+        villages / session location, coordinates, farmers, crop area, and feedback / observations are
+        used; fuel and APV information is ignored.
       </p>
+    </section>
+
+    <!-- Village-wise summary + charts -->
+    <section class="card table-card">
+      <div class="card-header">
+        <div class="pill-icon">V</div>
+        <span class="card-title-text">
+          Village-wise Summary &amp; Visual Insights
+        </span>
+      </div>
+
+      <div class="table-wrapper" style="max-height: 220px;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Village / Session Location</th>
+              <th>Sessions</th>
+              <th>Total Farmers</th>
+              <th>Total Crop Area (Acres)</th>
+              <th>Sample Feedback / Observations</th>
+            </tr>
+          </thead>
+          <tbody id="village-rows">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-container">
+          <div class="chart-title">Farmers Engagement by From City</div>
+          <canvas id="cityFarmersChart" height="160"></canvas>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Crop Area (Acres) by Village / Session Location</div>
+          <canvas id="villageAcresChart" height="160"></canvas>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -439,16 +514,30 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <!-- CSV & Dashboard Logic -->
   <script>
+    // ----------------- CONFIG: FILTERS -----------------
+    // Dates must be in YYYY-MM-DD format in the CSV for filtering to work correctly.
+    const FILTER_START_DATE = "2025-01-05"; // inclusive
+    const FILTER_END_DATE = "2025-01-10";   // inclusive
+
+    // If you want to restrict to particular cities or villages, put names here.
+    // Leave arrays empty [] to include all values.
+    const ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
+    const ALLOWED_TO_CITIES = [];   // e.g. ["Chichawatni"]
+    const ALLOWED_LOCATIONS = [];   // e.g. ["Basti Joriya", "Chak 10"]
+
+    let cityFarmersChartInstance = null;
+    let villageAcresChartInstance = null;
+
     document.addEventListener("DOMContentLoaded", () => {
       loadDashboard();
     });
 
     async function loadDashboard() {
       try {
-        // Avoid browser/GitHub caching issues
         const response = await fetch("sum_sheet.csv?cache=" + Date.now());
         if (!response.ok) {
           throw new Error("Failed to fetch CSV: HTTP " + response.status);
@@ -461,12 +550,13 @@
           skipEmptyLines: true,
           complete: (results) => {
             const rows = results.data || [];
-            if (!rows.length) {
-              console.warn("CSV parsed but has no rows.");
-            }
-            updateMetrics(rows);
-            updateTable(rows);
-            initMap(rows);
+            const filteredRows = filterRows(rows);
+
+            updateMetrics(filteredRows);
+            updateTable(filteredRows);
+            updateVillageSummary(filteredRows);
+            initMap(filteredRows);
+            buildCharts(filteredRows);
           },
           error: (err) => {
             console.error("PapaParse error:", err);
@@ -477,32 +567,61 @@
       }
     }
 
+    function filterRows(rows) {
+      return rows.filter((r) => {
+        const dateStr = (r["Date"] || "").trim();
+        if (FILTER_START_DATE && FILTER_END_DATE && dateStr) {
+          if (dateStr < FILTER_START_DATE || dateStr > FILTER_END_DATE) {
+            return false;
+          }
+        }
+
+        const fromCity = (r["From City"] || "").trim();
+        const toCity = (r["To City"] || "").trim();
+        const loc = (r["Session Location"] || "").trim();
+
+        if (ALLOWED_FROM_CITIES.length && !ALLOWED_FROM_CITIES.includes(fromCity)) {
+          return false;
+        }
+        if (ALLOWED_TO_CITIES.length && !ALLOWED_TO_CITIES.includes(toCity)) {
+          return false;
+        }
+        if (ALLOWED_LOCATIONS.length && !ALLOWED_LOCATIONS.includes(loc)) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
     function updateMetrics(rows) {
       const totalSessions = rows.length;
       const uniqueSN = new Set();
+      const cities = new Set();
+      const villages = new Set();
       let totalFarmers = 0;
       let totalAcres = 0;
-      const locations = new Set();
       let sessionsWithCoords = 0;
 
       rows.forEach((r) => {
         if (r["SN"]) uniqueSN.add(r["SN"]);
 
-        const farmers = parseFloat(
-          (r["Total Farmers"] || "").toString().replace(/,/g, "")
-        );
-        const acres = parseFloat(
-          (r["Total Acres"] || "").toString().replace(/,/g, "")
-        );
+        const fromCity = (r["From City"] || "").trim();
+        const toCity = (r["To City"] || "").trim();
+        if (fromCity) cities.add(fromCity);
+        if (toCity) cities.add(toCity);
+
+        const loc = (r["Session Location"] || "").trim();
+        if (loc) villages.add(loc);
+
+        const farmers = parseNumber(r["Total Farmers"]);
+        const acres = getCropArea(r);
 
         if (!isNaN(farmers)) totalFarmers += farmers;
         if (!isNaN(acres)) totalAcres += acres;
 
-        if (r["Session Location"]) locations.add(r["Session Location"]);
-
-        if (r["Coordinates"] && r["Coordinates"].trim() !== "") {
-          sessionsWithCoords += 1;
-        }
+        const coords = (r["Coordinates"] || "").trim();
+        if (coords) sessionsWithCoords += 1;
       });
 
       const farmersPerSession =
@@ -519,7 +638,8 @@
       setText("metric-total-acres", formatNumber(totalAcres));
       setText("metric-acres-per-session", acresPerSession);
 
-      setText("metric-locations", locations.size || "0");
+      setText("metric-villages", villages.size || "0");
+      setText("metric-cities", cities.size || "0");
       setText("metric-sessions-with-coords", sessionsWithCoords || "0");
     }
 
@@ -538,8 +658,64 @@
           <td>${escapeHtml(r["To City"] || "")}</td>
           <td>${escapeHtml(r["Session Location"] || "")}</td>
           <td>${escapeHtml(r["Total Farmers"] || "")}</td>
-          <td>${escapeHtml(r["Total Acres"] || "")}</td>
+          <td>${escapeHtml(getCropArea(r))}</td>
           <td>${escapeHtml(r["Coordinates"] || "")}</td>
+          <td>${escapeHtml(r["Feedback"] || r["Observations"] || r["Remarks"] || "")}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateVillageSummary(rows) {
+      const tbody = document.getElementById("village-rows");
+      if (!tbody) return;
+
+      const summary = {};
+
+      rows.forEach((r) => {
+        const villageRaw = (r["Session Location"] || "").trim() || "Unknown";
+        const village = villageRaw || "Unknown";
+        if (!summary[village]) {
+          summary[village] = {
+            sessions: 0,
+            farmers: 0,
+            acres: 0,
+            feedbackSamples: [],
+          };
+        }
+
+        summary[village].sessions += 1;
+
+        const farmers = parseNumber(r["Total Farmers"]);
+        const acres = getCropArea(r);
+        if (!isNaN(farmers)) summary[village].farmers += farmers;
+        if (!isNaN(acres)) summary[village].acres += acres;
+
+        const fb =
+          (r["Feedback"] || r["Observations"] || r["Remarks"] || "").trim();
+        if (fb && summary[village].feedbackSamples.length < 3) {
+          summary[village].feedbackSamples.push(fb);
+        }
+      });
+
+      const entries = Object.entries(summary).sort(
+        (a, b) => b[1].farmers - a[1].farmers
+      );
+
+      tbody.innerHTML = "";
+      entries.forEach(([village, data], idx) => {
+        const tr = document.createElement("tr");
+        const feedbackText =
+          data.feedbackSamples.length > 0
+            ? data.feedbackSamples.join(" | ")
+            : "";
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(village)}</td>
+          <td>${data.sessions}</td>
+          <td>${formatNumber(data.farmers)}</td>
+          <td>${formatNumber(data.acres)}</td>
+          <td>${escapeHtml(feedbackText)}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -549,7 +725,6 @@
       const mapDiv = document.getElementById("route-map");
       if (!mapDiv) return;
 
-      // Collect valid coordinate pairs from CSV
       const points = [];
       rows.forEach((r) => {
         const coord = (r["Coordinates"] || "").trim();
@@ -557,12 +732,18 @@
 
         const parts = coord.split(",").map((x) => parseFloat(x.trim()));
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-          points.push(parts);
+          points.push({
+            lat: parts[0],
+            lon: parts[1],
+            village: (r["Session Location"] || "").trim(),
+            farmers: parseNumber(r["Total Farmers"]),
+            acres: getCropArea(r),
+            date: (r["Date"] || "").trim(),
+          });
         }
       });
 
       if (!points.length) {
-        // No coordinates – leave background as-is
         return;
       }
 
@@ -575,10 +756,165 @@
         attribution: "&copy; OpenStreetMap contributors",
       }).addTo(map);
 
-      const latLngs = points.map((p) => L.latLng(p[0], p[1]));
+      const latLngs = [];
 
-      latLngs.forEach((latLng, idx) => {
-        L.marker(latLng).addTo(map).bindPopup("Session " + (idx + 1));
+      points.forEach((p, idx) => {
+        const latLng = L.latLng(p.lat, p.lon);
+        latLngs.push(latLng);
+
+        // Circle radius roughly scaled by acres
+        const acres = isNaN(p.acres) ? 0 : p.acres;
+        const radiusMeters = 100 + Math.sqrt(acres || 0) * 40;
+
+        L.circle(latLng, {
+          radius: radiusMeters,
+          fillOpacity: 0.3,
+          stroke: true,
+        }).addTo(map);
+
+        const popupHtml = `
+          <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
+          Date: ${escapeHtml(p.date)}<br/>
+          Farmers: ${escapeHtml(p.farmers)}<br/>
+          Crop Area: ${escapeHtml(acres)} acres
+        `;
+        L.marker(latLng).addTo(map).bindPopup(popupHtml);
       });
 
-      L.polyline(latLngs, { weight:
+      if (latLngs.length > 1) {
+        L.polyline(latLngs, { weight: 3, opacity: 0.9 }).addTo(map);
+        map.fitBounds(latLngs, { padding: [40, 40] });
+      } else {
+        map.setView(latLngs[0], 12);
+      }
+    }
+
+    function buildCharts(rows) {
+      // Destroy existing charts if reloaded
+      if (cityFarmersChartInstance) {
+        cityFarmersChartInstance.destroy();
+      }
+      if (villageAcresChartInstance) {
+        villageAcresChartInstance.destroy();
+      }
+
+      // Farmers by From City
+      const cityTotals = {};
+      rows.forEach((r) => {
+        const city = (r["From City"] || "Unknown").trim() || "Unknown";
+        const farmers = parseNumber(r["Total Farmers"]);
+        if (!cityTotals[city]) cityTotals[city] = 0;
+        if (!isNaN(farmers)) cityTotals[city] += farmers;
+      });
+
+      const cityLabels = Object.keys(cityTotals);
+      const cityData = cityLabels.map((c) => cityTotals[c]);
+
+      const cityCtx = document.getElementById("cityFarmersChart").getContext("2d");
+      cityFarmersChartInstance = new Chart(cityCtx, {
+        type: "bar",
+        data: {
+          labels: cityLabels,
+          datasets: [
+            {
+              label: "Farmers Reached",
+              data: cityData,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 },
+            },
+          },
+        },
+      });
+
+      // Acres by Village
+      const villageSummary = {};
+      rows.forEach((r) => {
+        const village = (r["Session Location"] || "Unknown").trim() || "Unknown";
+        if (!villageSummary[village]) villageSummary[village] = 0;
+        const acres = getCropArea(r);
+        if (!isNaN(acres)) villageSummary[village] += acres;
+      });
+
+      const villageLabels = Object.keys(villageSummary);
+      const villageData = villageLabels.map((v) => villageSummary[v]);
+
+      const villageCtx =
+        document.getElementById("villageAcresChart").getContext("2d");
+      villageAcresChartInstance = new Chart(villageCtx, {
+        type: "bar",
+        data: {
+          labels: villageLabels,
+          datasets: [
+            {
+              label: "Crop Area (Acres)",
+              data: villageData,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 },
+            },
+          },
+        },
+      });
+    }
+
+    // ----------------- HELPERS -----------------
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = value;
+      }
+    }
+
+    function parseNumber(value) {
+      if (value === undefined || value === null) return NaN;
+      const n = parseFloat(value.toString().replace(/,/g, "").trim());
+      return isNaN(n) ? NaN : n;
+    }
+
+    function getCropArea(row) {
+      // Try different possible column names for crop area
+      const candidates = [
+        "Crop Area",
+        "Crop Area (Acres)",
+        "Total Acres",
+        "Wheat Acres",
+      ];
+      for (const key of candidates) {
+        if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
+          return parseNumber(row[key]);
+        }
+      }
+      return NaN;
+    }
+
+    function formatNumber(num) {
+      if (isNaN(num)) return "–";
+      return Math.round(num).toLocaleString();
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+  </script>
+</body>
+</html>
