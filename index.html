@@ -49,14 +49,14 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      opacity: 0.28;        /* visible but subtle */
+      opacity: 0.28;
       filter: blur(3px) brightness(0.8);
-      transform: scale(1.1); /* slightly zoomed in */
+      transform: scale(1.1);
     }
 
     .overlay {
       position: relative;
-      background: rgba(255, 255, 255, 0.92); /* slightly transparent so video shows */
+      background: rgba(255, 255, 255, 0.92);
       backdrop-filter: blur(10px);
       min-height: 100vh;
     }
@@ -329,6 +329,56 @@
       font-size: 0.9rem;
     }
 
+    /* Refresh Button */
+    .refresh-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .refresh-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(135deg, #2980b9, #1c5d8a);
+    }
+
+    .refresh-btn:active {
+      transform: translateY(-1px);
+    }
+
+    .refresh-btn.loading {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    .refresh-btn .spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Small animations */
     @keyframes fadeInUp {
       from {
@@ -345,6 +395,42 @@
       animation: fadeInUp 0.6s ease forwards;
     }
 
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+    }
+
+    .loading-overlay.hidden {
+      display: none;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    .loading-text {
+      font-size: 1.1rem;
+      color: #2c3e50;
+      font-weight: 500;
+    }
+
     @media (max-width: 768px) {
       .container {
         padding: 1.4rem 1rem 2.5rem;
@@ -357,10 +443,23 @@
       #map {
         height: 340px;
       }
+
+      .refresh-btn {
+        bottom: 15px;
+        right: 15px;
+        padding: 10px 15px;
+        font-size: 0.85rem;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading CSV data...</div>
+  </div>
+
   <!-- Background video (tmp.mp4 must be in same folder) -->
   <div class="video-background">
     <video autoplay muted loop playsinline>
@@ -375,7 +474,7 @@
       <h1>🌾 Buctril Engagement Session Analysis Report</h1>
       <p>Comprehensive analysis of wheat field engagement sessions &amp; their impact</p>
       <p class="sub">Week 1 – November Field Belt Journey</p>
-      <p class="source">Auto-updated from <strong>sum_sheet.csv</strong></p>
+      <p class="source">Auto-updated from <strong>sum_sheet.csv</strong> | <span id="lastUpdated"></span></p>
     </header>
 
     <main class="container">
@@ -470,7 +569,7 @@
           </div>
           <div class="summary-item">
             <strong>Opportunity Areas</strong>
-            <p>High “Maybe” share sessions can be converted with follow-up visits and trials.</p>
+            <p>High "Maybe" share sessions can be converted with follow-up visits and trials.</p>
           </div>
           <div class="summary-item">
             <strong>Recommendation</strong>
@@ -484,11 +583,1094 @@
       <p>© 2025 Buctril Engagement Analysis | Generated from field session data</p>
       <p style="opacity: 0.8; margin-top: 0.3rem;">
         Interactive report – map, KPIs and charts update automatically from <code>sum_sheet.csv</code>.
+        Last updated: <span id="footerLastUpdated">Just now</span>
       </p>
     </footer>
   </div>
 
-  <!-- Main logic -->
-  <script src="data_processor.js"></script>
+  <!-- Refresh Button -->
+  <button id="refreshBtn" class="refresh-btn">
+    <span class="spinner" id="refreshSpinner"></span>
+    🔄 Refresh Data
+  </button>
+
+  <!-- Main JavaScript -->
+  <script>
+    // ================= GLOBAL VARIABLES =================
+    let csvData = null;
+    let processedData = null;
+    let map = null;
+    let markers = [];
+    let engagementChart = null;
+    let conversionChart = null;
+    let reasonsChart = null;
+    let distanceChart = null;
+    let lastUpdateTime = null;
+
+    // ================= UTILITY FUNCTIONS =================
+    function formatDateTime(date) {
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    function showLoading(show) {
+      const overlay = document.getElementById('loadingOverlay');
+      if (show) {
+        overlay.classList.remove('hidden');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function updateLastUpdatedTime() {
+      const now = new Date();
+      lastUpdateTime = now;
+      const formattedTime = formatDateTime(now);
+      
+      document.getElementById('lastUpdated').textContent = `Last updated: ${formattedTime}`;
+      document.getElementById('footerLastUpdated').textContent = formattedTime;
+    }
+
+    // ================= CSV DATA LOADER =================
+    function loadCSVData() {
+      console.log("Loading CSV data...");
+      showLoading(true);
+      
+      // Show loading state on refresh button
+      const refreshBtn = document.getElementById('refreshBtn');
+      const refreshSpinner = document.getElementById('refreshSpinner');
+      refreshBtn.classList.add('loading');
+      refreshSpinner.style.display = 'inline-block';
+      
+      Papa.parse("sum_sheet.csv", {
+        download: true,
+        header: true,
+        dynamicTyping: false, // We'll handle parsing ourselves
+        skipEmptyLines: true,
+        complete: function(results) {
+          if (results.errors.length > 0) {
+            console.error("CSV parsing errors:", results.errors);
+            alert("Error loading CSV. Check console for details.");
+            return;
+          }
+          
+          csvData = results.data;
+          console.log(`CSV loaded successfully: ${csvData.length} rows`);
+          
+          // Process the data
+          processedData = processCSVData(csvData);
+          
+          // Update all dashboard components
+          updateAllDashboardComponents();
+          
+          // Update timestamp
+          updateLastUpdatedTime();
+          
+          // Hide loading state
+          showLoading(false);
+          refreshBtn.classList.remove('loading');
+          refreshSpinner.style.display = 'none';
+          
+          // Show success message
+          showToast('Data loaded successfully!', 'success');
+        },
+        error: function(error) {
+          console.error("Failed to load CSV:", error);
+          alert("Failed to load CSV file. Make sure 'sum_sheet.csv' is in the same folder.");
+          showLoading(false);
+          refreshBtn.classList.remove('loading');
+          refreshSpinner.style.display = 'none';
+          showToast('Error loading data!', 'error');
+        }
+      });
+    }
+
+    // ================= TOAST NOTIFICATION =================
+    function showToast(message, type = 'info') {
+      // Remove existing toast
+      const existingToast = document.querySelector('.toast-notification');
+      if (existingToast) existingToast.remove();
+      
+      // Create toast
+      const toast = document.createElement('div');
+      toast.className = `toast-notification ${type}`;
+      toast.innerHTML = `
+        <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+        <span class="toast-message">${message}</span>
+      `;
+      
+      // Style toast
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#2ecc71' : type === 'error' ? '#e74c3c' : '#3498db'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease-out;
+      `;
+      
+      // Add animation
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+          from { opacity: 1; }
+          to { opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      document.body.appendChild(toast);
+      
+      // Auto-remove after 3 seconds
+      setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ================= DATA PROCESSING =================
+    function processCSVData(rawData) {
+      // Filter out only valid session rows (with SN numbers)
+      const sessions = rawData.filter(row => {
+        return row.SN !== undefined && 
+               row.SN !== null && 
+               row.SN !== '' && 
+               !isNaN(parseFloat(row.SN)) && 
+               parseFloat(row.SN) > 0 &&  // Skip the start row (SN=0)
+               row.City && row.City.trim() !== ''; // Has a city
+      });
+
+      // Extract and structure session data
+      const structuredSessions = sessions.map(session => {
+        // Clean numeric values
+        const cleanNum = (val) => {
+          if (val === undefined || val === null) return 0;
+          if (typeof val === 'string') {
+            // Remove commas and non-numeric characters except decimal point
+            const cleaned = val.replace(/[^\d.-]/g, '');
+            const num = parseFloat(cleaned);
+            return isNaN(num) ? 0 : num;
+          }
+          const num = Number(val);
+          return isNaN(num) ? 0 : num;
+        };
+
+        // Clean string values
+        const cleanStr = (val) => {
+          if (val === undefined || val === null) return '';
+          return String(val).trim();
+        };
+
+        // Parse coordinates
+        const parseCoordinates = (coordStr) => {
+          if (!coordStr) return null;
+          
+          try {
+            const str = coordStr.toString();
+            
+            // Try to extract latitude and longitude using regex
+            const latMatch = str.match(/(\d+)°\s*(\d+)['′]?\s*([\d.]+)?["″]?\s*([NS])/i);
+            const lonMatch = str.match(/(\d+)°\s*(\d+)['′]?\s*([\d.]+)?["″]?\s*([EW])/i);
+            
+            if (latMatch && lonMatch) {
+              const latDeg = parseInt(latMatch[1]);
+              const latMin = parseInt(latMatch[2]);
+              const latSec = latMatch[3] ? parseFloat(latMatch[3]) : 0;
+              const latDir = latMatch[4].toUpperCase();
+              
+              const lonDeg = parseInt(lonMatch[1]);
+              const lonMin = parseInt(lonMatch[2]);
+              const lonSec = lonMatch[3] ? parseFloat(lonMatch[3]) : 0;
+              const lonDir = lonMatch[4].toUpperCase();
+              
+              let lat = latDeg + (latMin / 60) + (latSec / 3600);
+              if (latDir === 'S') lat = -lat;
+              
+              let lon = lonDeg + (lonMin / 60) + (lonSec / 3600);
+              if (lonDir === 'W') lon = -lon;
+              
+              return [lat, lon];
+            }
+            
+            // Try alternative format (comma separated)
+            const parts = str.split(/[,\s]+/);
+            if (parts.length >= 2) {
+              const latStr = parts[0];
+              const lonStr = parts[1];
+              
+              // Try to parse as decimal degrees
+              const lat = parseFloat(latStr);
+              const lon = parseFloat(lonStr);
+              
+              if (!isNaN(lat) && !isNaN(lon)) {
+                return [lat, lon];
+              }
+            }
+          } catch (e) {
+            console.warn("Could not parse coordinates:", coordStr, e);
+          }
+          return null;
+        };
+
+        // Get values from session (handling different column name variations)
+        const totalFarmers = cleanNum(session["Total Farmers"]) || 0;
+        const knowBuctril = cleanNum(session.KnowBuctril) || cleanNum(session["Know Buctril"]) || 0;
+        const awarenessRate = totalFarmers > 0 ? (knowBuctril / totalFarmers * 100) : 0;
+
+        const definiteUse = cleanNum(session["Will Definitely Use"]) || 0;
+        const definiteUseRate = totalFarmers > 0 ? (definiteUse / totalFarmers * 100) : 0;
+
+        const maybeUse = cleanNum(session.Maybe) || 0;
+        const notInterested = cleanNum(session["Not Interested"]) || 0;
+
+        return {
+          id: cleanNum(session.SN),
+          day: cleanNum(session.Day) || 0,
+          date: cleanStr(session.Date),
+          fromCity: cleanStr(session["From City"]),
+          city: cleanStr(session.City),
+          location: cleanStr(session["Session Location"]),
+          totalFarmers: totalFarmers,
+          wheatFarmers: cleanNum(session["Total Wheat Farmers"]) || 0,
+          wheatAcres: cleanNum(session["Total Wheat Acres"]) || 0,
+          knowBuctril: knowBuctril,
+          awarenessRate: awarenessRate,
+          usedLastYear: cleanNum(session["Used Last Year"]) || 0,
+          willDefinitelyUse: definiteUse,
+          definiteUseRate: definiteUseRate,
+          maybeUse: maybeUse,
+          notInterested: notInterested,
+          estimatedBuctrilAcres: cleanNum(session["Estimated Buctril Acres from this Session"]) || 0,
+          coordinates: parseCoordinates(session["Spot Coordinates"]),
+          coordinatesStr: cleanStr(session["Spot Coordinates"]),
+          distance: cleanNum(session["Approximate Distance between cities (km)"]) || 0,
+          fuelConsumption: cleanNum(session["Fuel Consumption as per fuel tank filling  expense (KM/Ltr)"]) || 0,
+          topReasonToUse: cleanStr(session["Top Reason to Use (session)"]) || "Not recorded",
+          topReasonNotToUse: cleanStr(session["Top Reason Not to Use (session)"]) || "Not recorded",
+          averageUnderstandingScore: cleanNum(session["Average Understanding Score"]) || 0,
+          sessionSheetRef: cleanStr(session["Session Sheet Ref"]) || ""
+        };
+      });
+
+      // Calculate summary statistics
+      const validSessions = structuredSessions.filter(s => s.totalFarmers > 0);
+      const totalSessions = validSessions.length;
+      
+      const summary = {
+        totalSessions: totalSessions,
+        totalFarmers: validSessions.reduce((sum, s) => sum + s.totalFarmers, 0),
+        totalWheatFarmers: validSessions.reduce((sum, s) => sum + s.wheatFarmers, 0),
+        totalWheatAcres: validSessions.reduce((sum, s) => sum + s.wheatAcres, 0),
+        totalKnowBuctril: validSessions.reduce((sum, s) => sum + s.knowBuctril, 0),
+        totalDefiniteUse: validSessions.reduce((sum, s) => sum + s.willDefinitelyUse, 0),
+        totalMaybeUse: validSessions.reduce((sum, s) => sum + s.maybeUse, 0),
+        totalNotInterested: validSessions.reduce((sum, s) => sum + s.notInterested, 0),
+        totalDistance: validSessions.reduce((sum, s) => sum + s.distance, 0),
+        avgAwarenessRate: totalSessions > 0 ? validSessions.reduce((sum, s) => sum + s.awarenessRate, 0) / totalSessions : 0,
+        avgDefiniteUseRate: totalSessions > 0 ? validSessions.reduce((sum, s) => sum + s.definiteUseRate, 0) / totalSessions : 0,
+        avgUnderstandingScore: totalSessions > 0 ? validSessions.reduce((sum, s) => sum + s.averageUnderstandingScore, 0) / totalSessions : 0,
+        uniqueCities: [...new Set(validSessions.map(s => s.city))].filter(c => c),
+        daysCovered: [...new Set(validSessions.map(s => s.day))].filter(d => d > 0).length,
+        sessionsWithCoordinates: validSessions.filter(s => s.coordinates).length
+      };
+
+      // Group by day for daily summaries
+      const sessionsByDay = {};
+      validSessions.forEach(session => {
+        if (!sessionsByDay[session.day]) {
+          sessionsByDay[session.day] = [];
+        }
+        sessionsByDay[session.day].push(session);
+      });
+
+      return {
+        sessions: validSessions,
+        summary: summary,
+        byDay: sessionsByDay,
+        rawData: rawData
+      };
+    }
+
+    // ================= DASHBOARD UPDATERS =================
+    function updateAllDashboardComponents() {
+      if (!processedData) return;
+      
+      updateKPIMetrics();
+      updateSummaryCards();
+      updateSessionList();
+      updateMap();
+      updateCharts();
+      updateDataTable();
+      populateDayFilter();
+    }
+
+    function updateKPIMetrics() {
+      const kpiContainer = document.getElementById('kpiMetrics');
+      const s = processedData.summary;
+      
+      kpiContainer.innerHTML = `
+        <div class="kpi-item">
+          <div class="kpi-value">${s.totalSessions}</div>
+          <div class="kpi-label">Total Sessions</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${s.totalFarmers.toLocaleString()}</div>
+          <div class="kpi-label">Farmers Engaged</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${s.totalWheatAcres.toLocaleString()}</div>
+          <div class="kpi-label">Wheat Acres</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${Math.round(s.avgAwarenessRate)}%</div>
+          <div class="kpi-label">Avg Awareness</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${Math.round(s.avgDefiniteUseRate)}%</div>
+          <div class="kpi-label">Avg Definite Use</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-value">${s.uniqueCities.length}</div>
+          <div class="kpi-label">Cities Covered</div>
+        </div>
+      `;
+    }
+
+    function updateSummaryCards() {
+      const s = processedData.summary;
+      
+      document.getElementById('totalFarmers').textContent = s.totalFarmers.toLocaleString();
+      document.getElementById('totalAcres').textContent = s.totalWheatAcres.toLocaleString();
+      document.getElementById('avgAwareness').textContent = Math.round(s.avgAwarenessRate) + '%';
+      document.getElementById('definiteUse').textContent = Math.round(s.avgDefiniteUseRate) + '%';
+    }
+
+    function updateSessionList() {
+      const container = document.getElementById('sessionList');
+      const sessionsByDay = processedData.byDay;
+      
+      // Sort days numerically
+      const sortedDays = Object.keys(sessionsByDay).sort((a, b) => parseInt(a) - parseInt(b));
+      
+      if (sortedDays.length === 0) {
+        container.innerHTML = '<div class="session-item"><strong>No session data available</strong></div>';
+        return;
+      }
+      
+      let html = '';
+      sortedDays.forEach(day => {
+        const daySessions = sessionsByDay[day];
+        const totalFarmers = daySessions.reduce((sum, s) => sum + s.totalFarmers, 0);
+        const totalAcres = daySessions.reduce((sum, s) => sum + s.wheatAcres, 0);
+        const avgAwareness = daySessions.reduce((sum, s) => sum + s.awarenessRate, 0) / daySessions.length;
+        const avgDefinite = daySessions.reduce((sum, s) => sum + s.definiteUseRate, 0) / daySessions.length;
+        
+        // Get unique cities for this day
+        const cities = [...new Set(daySessions.map(s => s.city))].filter(c => c);
+        const cityList = cities.length > 2 ? 
+          `${cities[0]}, ${cities[1]}... (+${cities.length - 2} more)` : 
+          cities.join(', ');
+        
+        html += `
+          <div class="session-item">
+            <strong>Day ${day}: ${daySessions[0].date || 'Unknown date'}</strong>
+            <p>${daySessions.length} session${daySessions.length > 1 ? 's' : ''} | ${totalFarmers} farmers | ${totalAcres.toLocaleString()} acres</p>
+            <p>Awareness: ${Math.round(avgAwareness)}% | Definite: ${Math.round(avgDefinite)}%</p>
+            <p>Cities: ${cityList || 'Not specified'}</p>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+    }
+
+    // ================= MAP FUNCTIONS =================
+    function updateMap() {
+      if (!map) {
+        // Initialize map with Pakistan as center
+        map = L.map('map').setView([30.3753, 69.3451], 6);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 18
+        }).addTo(map);
+      } else {
+        // Clear existing markers
+        markers.forEach(marker => map.removeLayer(marker));
+        markers = [];
+      }
+      
+      const sessions = processedData.sessions;
+      const metricFilter = document.getElementById('metricFilter').value;
+      
+      // Calculate max values for scaling
+      const maxFarmers = Math.max(...sessions.map(s => s.totalFarmers));
+      const maxAcres = Math.max(...sessions.map(s => s.wheatAcres));
+      const maxAwareness = Math.max(...sessions.map(s => s.awarenessRate));
+      const maxDefinite = Math.max(...sessions.map(s => s.definiteUseRate));
+      
+      // Add markers for each session with coordinates
+      sessions.forEach(session => {
+        if (session.coordinates) {
+          // Determine marker size based on selected metric
+          let radius;
+          let color;
+          
+          switch(metricFilter) {
+            case 'acres':
+              radius = Math.max(8, Math.min(25, (session.wheatAcres / maxAcres) * 20));
+              color = getColorByValue(session.awarenessRate, maxAwareness);
+              break;
+            case 'awareness':
+              radius = Math.max(8, Math.min(25, (session.totalFarmers / maxFarmers) * 15));
+              color = getColorByValue(session.awarenessRate, maxAwareness);
+              break;
+            case 'definite':
+              radius = Math.max(8, Math.min(25, (session.totalFarmers / maxFarmers) * 15));
+              color = getColorByValue(session.definiteUseRate, maxDefinite);
+              break;
+            default: // farmers
+              radius = Math.max(8, Math.min(25, (session.totalFarmers / maxFarmers) * 15));
+              color = getColorByValue(session.awarenessRate, maxAwareness);
+          }
+          
+          const popupContent = `
+            <div style="padding: 8px; min-width: 200px;">
+              <strong>${session.location || session.city}</strong><br>
+              <hr style="margin: 5px 0;">
+              <strong>Day ${session.day}:</strong> ${session.date}<br>
+              <strong>Farmers:</strong> ${session.totalFarmers}<br>
+              <strong>Wheat Acres:</strong> ${session.wheatAcres.toLocaleString()}<br>
+              <strong>Awareness:</strong> ${Math.round(session.awarenessRate)}%<br>
+              <strong>Definite Use:</strong> ${Math.round(session.definiteUseRate)}%<br>
+              <strong>Top Reason:</strong> ${session.topReasonToUse.substring(0, 30)}${session.topReasonToUse.length > 30 ? '...' : ''}
+            </div>
+          `;
+          
+          const marker = L.circleMarker(session.coordinates, {
+            radius: radius,
+            fillColor: color,
+            color: '#333',
+            weight: 1,
+            opacity: 0.9,
+            fillOpacity: 0.7
+          }).addTo(map).bindPopup(popupContent);
+          
+          // Store session data with marker for filtering
+          marker.options.sessionData = session;
+          markers.push(marker);
+        }
+      });
+      
+      // Fit map to show all markers with padding
+      if (markers.length > 0) {
+        const group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+      }
+      
+      // Update legend based on metric
+      updateMapLegend(metricFilter, maxFarmers, maxAcres, maxAwareness, maxDefinite);
+    }
+    
+    function getColorByValue(value, maxValue) {
+      if (maxValue === 0) return '#3498db';
+      
+      const ratio = value / maxValue;
+      
+      if (ratio < 0.3) return '#e74c3c'; // Red for low values
+      if (ratio < 0.6) return '#f39c12'; // Orange for medium values
+      return '#2ecc71'; // Green for high values
+    }
+    
+    function updateMapLegend(metric, maxFarmers, maxAcres, maxAwareness, maxDefinite) {
+      // Remove existing legend
+      const existingLegend = document.querySelector('.map-legend');
+      if (existingLegend) existingLegend.remove();
+      
+      let legendContent = '';
+      let title = '';
+      
+      switch(metric) {
+        case 'farmers':
+          title = 'Marker Size = Farmers Engaged';
+          legendContent = `
+            <div class="legend-item">
+              <span class="legend-circle" style="width: 10px; height: 10px; background: #3498db;"></span>
+              <span>Small: < ${Math.round(maxFarmers * 0.3)} farmers</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-circle" style="width: 18px; height: 18px; background: #3498db;"></span>
+              <span>Medium: < ${Math.round(maxFarmers * 0.6)} farmers</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-circle" style="width: 25px; height: 25px; background: #3498db;"></span>
+              <span>Large: ≥ ${Math.round(maxFarmers * 0.6)} farmers</span>
+            </div>
+          `;
+          break;
+        case 'acres':
+          title = 'Marker Size = Wheat Acres';
+          legendContent = `
+            <div class="legend-item">
+              <span class="legend-circle" style="width: 10px; height: 10px; background: #3498db;"></span>
+              <span>Small: < ${Math.round(maxAcres * 0.3)} acres</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-circle" style="width: 18px; height: 18px; background: #3498db;"></span>
+              <span>Medium: < ${Math.round(maxAcres * 0.6)} acres</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-circle" style="width: 25px; height: 25px; background: #3498db;"></span>
+              <span>Large: ≥ ${Math.round(maxAcres * 0.6)} acres</span>
+            </div>
+          `;
+          break;
+        case 'awareness':
+          title = 'Marker Color = Awareness Rate';
+          legendContent = `
+            <div class="legend-item">
+              <span class="legend-square" style="background: #e74c3c;"></span>
+              <span>Low: < 30%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-square" style="background: #f39c12;"></span>
+              <span>Medium: 30-60%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-square" style="background: #2ecc71;"></span>
+              <span>High: ≥ 60%</span>
+            </div>
+          `;
+          break;
+        case 'definite':
+          title = 'Marker Color = Definite Use Rate';
+          legendContent = `
+            <div class="legend-item">
+              <span class="legend-square" style="background: #e74c3c;"></span>
+              <span>Low: < 30%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-square" style="background: #f39c12;"></span>
+              <span>Medium: 30-60%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-square" style="background: #2ecc71;"></span>
+              <span>High: ≥ 60%</span>
+            </div>
+          `;
+          break;
+      }
+      
+      const legend = L.control({position: 'bottomright'});
+      legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'map-legend');
+        div.style.cssText = `
+          background: white;
+          padding: 10px;
+          border-radius: 5px;
+          box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+          font-size: 12px;
+          min-width: 150px;
+        `;
+        div.innerHTML = `
+          <strong>${title}</strong>
+          ${legendContent}
+          <style>
+            .legend-item { display: flex; align-items: center; margin: 5px 0; }
+            .legend-circle { 
+              display: inline-block; 
+              border-radius: 50%; 
+              margin-right: 8px; 
+              border: 1px solid #333;
+            }
+            .legend-square { 
+              display: inline-block; 
+              width: 12px; 
+              height: 12px; 
+              margin-right: 8px; 
+              border: 1px solid #333;
+            }
+          </style>
+        `;
+        return div;
+      };
+      
+      legend.addTo(map);
+    }
+
+    // ================= CHART FUNCTIONS =================
+    function updateCharts() {
+      const sessions = processedData.sessions;
+      
+      // 1. Engagement Chart (Farmers per session)
+      const ctx1 = document.getElementById('engagementChart').getContext('2d');
+      if (engagementChart) engagementChart.destroy();
+      
+      // Sort sessions by ID
+      const sortedSessions = [...sessions].sort((a, b) => a.id - b.id);
+      const sessionLabels = sortedSessions.map(s => `S${s.id} (${s.city.substring(0, 10)}${s.city.length > 10 ? '...' : ''})`);
+      const farmerCounts = sortedSessions.map(s => s.totalFarmers);
+      const acreCounts = sortedSessions.map(s => s.wheatAcres / 100); // Scale down for chart
+      
+      engagementChart = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: sessionLabels,
+          datasets: [
+            {
+              label: 'Farmers Engaged',
+              data: farmerCounts,
+              backgroundColor: 'rgba(52, 152, 219, 0.7)',
+              borderColor: 'rgba(52, 152, 219, 1)',
+              borderWidth: 1,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Wheat Acres (÷100)',
+              data: acreCounts,
+              backgroundColor: 'rgba(46, 204, 113, 0.7)',
+              borderColor: 'rgba(46, 204, 113, 1)',
+              borderWidth: 1,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Farmers'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Acres (÷100)'
+              },
+              grid: {
+                drawOnChartArea: false
+              }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Engagement by Session'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.datasetIndex === 0) {
+                    label += context.parsed.y + ' farmers';
+                  } else {
+                    label += (context.parsed.y * 100).toLocaleString() + ' acres';
+                  }
+                  return label;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // 2. Conversion Chart (Awareness vs Definite Use)
+      const ctx2 = document.getElementById('conversionChart').getContext('2d');
+      if (conversionChart) conversionChart.destroy();
+      
+      // Group by day
+      const days = Object.keys(processedData.byDay).sort((a, b) => a - b);
+      const dayLabels = days.map(day => `Day ${day}`);
+      const dayAwareness = days.map(day => {
+        const daySessions = processedData.byDay[day];
+        return daySessions.reduce((sum, s) => sum + s.awarenessRate, 0) / daySessions.length;
+      });
+      const dayDefinite = days.map(day => {
+        const daySessions = processedData.byDay[day];
+        return daySessions.reduce((sum, s) => sum + s.definiteUseRate, 0) / daySessions.length;
+      });
+      
+      conversionChart = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: dayLabels,
+          datasets: [
+            {
+              label: 'Awareness Rate (%)',
+              data: dayAwareness,
+              borderColor: 'rgba(231, 76, 60, 1)',
+              backgroundColor: 'rgba(231, 76, 60, 0.1)',
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'Definite Use Rate (%)',
+              data: dayDefinite,
+              borderColor: 'rgba(46, 204, 113, 1)',
+              backgroundColor: 'rgba(46, 204, 113, 0.1)',
+              fill: true,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              title: {
+                display: true,
+                text: 'Percentage (%)'
+              }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Conversion Funnel by Day'
+            }
+          }
+        }
+      });
+      
+      // 3. Reasons Chart
+      const ctx3 = document.getElementById('reasonsChart').getContext('2d');
+      if (reasonsChart) reasonsChart.destroy();
+      
+      // Count reasons
+      const reasonCounts = {};
+      sessions.forEach(s => {
+        const reason = s.topReasonToUse;
+        if (reason && reason !== "Not recorded" && reason.trim() !== "") {
+          // Simplify reason names
+          let simplifiedReason = reason;
+          if (reason.includes("Trust in Bayer")) simplifiedReason = "Trust in Bayer";
+          else if (reason.includes("Good Past Experience")) simplifiedReason = "Past Experience";
+          else if (reason.includes("Better Weed Control")) simplifiedReason = "Weed Control";
+          else if (reason.includes("Safe on Crop")) simplifiedReason = "Crop Safety";
+          
+          reasonCounts[simplifiedReason] = (reasonCounts[simplifiedReason] || 0) + 1;
+        }
+      });
+      
+      // Sort by count and take top 6
+      const sortedReasons = Object.entries(reasonCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+      
+      const reasonLabels = sortedReasons.map(r => r[0]);
+      const reasonData = sortedReasons.map(r => r[1]);
+      
+      reasonsChart = new Chart(ctx3, {
+        type: 'doughnut',
+        data: {
+          labels: reasonLabels,
+          datasets: [{
+            data: reasonData,
+            backgroundColor: [
+              '#3498db', '#2ecc71', '#e74c3c', '#f39c12', 
+              '#9b59b6', '#1abc9c', '#d35400', '#34495e'
+            ]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Top Reasons for Use'
+            },
+            legend: {
+              position: 'right'
+            }
+          }
+        }
+      });
+      
+      // 4. Distance Chart
+      const ctx4 = document.getElementById('distanceChart').getContext('2d');
+      if (distanceChart) distanceChart.destroy();
+      
+      // Get unique cities with their total distances
+      const cityDistances = {};
+      sessions.forEach(s => {
+        if (s.distance > 0) {
+          cityDistances[s.city] = (cityDistances[s.city] || 0) + s.distance;
+        }
+      });
+      
+      // Sort by distance and take top 10
+      const sortedCities = Object.entries(cityDistances)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      
+      const cityLabels = sortedCities.map(c => c[0]);
+      const cityDistanceData = sortedCities.map(c => c[1]);
+      
+      distanceChart = new Chart(ctx4, {
+        type: 'bar',
+        data: {
+          labels: cityLabels,
+          datasets: [{
+            label: 'Distance Traveled (km)',
+            data: cityDistanceData,
+            backgroundColor: 'rgba(155, 89, 182, 0.7)',
+            borderColor: 'rgba(155, 89, 182, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Distance Traveled by City'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Kilometers (km)'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ================= TABLE UPDATER =================
+    function updateDataTable() {
+      const table = document.getElementById('dataTable');
+      const sessions = processedData.sessions.slice(0, 20); // Show first 20 rows
+      
+      if (sessions.length === 0) {
+        table.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No data available</td></tr>';
+        return;
+      }
+      
+      let html = `
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Date</th>
+            <th>From City</th>
+            <th>City</th>
+            <th>Farmers</th>
+            <th>Wheat Acres</th>
+            <th>Awareness</th>
+            <th>Definite Use</th>
+            <th>Distance (km)</th>
+          </tr>
+        </thead>
+        <tbody>
+      `;
+      
+      sessions.forEach(session => {
+        html += `
+          <tr>
+            <td>${session.id}</td>
+            <td>${session.date}</td>
+            <td>${session.fromCity || '-'}</td>
+            <td>${session.city}</td>
+            <td>${session.totalFarmers}</td>
+            <td>${session.wheatAcres.toLocaleString()}</td>
+            <td>${Math.round(session.awarenessRate)}%</td>
+            <td>${Math.round(session.definiteUseRate)}%</td>
+            <td>${session.distance || '-'}</td>
+          </tr>
+        `;
+      });
+      
+      html += `</tbody>`;
+      table.innerHTML = html;
+    }
+
+    // ================= FILTER FUNCTIONS =================
+    function populateDayFilter() {
+      const dayFilter = document.getElementById('dayFilter');
+      const metricFilter = document.getElementById('metricFilter');
+      
+      // Clear existing options except "All Days"
+      while (dayFilter.options.length > 1) {
+        dayFilter.remove(1);
+      }
+      
+      const days = Object.keys(processedData.byDay).sort((a, b) => parseInt(a) - parseInt(b));
+      
+      days.forEach(day => {
+        const daySessions = processedData.byDay[day];
+        const sessionCount = daySessions.length;
+        const option = document.createElement('option');
+        option.value = day;
+        option.textContent = `Day ${day} (${sessionCount} session${sessionCount > 1 ? 's' : ''})`;
+        dayFilter.appendChild(option);
+      });
+      
+      // Add event listeners
+      dayFilter.addEventListener('change', function() {
+        filterMapByDay(this.value);
+      });
+      
+      metricFilter.addEventListener('change', function() {
+        updateMap();
+      });
+    }
+
+    function filterMapByDay(day) {
+      if (day === 'all') {
+        // Show all markers
+        markers.forEach(marker => {
+          marker.setStyle({ opacity: 0.9, fillOpacity: 0.7 });
+        });
+        return;
+      }
+      
+      // Highlight markers for selected day, fade others
+      markers.forEach(marker => {
+        const session = marker.options.sessionData;
+        if (session && session.day == day) {
+          marker.setStyle({ opacity: 1, fillOpacity: 0.9, weight: 2 });
+        } else {
+          marker.setStyle({ opacity: 0.3, fillOpacity: 0.1, weight: 1 });
+        }
+      });
+    }
+
+    // ================= MAP CONTROLS =================
+    document.getElementById('btnHeatMap').addEventListener('click', function() {
+      showToast('Heat map functionality would require Leaflet.heat plugin', 'info');
+    });
+
+    document.getElementById('btnRoute').addEventListener('click', function() {
+      showToast('Route visualization would connect session coordinates in sequence', 'info');
+    });
+
+    document.getElementById('btnReset').addEventListener('click', function() {
+      if (map && markers.length > 0) {
+        const group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+      }
+      document.getElementById('dayFilter').value = 'all';
+      filterMapByDay('all');
+      showToast('Map view reset', 'info');
+    });
+
+    // ================= INITIALIZATION =================
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("Dashboard initializing...");
+      
+      // Load data when page loads
+      loadCSVData();
+      
+      // Set up refresh button
+      document.getElementById('refreshBtn').addEventListener('click', function() {
+        loadCSVData();
+      });
+      
+      // Auto-refresh every 10 minutes (optional)
+      setInterval(() => {
+        console.log("Auto-refreshing data...");
+        loadCSVData();
+      }, 10 * 60 * 1000);
+      
+      // Add keyboard shortcut (Ctrl+R or Cmd+R to refresh)
+      document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+          e.preventDefault();
+          loadCSVData();
+        }
+      });
+    });
+
+    // ================= EXPORT FUNCTIONALITY =================
+    function exportToCSV() {
+      if (!processedData) return;
+      
+      const sessions = processedData.sessions;
+      const headers = [
+        'SN', 'Date', 'Day', 'From City', 'City', 'Location', 
+        'Total Farmers', 'Wheat Farmers', 'Wheat Acres', 'Awareness Rate', 
+        'Definite Use Rate', 'Distance (km)', 'Top Reason to Use'
+      ];
+      
+      const csvRows = [
+        headers.join(','),
+        ...sessions.map(s => [
+          s.id,
+          `"${s.date}"`,
+          s.day,
+          `"${s.fromCity}"`,
+          `"${s.city}"`,
+          `"${s.location}"`,
+          s.totalFarmers,
+          s.wheatFarmers,
+          s.wheatAcres,
+          `${Math.round(s.awarenessRate)}%`,
+          `${Math.round(s.definiteUseRate)}%`,
+          s.distance,
+          `"${s.topReasonToUse}"`
+        ].join(','))
+      ];
+      
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `buctril-session-data-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast('Data exported to CSV', 'success');
+    }
+
+    // Add export button to the page
+    document.addEventListener('DOMContentLoaded', function() {
+      const exportBtn = document.createElement('button');
+      exportBtn.textContent = '📥 Export Data';
+      exportBtn.className = 'refresh-btn';
+      exportBtn.style.bottom = '70px';
+      exportBtn.style.right = '20px';
+      exportBtn.onclick = exportToCSV;
+      document.body.appendChild(exportBtn);
+    });
+  </script>
 </body>
 </html>
