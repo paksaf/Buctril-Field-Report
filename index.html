@@ -1,959 +1,456 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Buctril Farmer Engagement Summary 2025</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Leaflet CSS for map -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-
-  <style>
-    :root {
-      --bg-dark: rgba(6, 19, 38, 0.92);
-      --card: rgba(18, 31, 55, 0.96);
-      --accent: #ffb74d;
-      --accent-soft: rgba(255, 183, 77, 0.2);
-      --text-main: #fefefe;
-      --text-muted: #b3bed4;
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --radius-lg: 18px;
-      --radius-xl: 24px;
-      --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.4);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        "Segoe UI", sans-serif;
-      color: var(--text-main);
-      background: #000;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Background video/image */
-
-    #bg-video {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      filter: blur(1px) brightness(0.6);
-      z-index: -2;
-    }
-
-    .bg-fallback {
-      position: fixed;
-      inset: 0;
-      z-index: -3;
-      background: url("wheat-bg.jpg") center/cover no-repeat;
-      opacity: 0.6;
-    }
-
-    .overlay {
-      position: relative;
-      min-height: 100vh;
-      background: radial-gradient(
-          circle at top left,
-          rgba(255, 193, 7, 0.25),
-          transparent 55%
-        ),
-        radial-gradient(circle at bottom right, rgba(3, 155, 229, 0.25), transparent 55%),
-        linear-gradient(to bottom, rgba(2, 8, 23, 0.96), rgba(2, 6, 23, 0.98));
-      padding: 24px clamp(16px, 4vw, 40px);
-    }
-
-    header {
-      margin-bottom: 20px;
-    }
-
-    .title-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .logo-badge {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, #ffe082, #f57c00);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      color: #3e2723;
-      box-shadow: 0 0 0 2px rgba(255, 224, 130, 0.35);
-      margin-right: 6px;
-    }
-
-    h1 {
-      font-size: clamp(26px, 3vw, 34px);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
-    }
-
-    .subtitle {
-      margin-top: 4px;
-      font-size: 14px;
-      color: var(--text-muted);
-      max-width: 780px;
-    }
-
-    .subtitle code {
-      font-family: "Menlo", "SF Mono", ui-monospace, monospace;
-      font-size: 13px;
-      background: rgba(15, 23, 42, 0.8);
-      padding: 2px 6px;
-      border-radius: 6px;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-    }
-
-    .layout-main {
-      display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
-      gap: 20px;
-      align-items: flex-start;
-      margin-bottom: 16px;
-    }
-
-    @media (max-width: 900px) {
-      .layout-main {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: var(--radius-xl);
-      border: 1px solid var(--border-subtle);
-      box-shadow: var(--shadow-soft);
-      padding: 14px 16px 18px;
-      backdrop-filter: blur(20px);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .pill-icon {
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .card-title-text {
-      font-size: 13px;
-      color: #e5e9f5;
-    }
-
-    /* Map card */
-
-    #route-map {
-      width: 100%;
-      min-height: 360px;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      background: radial-gradient(
-        circle at top,
-        rgba(148, 163, 184, 0.25),
-        rgba(15, 23, 42, 0.9)
-      );
-    }
-
-    /* Metrics card */
-
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 10px;
-    }
-
-    .metric-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 10px;
-    }
-
-    .metric {
-      background: radial-gradient(circle at top left, rgba(255, 183, 77, 0.08), transparent 55%),
-        rgba(13, 25, 48, 0.96);
-      border-radius: var(--radius-lg);
-      padding: 10px 12px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .metric-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-muted);
-    }
-
-    .metric-value {
-      font-size: 24px;
-      font-weight: 600;
-      line-height: 1.1;
-    }
-
-    .metric-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .metric-sub span {
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    /* Table cards */
-
-    .table-card {
-      margin-top: 6px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 6px;
-      font-size: 12px;
-    }
-
-    thead {
-      background: linear-gradient(
-        to right,
-        rgba(30, 64, 175, 0.9),
-        rgba(2, 132, 199, 0.9)
-      );
-    }
-
-    thead th {
-      text-align: left;
-      padding: 8px 10px;
-      color: #e5f3ff;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    tbody tr:nth-child(even) {
-      background: rgba(15, 23, 42, 0.85);
-    }
-
-    tbody tr:nth-child(odd) {
-      background: rgba(15, 23, 42, 0.6);
-    }
-
-    tbody td {
-      padding: 6px 10px;
-      border-bottom: 1px solid rgba(51, 65, 85, 0.95);
-      color: #e2e8f0;
-      vertical-align: top;
-    }
-
-    tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    .table-wrapper {
-      max-height: 260px;
-      overflow: auto;
-      border-radius: 14px;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-    }
-
-    .footer-note {
-      margin-top: 10px;
-      font-size: 11px;
-      color: var(--text-muted);
-      text-align: center;
-    }
-
-    .footer-note code {
-      font-family: "Menlo", "SF Mono", ui-monospace, monospace;
-      font-size: 11px;
-      background: rgba(15, 23, 42, 0.85);
-      padding: 1px 5px;
-      border-radius: 5px;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-    }
-
-    /* Charts section */
-
-    .charts-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
-      gap: 16px;
-      margin-top: 10px;
-    }
-
-    @media (max-width: 900px) {
-      .charts-grid {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    .chart-container {
-      background: rgba(13, 25, 48, 0.96);
-      border-radius: var(--radius-lg);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      padding: 10px 12px;
-    }
-
-    .chart-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-  </style>
-</head>
-
-<body>
-  <!-- Optional background video (put wheat video as bg-video.mp4 in repo root) -->
-  <div class="bg-fallback"></div>
-  <video id="bg-video" autoplay muted loop playsinline>
-    <source src="bg-video.mp4" type="video/mp4" />
-  </video>
-
-  <div class="overlay">
-    <header>
-      <div class="title-row">
-        <div class="logo-badge">🌾</div>
-        <h1>Buctril Farmer Engagement Summary 2025</h1>
-      </div>
-      <p class="subtitle">
-        This dashboard reads <code>sum_sheet.csv</code> directly from the repository and summarises
-        farmer engagement by <strong>cities</strong>, <strong>villages/session locations</strong>,
-        <strong>dates</strong>, <strong>farmers reached</strong>, <strong>crop area (acres)</strong>,
-        and <strong>feedback / observations</strong>. Only these fields are used – fuel and APV
-        details are intentionally ignored.
-      </p>
-    </header>
-
-    <!-- Top layout: map + key metrics -->
-    <main class="layout-main">
-      <!-- Left: Map -->
-      <section class="card">
-        <div class="card-header">
-          <div class="pill-icon">M</div>
-          <span class="card-title-text">Engagement Route Map (Circles by crop area)</span>
-        </div>
-        <div id="route-map"></div>
-      </section>
-
-      <!-- Right: Metrics -->
-      <section class="card">
-        <div class="card-header">
-          <div class="pill-icon">Σ</div>
-          <span class="card-title-text">Key Engagement Metrics (Filtered Range)</span>
-        </div>
-
-        <div class="metrics-grid">
-          <div class="metric-row">
-            <div class="metric">
-              <div class="metric-label">Total Sessions</div>
-              <div class="metric-value" id="metric-total-sessions">–</div>
-              <div class="metric-sub">
-                Unique session IDs (SN):
-                <span id="metric-unique-sn">–</span>
-              </div>
-            </div>
-
-            <div class="metric">
-              <div class="metric-label">Total Farmers Reached</div>
-              <div class="metric-value" id="metric-total-farmers">–</div>
-              <div class="metric-sub">
-                Avg per session:
-                <span id="metric-farmers-per-session">–</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="metric-row">
-            <div class="metric">
-              <div class="metric-label">Total Wheat / Crop Area (Acres)</div>
-              <div class="metric-value" id="metric-total-acres">–</div>
-              <div class="metric-sub">
-                Avg acres per session:
-                <span id="metric-acres-per-session">–</span>
-              </div>
-            </div>
-
-            <div class="metric">
-              <div class="metric-label">Coverage</div>
-              <div class="metric-value" id="metric-villages">–</div>
-              <div class="metric-sub">
-                Cities touched:
-                <span id="metric-cities">–</span>,
-                sessions with GPS:
-                <span id="metric-sessions-with-coords">–</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Session-wise detail -->
-    <section class="card table-card">
-      <div class="card-header">
-        <div class="pill-icon">T</div>
-        <span class="card-title-text">
-          Session-wise Detail (From <code>sum_sheet.csv</code> – filtered by date / city / village)
-        </span>
-      </div>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>SN</th>
-              <th>Date</th>
-              <th>From City</th>
-              <th>To City</th>
-              <th>Session Location (Village)</th>
-              <th>Total Farmers</th>
-              <th>Crop Area (Acres)</th>
-              <th>Coordinates (lat, lon)</th>
-              <th>Feedback / Observations</th>
-            </tr>
-          </thead>
-          <tbody id="session-rows">
-            <!-- Filled by JS -->
-          </tbody>
-        </table>
-      </div>
-
-      <p class="footer-note">
-        All values above are loaded from <code>sum_sheet.csv</code>. Only fields for date, cities,
-        villages / session location, coordinates, farmers, crop area, and feedback / observations are
-        used; fuel and APV information is ignored.
-      </p>
-    </section>
-
-    <!-- Village-wise summary + charts -->
-    <section class="card table-card">
-      <div class="card-header">
-        <div class="pill-icon">V</div>
-        <span class="card-title-text">
-          Village-wise Summary &amp; Visual Insights
-        </span>
-      </div>
-
-      <div class="table-wrapper" style="max-height: 220px;">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Village / Session Location</th>
-              <th>Sessions</th>
-              <th>Total Farmers</th>
-              <th>Total Crop Area (Acres)</th>
-              <th>Sample Feedback / Observations</th>
-            </tr>
-          </thead>
-          <tbody id="village-rows">
-            <!-- Filled by JS -->
-          </tbody>
-        </table>
-      </div>
-
-      <div class="charts-grid">
-        <div class="chart-container">
-          <div class="chart-title">Farmers Engagement by From City</div>
-          <canvas id="cityFarmersChart" height="160"></canvas>
-        </div>
-        <div class="chart-container">
-          <div class="chart-title">Crop Area (Acres) by Village / Session Location</div>
-          <canvas id="villageAcresChart" height="160"></canvas>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-  <!-- CSV & Dashboard Logic -->
- <!-- CSV & Dashboard Logic -->
-<script>
-  // ----------------- CONFIG: FILTERS -----------------
-  // Dates must be in YYYY-MM-DD format in the CSV for filtering to work correctly.
-  const FILTER_START_DATE = "2025-01-05"; // inclusive
-  const FILTER_END_DATE = "2025-12-31";   // inclusive (wider so you see data)
-
-  // If you want to restrict to particular cities or villages, put names here.
-  // Leave arrays empty [] to include all values.
-  const ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
-  const ALLOWED_TO_CITIES = [];   // e.g. ["Chichawatni"]
-  const ALLOWED_LOCATIONS = [];   // e.g. ["Basti Joriya", "Chak 10"]
-
-  let cityFarmersChartInstance = null;
-  let villageAcresChartInstance = null;
-
-  document.addEventListener("DOMContentLoaded", () => {
-    loadDashboard();
-  });
-
-  async function loadDashboard() {
-    try {
-      const response = await fetch("sum_sheet.csv?cache=" + Date.now());
-      if (!response.ok) {
-        throw new Error("Failed to fetch CSV: HTTP " + response.status);
-      }
-
-      const csvText = await response.text();
-
-      Papa.parse(csvText, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          const rows = results.data || [];
-          console.log("CSV columns:", Object.keys(rows[0] || {})); // helpful for debugging
-
-          const filteredRows = filterRows(rows);
-
-          updateMetrics(filteredRows);
-          updateSessionTable(filteredRows);
-          updateVillageSummary(filteredRows);
-          initMap(filteredRows);
-          buildCharts(filteredRows);
-        },
-        error: (err) => {
-          console.error("PapaParse error:", err);
-        },
-      });
-    } catch (err) {
-      console.error("Error loading CSV:", err);
-    }
-  }
-
-  // ----------------- FILTERING -----------------
-  function filterRows(rows) {
-    return rows.filter((r) => {
-      const dateStr = (r["Date"] || "").trim();
-      if (FILTER_START_DATE && FILTER_END_DATE && dateStr) {
-        if (dateStr < FILTER_START_DATE || dateStr > FILTER_END_DATE) {
-          return false;
+    <meta charset="UTF-8" />
+    <title>Buctril Farmer Engagement Summary 2025</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+    <style>
+        :root {
+            --bg-dark: rgba(6, 19, 38, 0.92);
+            --card: rgba(18, 31, 55, 0.96);
+            --accent: #ffb74d;
+            --accent-soft: rgba(255, 183, 77, 0.2);
+            --text-main: #fefefe;
+            --text-muted: #b3bed4;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --radius-lg: 18px;
+            --radius-xl: 24px;
+            --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.4);
         }
-      }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                "Segoe UI", sans-serif;
+            color: var(--text-main);
+            background: #000;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        /* Background video/image */
+        #bg-video {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(1px) brightness(0.6);
+            z-index: -2;
+        }
+        .bg-fallback {
+            position: fixed;
+            inset: 0;
+            z-index: -3;
+            background: url("wheat-bg.jpg") center/cover no-repeat;
+            opacity: 0.6;
+        }
+        .overlay {
+            position: relative;
+            min-height: 100vh;
+            background: radial-gradient(
+                circle at top left,
+                rgba(255, 193, 7, 0.25),
+                transparent 55%
+            ),
+            radial-gradient(circle at bottom right, rgba(3, 155, 229, 0.25), transparent 55%),
+            linear-gradient(to bottom, rgba(2, 8, 23, 0.96), rgba(2, 6, 23, 0.98));
+            padding: 24px clamp(16px, 4vw, 40px);
+        }
+        header {
+            margin-bottom: 20px;
+        }
+        .title-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .logo-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffe082, #f57c00);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #3e2723;
+            box-shadow: 0 0 0 2px rgba(255, 224, 130, 0.35);
+            margin-right: 6px;
+        }
+        h1 {
+            font-size: clamp(26px, 3vw, 34px);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+        }
+        .subtitle {
+            margin-top: 4px;
+            font-size: 14px;
+            color: var(--text-muted);
+            max-width: 780px;
+        }
+        .subtitle code {
+            font-family: "Menlo", "SF Mono", ui-monospace, monospace;
+            font-size: 13px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+        }
+        .layout-main {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
+            gap: 20px;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 900px) {
+            .layout-main {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .card {
+            background: var(--card);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-soft);
+            padding: 14px 16px 18px;
+            backdrop-filter: blur(20px);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .pill-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+        .card-title-text {
+            font-size: 13px;
+            color: #e5e9f5;
+        }
+        /* Map card */
+        #route-map {
+            width: 100%;
+            min-height: 360px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: radial-gradient(
+                circle at top,
+                rgba(148, 163, 184, 0.25),
+                rgba(15, 23, 42, 0.9)
+            );
+        }
+        /* Metrics card */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
+        }
+        .metric-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+        }
+        .metric {
+            background: radial-gradient(circle at top left, rgba(255, 183, 77, 0.08), transparent 55%),
+                rgba(13, 25, 48, 0.96);
+            border-radius: var(--radius-lg);
+            padding: 10px 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .metric-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: 600;
+            line-height: 1.1;
+        }
+        .metric-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .metric-sub span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        /* Table cards */
+        .table-card {
+            margin-top: 6px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 12px;
+        }
+        thead {
+            background: linear-gradient(
+                to right,
+                rgba(30, 64, 175, 0.9),
+                rgba(2, 132, 199, 0.9)
+            );
+        }
+        thead th {
+            text-align: left;
+            padding: 8px 10px;
+            color: #e5f3ff;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        tbody tr:nth-child(even) {
+            background: rgba(15, 23, 42, 0.85);
+        }
+        tbody tr:nth-child(odd) {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        tbody td {
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.95);
+            color: #e2e8f0;
+            vertical-align: top;
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .table-wrapper {
+            max-height: 260px;
+            overflow: auto;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+        }
+        .footer-note {
+            margin-top: 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .footer-note code {
+            font-family: "Menlo", "SF Mono", ui-monospace, monospace;
+            font-size: 11px;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 1px 5px;
+            border-radius: 5px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+        }
+        /* Charts section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
+            gap: 16px;
+            margin-top: 10px;
+        }
+        @media (max-width: 900px) {
+            .charts-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .chart-container {
+            background: rgba(13, 25, 48, 0.96);
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            padding: 10px 12px;
+        }
+        .chart-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .media-link {
+            display: block;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-fallback"></div>
+    <video id="bg-video" autoplay muted loop playsinline>
+        <source src="bg-video.mp4" type="video/mp4" />
+    </video>
+    <div class="overlay">
+        <header>
+            <div class="title-row">
+                <div class="logo-badge">🌾</div>
+                <h1>Buctril Farmer Engagement Summary 2025</h1>
+            </div>
+            <p class="subtitle">
+                This dashboard reads <code>sum_sheet.csv</code> directly from the repository and summarises
+                farmer engagement by <strong>cities</strong>, <strong>villages/session locations</strong>,
+                <strong>dates</strong>, <strong>farmers reached</strong>, <strong>crop area (acres)</strong>,
+                and <strong>feedback / observations</strong>.
+            </p>
+        </header>
 
-      const fromCity = (r["From City"] || "").trim();
-      const toCity = (r["To City"] || "").trim();
-      const loc = (r["Session Location"] || "").trim();
+        <main class="layout-main">
+            <section class="card">
+                <div class="card-header">
+                    <div class="pill-icon">M</div>
+                    <span class="card-title-text">Engagement Route Map (Circles by crop area)</span>
+                </div>
+                <div id="route-map"></div>
+            </section>
 
-      if (ALLOWED_FROM_CITIES.length && !ALLOWED_FROM_CITIES.includes(fromCity)) {
-        return false;
-      }
-      if (ALLOWED_TO_CITIES.length && !ALLOWED_TO_CITIES.includes(toCity)) {
-        return false;
-      }
-      if (ALLOWED_LOCATIONS.length && !ALLOWED_LOCATIONS.includes(loc)) {
-        return false;
-      }
+            <section class="card">
+                <div class="card-header">
+                    <div class="pill-icon">Σ</div>
+                    <span class="card-title-text">Key Engagement Metrics (Filtered Range)</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-row">
+                        <div class="metric">
+                            <div class="metric-label">Total Sessions</div>
+                            <div class="metric-value" id="metric-total-sessions">–</div>
+                            <div class="metric-sub">
+                                Unique session IDs (SN):
+                                <span id="metric-unique-sn">–</span>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Farmers Reached</div>
+                            <div class="metric-value" id="metric-total-farmers">–</div>
+                            <div class="metric-sub">
+                                Avg per session:
+                                <span id="metric-farmers-per-session">–</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric">
+                            <div class="metric-label">Total Wheat / Crop Area (Acres)</div>
+                            <div class="metric-value" id="metric-total-acres">–</div>
+                            <div class="metric-sub">
+                                Avg acres per session:
+                                <span id="metric-acres-per-session">–</span>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Coverage</div>
+                            <div class="metric-value" id="metric-villages">–</div>
+                            <div class="metric-sub">
+                                Cities touched:
+                                <span id="metric-cities">–</span>,
+                                sessions with GPS:
+                                <span id="metric-sessions-with-coords">–</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
 
-      return true;
-    });
-  }
+        <section class="card table-card">
+            <div class="card-header">
+                <div class="pill-icon">T</div>
+                <span class="card-title-text">
+                    Session-wise Detail (Includes Media Placeholders)
+                </span>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SN</th>
+                            <th>Date</th>
+                            <th>From City</th>
+                            <th>To City</th>
+                            <th>Session Location (Village)</th>
+                            <th>Total Farmers</th>
+                            <th>Crop Area (Acres)</th>
+                            <th>Coordinates (lat, lon)</th>
+                            <th>Feedback / Observations</th>
+                            <th>Media (Files are named 1.jpg/mov, 2.jpg/mov, etc., per date)</th> </tr>
+                    </thead>
+                    <tbody id="session-rows">
+                        </tbody>
+                </table>
+            </div>
+            <p class="footer-note">
+                Media files are dynamically linked based on the chronological order of the unique dates found in the <code>sum_sheet.csv</code>, starting with 1.
+            </p>
+        </section>
 
-  // ----------------- METRICS -----------------
-  function updateMetrics(rows) {
-    const totalSessions = rows.length;
-    const uniqueSN = new Set();
-    const cities = new Set();
-    const villages = new Set();
-    let totalFarmers = 0;
-    let totalAcres = 0;
-    let sessionsWithCoords = 0;
+        <section class="card table-card">
+            <div class="card-header">
+                <div class="pill-icon">V</div>
+                <span class="card-title-text">
+                    Village-wise Summary &amp; Visual Insights
+                </span>
+            </div>
+            <div class="table-wrapper" style="max-height: 220px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Village / Session Location</th>
+                            <th>Sessions</th>
+                            <th>Total Farmers</th>
+                            <th>Total Crop Area (Acres)</th>
+                            <th>Sample Feedback / Observations</th>
+                        </tr>
+                    </thead>
+                    <tbody id="village-rows">
+                        </tbody>
+                </table>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">Farmers Engagement by From City</div>
+                    <canvas id="cityFarmersChart" height="160"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Crop Area (Acres) by Village / Session Location</div>
+                    <canvas id="villageAcresChart" height="160"></canvas>
+                </div>
+            </div>
+        </section>
+    </div>
 
-    rows.forEach((r) => {
-      if (r["SN"]) uniqueSN.add(r["SN"]);
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-      const fromCity = (r["From City"] || "").trim();
-      const toCity = (r["To City"] || "").trim();
-      if (fromCity) cities.add(fromCity);
-      if (toCity) cities.add(toCity);
-
-      const loc = (r["Session Location"] || "").trim();
-      if (loc) villages.add(loc);
-
-      const farmers = getFarmers(r);
-      const acres = getCropArea(r);
-
-      if (!isNaN(farmers)) totalFarmers += farmers;
-      if (!isNaN(acres)) totalAcres += acres;
-
-      const coords = getCoords(r);
-      if (coords) sessionsWithCoords += 1;
-    });
-
-    const farmersPerSession =
-      totalSessions > 0 ? (totalFarmers / totalSessions).toFixed(1) : "–";
-    const acresPerSession =
-      totalSessions > 0 ? (totalAcres / totalSessions).toFixed(1) : "–";
-
-    setText("metric-total-sessions", totalSessions || "0");
-    setText("metric-unique-sn", uniqueSN.size || "0");
-
-    setText("metric-total-farmers", formatNumber(totalFarmers));
-    setText("metric-farmers-per-session", farmersPerSession);
-
-    setText("metric-total-acres", formatNumber(totalAcres));
-    setText("metric-acres-per-session", acresPerSession);
-
-    setText("metric-villages", villages.size || "0");
-    setText("metric-cities", cities.size || "0");
-    setText("metric-sessions-with-coords", sessionsWithCoords || "0");
-  }
-
-  // ----------------- TABLES -----------------
-  function updateSessionTable(rows) {
-    const tbody = document.getElementById("session-rows");
-    if (!tbody) return;
-
-    tbody.innerHTML = "";
-
-    rows.forEach((r) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(r["SN"] || "")}</td>
-        <td>${escapeHtml(r["Date"] || "")}</td>
-        <td>${escapeHtml(r["From City"] || "")}</td>
-        <td>${escapeHtml(r["To City"] || "")}</td>
-        <td>${escapeHtml(r["Session Location"] || "")}</td>
-        <td>${escapeHtml(getFarmers(r))}</td>
-        <td>${escapeHtml(getCropArea(r))}</td>
-        <td>${escapeHtml(getCoords(r))}</td>
-        <td>${escapeHtml(getFeedback(r))}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  function updateVillageSummary(rows) {
-    const tbody = document.getElementById("village-rows");
-    if (!tbody) return;
-
-    const summary = {};
-
-    rows.forEach((r) => {
-      const villageRaw = (r["Session Location"] || "").trim() || "Unknown";
-      const village = villageRaw || "Unknown";
-      if (!summary[village]) {
-        summary[village] = {
-          sessions: 0,
-          farmers: 0,
-          acres: 0,
-          feedbackSamples: [],
-        };
-      }
-
-      summary[village].sessions += 1;
-
-      const farmers = getFarmers(r);
-      const acres = getCropArea(r);
-      if (!isNaN(farmers)) summary[village].farmers += farmers;
-      if (!isNaN(acres)) summary[village].acres += acres;
-
-      const fb = getFeedback(r);
-      if (fb && summary[village].feedbackSamples.length < 3) {
-        summary[village].feedbackSamples.push(fb);
-      }
-    });
-
-    const entries = Object.entries(summary).sort(
-      (a, b) => b[1].farmers - a[1].farmers
-    );
-
-    tbody.innerHTML = "";
-    entries.forEach(([village, data], idx) => {
-      const tr = document.createElement("tr");
-      const feedbackText =
-        data.feedbackSamples.length > 0
-          ? data.feedbackSamples.join(" | ")
-          : "";
-      tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(village)}</td>
-        <td>${data.sessions}</td>
-        <td>${formatNumber(data.farmers)}</td>
-        <td>${formatNumber(data.acres)}</td>
-        <td>${escapeHtml(feedbackText)}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  // ----------------- MAP -----------------
-  function initMap(rows) {
-    const mapDiv = document.getElementById("route-map");
-    if (!mapDiv) return;
-
-    const points = [];
-    rows.forEach((r) => {
-      const coord = getCoords(r);
-      if (!coord) return;
-
-      let parts = coord.split(/[, ]/).map((x) => parseFloat(x.trim()));
-      parts = parts.filter((n) => !isNaN(n));
-      if (parts.length < 2) return;
-
-      points.push({
-        lat: parts[0],
-        lon: parts[1],
-        village: (r["Session Location"] || "").trim(),
-        farmers: getFarmers(r),
-        acres: getCropArea(r),
-        date: (r["Date"] || "").trim(),
-      });
-    });
-
-    if (!points.length) {
-      console.warn("No valid coordinates found in CSV for map.");
-      return;
-    }
-
-    const map = L.map("route-map", {
-      zoomControl: true,
-    });
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
-
-    const latLngs = [];
-
-    points.forEach((p, idx) => {
-      const latLng = L.latLng(p.lat, p.lon);
-      latLngs.push(latLng);
-
-      const acres = isNaN(p.acres) ? 0 : p.acres;
-      const radiusMeters = 100 + Math.sqrt(acres || 0) * 40;
-
-      L.circle(latLng, {
-        radius: radiusMeters,
-        fillOpacity: 0.3,
-        stroke: true,
-      }).addTo(map);
-
-      const popupHtml = `
-        <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
-        Date: ${escapeHtml(p.date)}<br/>
-        Farmers: ${escapeHtml(p.farmers)}<br/>
-        Crop Area: ${escapeHtml(acres)} acres
-      `;
-      L.marker(latLng).addTo(map).bindPopup(popupHtml);
-    });
-
-    if (latLngs.length > 1) {
-      L.polyline(latLngs, { weight: 3, opacity: 0.9 }).addTo(map);
-      map.fitBounds(latLngs, { padding: [40, 40] });
-    } else {
-      map.setView(latLngs[0], 12);
-    }
-  }
-
-  // ----------------- CHARTS -----------------
-  function buildCharts(rows) {
-    if (cityFarmersChartInstance) cityFarmersChartInstance.destroy();
-    if (villageAcresChartInstance) villageAcresChartInstance.destroy();
-
-    // Farmers by From City
-    const cityTotals = {};
-    rows.forEach((r) => {
-      const city = (r["From City"] || "Unknown").trim() || "Unknown";
-      const farmers = getFarmers(r);
-      if (!cityTotals[city]) cityTotals[city] = 0;
-      if (!isNaN(farmers)) cityTotals[city] += farmers;
-    });
-
-    const cityLabels = Object.keys(cityTotals);
-    const cityData = cityLabels.map((c) => cityTotals[c]);
-
-    const cityCtx = document
-      .getElementById("cityFarmersChart")
-      .getContext("2d");
-    cityFarmersChartInstance = new Chart(cityCtx, {
-      type: "bar",
-      data: {
-        labels: cityLabels,
-        datasets: [
-          {
-            label: "Farmers Reached",
-            data: cityData,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { precision: 0 },
-          },
-        },
-      },
-    });
-
-    // Acres by Village
-    const villageSummary = {};
-    rows.forEach((r) => {
-      const village = (r["Session Location"] || "Unknown").trim() || "Unknown";
-      if (!villageSummary[village]) villageSummary[village] = 0;
-      const acres = getCropArea(r);
-      if (!isNaN(acres)) villageSummary[village] += acres;
-    });
-
-    const villageLabels = Object.keys(villageSummary);
-    const villageData = villageLabels.map((v) => villageSummary[v]);
-
-    const villageCtx = document
-      .getElementById("villageAcresChart")
-      .getContext("2d");
-    villageAcresChartInstance = new Chart(villageCtx, {
-      type: "bar",
-      data: {
-        labels: villageLabels,
-        datasets: [
-          {
-            label: "Crop Area (Acres)",
-            data: villageData,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { precision: 0 },
-          },
-        },
-      },
-    });
-  }
-
-  // ----------------- HELPERS -----------------
-  function setText(id, value) {
-    const el = document.getElementById(id);
-    if (el) {
-      el.textContent = value;
-    }
-  }
-
-  function parseNumber(value) {
-    if (value === undefined || value === null) return NaN;
-    const n = parseFloat(value.toString().replace(/,/g, "").trim());
-    return isNaN(n) ? NaN : n;
-  }
-
-  // Find a column whose name contains any of the given keywords (case-insensitive)
-  function findField(row, keywords) {
-    const keys = Object.keys(row || {});
-    for (const key of keys) {
-      const lower = key.toLowerCase();
-      for (const kw of keywords) {
-        if (lower.includes(kw)) return key;
-      }
-    }
-    return null;
-  }
-
-  function getFarmers(row) {
-    const key = findField(row, ["farmer"]);
-    if (!key) return NaN;
-    return parseNumber(row[key]);
-  }
-
-  function getCropArea(row) {
-    // Try any column that mentions acres or area
-    const key = findField(row, ["acre", "area"]);
-    if (!key) return NaN;
-    return parseNumber(row[key]);
-  }
-
-  function getFeedback(row) {
-    const key = findField(row, ["feedback", "observation", "remark", "comment"]);
-    if (!key) return "";
-    return (row[key] || "").toString();
-  }
-
-  function getCoords(row) {
-    // 1) Single column like "Coordinates", "GPS", etc.
-    const coordKey = findField(row, ["coord", "gps"]);
-    if (coordKey && row[coordKey]) {
-      return row[coordKey].toString();
-    }
-
-    // 2) Separate lat / lon columns
-    const latKey = findField(row, ["lat"]);
-    const lonKey = findField(row, ["lon", "lng", "long"]);
-    if (latKey && lonKey && row[latKey] && row[lonKey]) {
-      return row[latKey].toString() + ", " + row[lonKey].toString();
-    }
-
-    return "";
-  }
-
-  function formatNumber(num) {
-    if (isNaN(num)) return "–";
-    return Math.round(num).toLocaleString();
-  }
-
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-</script>
-
+    <script src="dashboard.js"></script>
 </body>
 </html>
