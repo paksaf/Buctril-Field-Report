@@ -517,404 +517,443 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <!-- CSV & Dashboard Logic -->
-  <script>
-    // ----------------- CONFIG: FILTERS -----------------
-    // Dates must be in YYYY-MM-DD format in the CSV for filtering to work correctly.
-    const FILTER_START_DATE = "2025-01-05"; // inclusive
-    const FILTER_END_DATE = "2025-01-10";   // inclusive
+ <!-- CSV & Dashboard Logic -->
+<script>
+  // ----------------- CONFIG: FILTERS -----------------
+  // Dates must be in YYYY-MM-DD format in the CSV for filtering to work correctly.
+  const FILTER_START_DATE = "2025-01-05"; // inclusive
+  const FILTER_END_DATE = "2025-12-31";   // inclusive (wider so you see data)
 
-    // If you want to restrict to particular cities or villages, put names here.
-    // Leave arrays empty [] to include all values.
-    const ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
-    const ALLOWED_TO_CITIES = [];   // e.g. ["Chichawatni"]
-    const ALLOWED_LOCATIONS = [];   // e.g. ["Basti Joriya", "Chak 10"]
+  // If you want to restrict to particular cities or villages, put names here.
+  // Leave arrays empty [] to include all values.
+  const ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
+  const ALLOWED_TO_CITIES = [];   // e.g. ["Chichawatni"]
+  const ALLOWED_LOCATIONS = [];   // e.g. ["Basti Joriya", "Chak 10"]
 
-    let cityFarmersChartInstance = null;
-    let villageAcresChartInstance = null;
+  let cityFarmersChartInstance = null;
+  let villageAcresChartInstance = null;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      loadDashboard();
+  document.addEventListener("DOMContentLoaded", () => {
+    loadDashboard();
+  });
+
+  async function loadDashboard() {
+    try {
+      const response = await fetch("sum_sheet.csv?cache=" + Date.now());
+      if (!response.ok) {
+        throw new Error("Failed to fetch CSV: HTTP " + response.status);
+      }
+
+      const csvText = await response.text();
+
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const rows = results.data || [];
+          console.log("CSV columns:", Object.keys(rows[0] || {})); // helpful for debugging
+
+          const filteredRows = filterRows(rows);
+
+          updateMetrics(filteredRows);
+          updateSessionTable(filteredRows);
+          updateVillageSummary(filteredRows);
+          initMap(filteredRows);
+          buildCharts(filteredRows);
+        },
+        error: (err) => {
+          console.error("PapaParse error:", err);
+        },
+      });
+    } catch (err) {
+      console.error("Error loading CSV:", err);
+    }
+  }
+
+  // ----------------- FILTERING -----------------
+  function filterRows(rows) {
+    return rows.filter((r) => {
+      const dateStr = (r["Date"] || "").trim();
+      if (FILTER_START_DATE && FILTER_END_DATE && dateStr) {
+        if (dateStr < FILTER_START_DATE || dateStr > FILTER_END_DATE) {
+          return false;
+        }
+      }
+
+      const fromCity = (r["From City"] || "").trim();
+      const toCity = (r["To City"] || "").trim();
+      const loc = (r["Session Location"] || "").trim();
+
+      if (ALLOWED_FROM_CITIES.length && !ALLOWED_FROM_CITIES.includes(fromCity)) {
+        return false;
+      }
+      if (ALLOWED_TO_CITIES.length && !ALLOWED_TO_CITIES.includes(toCity)) {
+        return false;
+      }
+      if (ALLOWED_LOCATIONS.length && !ALLOWED_LOCATIONS.includes(loc)) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  // ----------------- METRICS -----------------
+  function updateMetrics(rows) {
+    const totalSessions = rows.length;
+    const uniqueSN = new Set();
+    const cities = new Set();
+    const villages = new Set();
+    let totalFarmers = 0;
+    let totalAcres = 0;
+    let sessionsWithCoords = 0;
+
+    rows.forEach((r) => {
+      if (r["SN"]) uniqueSN.add(r["SN"]);
+
+      const fromCity = (r["From City"] || "").trim();
+      const toCity = (r["To City"] || "").trim();
+      if (fromCity) cities.add(fromCity);
+      if (toCity) cities.add(toCity);
+
+      const loc = (r["Session Location"] || "").trim();
+      if (loc) villages.add(loc);
+
+      const farmers = getFarmers(r);
+      const acres = getCropArea(r);
+
+      if (!isNaN(farmers)) totalFarmers += farmers;
+      if (!isNaN(acres)) totalAcres += acres;
+
+      const coords = getCoords(r);
+      if (coords) sessionsWithCoords += 1;
     });
 
-    async function loadDashboard() {
-      try {
-        const response = await fetch("sum_sheet.csv?cache=" + Date.now());
-        if (!response.ok) {
-          throw new Error("Failed to fetch CSV: HTTP " + response.status);
-        }
+    const farmersPerSession =
+      totalSessions > 0 ? (totalFarmers / totalSessions).toFixed(1) : "–";
+    const acresPerSession =
+      totalSessions > 0 ? (totalAcres / totalSessions).toFixed(1) : "–";
 
-        const csvText = await response.text();
+    setText("metric-total-sessions", totalSessions || "0");
+    setText("metric-unique-sn", uniqueSN.size || "0");
 
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            const rows = results.data || [];
-            const filteredRows = filterRows(rows);
+    setText("metric-total-farmers", formatNumber(totalFarmers));
+    setText("metric-farmers-per-session", farmersPerSession);
 
-            updateMetrics(filteredRows);
-            updateTable(filteredRows);
-            updateVillageSummary(filteredRows);
-            initMap(filteredRows);
-            buildCharts(filteredRows);
-          },
-          error: (err) => {
-            console.error("PapaParse error:", err);
-          },
-        });
-      } catch (err) {
-        console.error("Error loading CSV:", err);
-      }
-    }
+    setText("metric-total-acres", formatNumber(totalAcres));
+    setText("metric-acres-per-session", acresPerSession);
 
-    function filterRows(rows) {
-      return rows.filter((r) => {
-        const dateStr = (r["Date"] || "").trim();
-        if (FILTER_START_DATE && FILTER_END_DATE && dateStr) {
-          if (dateStr < FILTER_START_DATE || dateStr > FILTER_END_DATE) {
-            return false;
-          }
-        }
+    setText("metric-villages", villages.size || "0");
+    setText("metric-cities", cities.size || "0");
+    setText("metric-sessions-with-coords", sessionsWithCoords || "0");
+  }
 
-        const fromCity = (r["From City"] || "").trim();
-        const toCity = (r["To City"] || "").trim();
-        const loc = (r["Session Location"] || "").trim();
+  // ----------------- TABLES -----------------
+  function updateSessionTable(rows) {
+    const tbody = document.getElementById("session-rows");
+    if (!tbody) return;
 
-        if (ALLOWED_FROM_CITIES.length && !ALLOWED_FROM_CITIES.includes(fromCity)) {
-          return false;
-        }
-        if (ALLOWED_TO_CITIES.length && !ALLOWED_TO_CITIES.includes(toCity)) {
-          return false;
-        }
-        if (ALLOWED_LOCATIONS.length && !ALLOWED_LOCATIONS.includes(loc)) {
-          return false;
-        }
+    tbody.innerHTML = "";
 
-        return true;
-      });
-    }
+    rows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(r["SN"] || "")}</td>
+        <td>${escapeHtml(r["Date"] || "")}</td>
+        <td>${escapeHtml(r["From City"] || "")}</td>
+        <td>${escapeHtml(r["To City"] || "")}</td>
+        <td>${escapeHtml(r["Session Location"] || "")}</td>
+        <td>${escapeHtml(getFarmers(r))}</td>
+        <td>${escapeHtml(getCropArea(r))}</td>
+        <td>${escapeHtml(getCoords(r))}</td>
+        <td>${escapeHtml(getFeedback(r))}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
 
-    function updateMetrics(rows) {
-      const totalSessions = rows.length;
-      const uniqueSN = new Set();
-      const cities = new Set();
-      const villages = new Set();
-      let totalFarmers = 0;
-      let totalAcres = 0;
-      let sessionsWithCoords = 0;
+  function updateVillageSummary(rows) {
+    const tbody = document.getElementById("village-rows");
+    if (!tbody) return;
 
-      rows.forEach((r) => {
-        if (r["SN"]) uniqueSN.add(r["SN"]);
+    const summary = {};
 
-        const fromCity = (r["From City"] || "").trim();
-        const toCity = (r["To City"] || "").trim();
-        if (fromCity) cities.add(fromCity);
-        if (toCity) cities.add(toCity);
-
-        const loc = (r["Session Location"] || "").trim();
-        if (loc) villages.add(loc);
-
-        const farmers = parseNumber(r["Total Farmers"]);
-        const acres = getCropArea(r);
-
-        if (!isNaN(farmers)) totalFarmers += farmers;
-        if (!isNaN(acres)) totalAcres += acres;
-
-        const coords = (r["Coordinates"] || "").trim();
-        if (coords) sessionsWithCoords += 1;
-      });
-
-      const farmersPerSession =
-        totalSessions > 0 ? (totalFarmers / totalSessions).toFixed(1) : "–";
-      const acresPerSession =
-        totalSessions > 0 ? (totalAcres / totalSessions).toFixed(1) : "–";
-
-      setText("metric-total-sessions", totalSessions || "0");
-      setText("metric-unique-sn", uniqueSN.size || "0");
-
-      setText("metric-total-farmers", formatNumber(totalFarmers));
-      setText("metric-farmers-per-session", farmersPerSession);
-
-      setText("metric-total-acres", formatNumber(totalAcres));
-      setText("metric-acres-per-session", acresPerSession);
-
-      setText("metric-villages", villages.size || "0");
-      setText("metric-cities", cities.size || "0");
-      setText("metric-sessions-with-coords", sessionsWithCoords || "0");
-    }
-
-    function updateTable(rows) {
-      const tbody = document.getElementById("session-rows");
-      if (!tbody) return;
-
-      tbody.innerHTML = "";
-
-      rows.forEach((r) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${escapeHtml(r["SN"] || "")}</td>
-          <td>${escapeHtml(r["Date"] || "")}</td>
-          <td>${escapeHtml(r["From City"] || "")}</td>
-          <td>${escapeHtml(r["To City"] || "")}</td>
-          <td>${escapeHtml(r["Session Location"] || "")}</td>
-          <td>${escapeHtml(r["Total Farmers"] || "")}</td>
-          <td>${escapeHtml(getCropArea(r))}</td>
-          <td>${escapeHtml(r["Coordinates"] || "")}</td>
-          <td>${escapeHtml(r["Feedback"] || r["Observations"] || r["Remarks"] || "")}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function updateVillageSummary(rows) {
-      const tbody = document.getElementById("village-rows");
-      if (!tbody) return;
-
-      const summary = {};
-
-      rows.forEach((r) => {
-        const villageRaw = (r["Session Location"] || "").trim() || "Unknown";
-        const village = villageRaw || "Unknown";
-        if (!summary[village]) {
-          summary[village] = {
-            sessions: 0,
-            farmers: 0,
-            acres: 0,
-            feedbackSamples: [],
-          };
-        }
-
-        summary[village].sessions += 1;
-
-        const farmers = parseNumber(r["Total Farmers"]);
-        const acres = getCropArea(r);
-        if (!isNaN(farmers)) summary[village].farmers += farmers;
-        if (!isNaN(acres)) summary[village].acres += acres;
-
-        const fb =
-          (r["Feedback"] || r["Observations"] || r["Remarks"] || "").trim();
-        if (fb && summary[village].feedbackSamples.length < 3) {
-          summary[village].feedbackSamples.push(fb);
-        }
-      });
-
-      const entries = Object.entries(summary).sort(
-        (a, b) => b[1].farmers - a[1].farmers
-      );
-
-      tbody.innerHTML = "";
-      entries.forEach(([village, data], idx) => {
-        const tr = document.createElement("tr");
-        const feedbackText =
-          data.feedbackSamples.length > 0
-            ? data.feedbackSamples.join(" | ")
-            : "";
-        tr.innerHTML = `
-          <td>${idx + 1}</td>
-          <td>${escapeHtml(village)}</td>
-          <td>${data.sessions}</td>
-          <td>${formatNumber(data.farmers)}</td>
-          <td>${formatNumber(data.acres)}</td>
-          <td>${escapeHtml(feedbackText)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function initMap(rows) {
-      const mapDiv = document.getElementById("route-map");
-      if (!mapDiv) return;
-
-      const points = [];
-      rows.forEach((r) => {
-        const coord = (r["Coordinates"] || "").trim();
-        if (!coord) return;
-
-        const parts = coord.split(",").map((x) => parseFloat(x.trim()));
-        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-          points.push({
-            lat: parts[0],
-            lon: parts[1],
-            village: (r["Session Location"] || "").trim(),
-            farmers: parseNumber(r["Total Farmers"]),
-            acres: getCropArea(r),
-            date: (r["Date"] || "").trim(),
-          });
-        }
-      });
-
-      if (!points.length) {
-        return;
+    rows.forEach((r) => {
+      const villageRaw = (r["Session Location"] || "").trim() || "Unknown";
+      const village = villageRaw || "Unknown";
+      if (!summary[village]) {
+        summary[village] = {
+          sessions: 0,
+          farmers: 0,
+          acres: 0,
+          feedbackSamples: [],
+        };
       }
 
-      const map = L.map("route-map", {
-        zoomControl: true,
-      });
+      summary[village].sessions += 1;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 18,
-        attribution: "&copy; OpenStreetMap contributors",
+      const farmers = getFarmers(r);
+      const acres = getCropArea(r);
+      if (!isNaN(farmers)) summary[village].farmers += farmers;
+      if (!isNaN(acres)) summary[village].acres += acres;
+
+      const fb = getFeedback(r);
+      if (fb && summary[village].feedbackSamples.length < 3) {
+        summary[village].feedbackSamples.push(fb);
+      }
+    });
+
+    const entries = Object.entries(summary).sort(
+      (a, b) => b[1].farmers - a[1].farmers
+    );
+
+    tbody.innerHTML = "";
+    entries.forEach(([village, data], idx) => {
+      const tr = document.createElement("tr");
+      const feedbackText =
+        data.feedbackSamples.length > 0
+          ? data.feedbackSamples.join(" | ")
+          : "";
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(village)}</td>
+        <td>${data.sessions}</td>
+        <td>${formatNumber(data.farmers)}</td>
+        <td>${formatNumber(data.acres)}</td>
+        <td>${escapeHtml(feedbackText)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ----------------- MAP -----------------
+  function initMap(rows) {
+    const mapDiv = document.getElementById("route-map");
+    if (!mapDiv) return;
+
+    const points = [];
+    rows.forEach((r) => {
+      const coord = getCoords(r);
+      if (!coord) return;
+
+      let parts = coord.split(/[, ]/).map((x) => parseFloat(x.trim()));
+      parts = parts.filter((n) => !isNaN(n));
+      if (parts.length < 2) return;
+
+      points.push({
+        lat: parts[0],
+        lon: parts[1],
+        village: (r["Session Location"] || "").trim(),
+        farmers: getFarmers(r),
+        acres: getCropArea(r),
+        date: (r["Date"] || "").trim(),
+      });
+    });
+
+    if (!points.length) {
+      console.warn("No valid coordinates found in CSV for map.");
+      return;
+    }
+
+    const map = L.map("route-map", {
+      zoomControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    const latLngs = [];
+
+    points.forEach((p, idx) => {
+      const latLng = L.latLng(p.lat, p.lon);
+      latLngs.push(latLng);
+
+      const acres = isNaN(p.acres) ? 0 : p.acres;
+      const radiusMeters = 100 + Math.sqrt(acres || 0) * 40;
+
+      L.circle(latLng, {
+        radius: radiusMeters,
+        fillOpacity: 0.3,
+        stroke: true,
       }).addTo(map);
 
-      const latLngs = [];
+      const popupHtml = `
+        <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
+        Date: ${escapeHtml(p.date)}<br/>
+        Farmers: ${escapeHtml(p.farmers)}<br/>
+        Crop Area: ${escapeHtml(acres)} acres
+      `;
+      L.marker(latLng).addTo(map).bindPopup(popupHtml);
+    });
 
-      points.forEach((p, idx) => {
-        const latLng = L.latLng(p.lat, p.lon);
-        latLngs.push(latLng);
-
-        // Circle radius roughly scaled by acres
-        const acres = isNaN(p.acres) ? 0 : p.acres;
-        const radiusMeters = 100 + Math.sqrt(acres || 0) * 40;
-
-        L.circle(latLng, {
-          radius: radiusMeters,
-          fillOpacity: 0.3,
-          stroke: true,
-        }).addTo(map);
-
-        const popupHtml = `
-          <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
-          Date: ${escapeHtml(p.date)}<br/>
-          Farmers: ${escapeHtml(p.farmers)}<br/>
-          Crop Area: ${escapeHtml(acres)} acres
-        `;
-        L.marker(latLng).addTo(map).bindPopup(popupHtml);
-      });
-
-      if (latLngs.length > 1) {
-        L.polyline(latLngs, { weight: 3, opacity: 0.9 }).addTo(map);
-        map.fitBounds(latLngs, { padding: [40, 40] });
-      } else {
-        map.setView(latLngs[0], 12);
-      }
+    if (latLngs.length > 1) {
+      L.polyline(latLngs, { weight: 3, opacity: 0.9 }).addTo(map);
+      map.fitBounds(latLngs, { padding: [40, 40] });
+    } else {
+      map.setView(latLngs[0], 12);
     }
+  }
 
-    function buildCharts(rows) {
-      // Destroy existing charts if reloaded
-      if (cityFarmersChartInstance) {
-        cityFarmersChartInstance.destroy();
-      }
-      if (villageAcresChartInstance) {
-        villageAcresChartInstance.destroy();
-      }
+  // ----------------- CHARTS -----------------
+  function buildCharts(rows) {
+    if (cityFarmersChartInstance) cityFarmersChartInstance.destroy();
+    if (villageAcresChartInstance) villageAcresChartInstance.destroy();
 
-      // Farmers by From City
-      const cityTotals = {};
-      rows.forEach((r) => {
-        const city = (r["From City"] || "Unknown").trim() || "Unknown";
-        const farmers = parseNumber(r["Total Farmers"]);
-        if (!cityTotals[city]) cityTotals[city] = 0;
-        if (!isNaN(farmers)) cityTotals[city] += farmers;
-      });
+    // Farmers by From City
+    const cityTotals = {};
+    rows.forEach((r) => {
+      const city = (r["From City"] || "Unknown").trim() || "Unknown";
+      const farmers = getFarmers(r);
+      if (!cityTotals[city]) cityTotals[city] = 0;
+      if (!isNaN(farmers)) cityTotals[city] += farmers;
+    });
 
-      const cityLabels = Object.keys(cityTotals);
-      const cityData = cityLabels.map((c) => cityTotals[c]);
+    const cityLabels = Object.keys(cityTotals);
+    const cityData = cityLabels.map((c) => cityTotals[c]);
 
-      const cityCtx = document.getElementById("cityFarmersChart").getContext("2d");
-      cityFarmersChartInstance = new Chart(cityCtx, {
-        type: "bar",
-        data: {
-          labels: cityLabels,
-          datasets: [
-            {
-              label: "Farmers Reached",
-              data: cityData,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { precision: 0 },
-            },
+    const cityCtx = document
+      .getElementById("cityFarmersChart")
+      .getContext("2d");
+    cityFarmersChartInstance = new Chart(cityCtx, {
+      type: "bar",
+      data: {
+        labels: cityLabels,
+        datasets: [
+          {
+            label: "Farmers Reached",
+            data: cityData,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 },
           },
         },
-      });
+      },
+    });
 
-      // Acres by Village
-      const villageSummary = {};
-      rows.forEach((r) => {
-        const village = (r["Session Location"] || "Unknown").trim() || "Unknown";
-        if (!villageSummary[village]) villageSummary[village] = 0;
-        const acres = getCropArea(r);
-        if (!isNaN(acres)) villageSummary[village] += acres;
-      });
+    // Acres by Village
+    const villageSummary = {};
+    rows.forEach((r) => {
+      const village = (r["Session Location"] || "Unknown").trim() || "Unknown";
+      if (!villageSummary[village]) villageSummary[village] = 0;
+      const acres = getCropArea(r);
+      if (!isNaN(acres)) villageSummary[village] += acres;
+    });
 
-      const villageLabels = Object.keys(villageSummary);
-      const villageData = villageLabels.map((v) => villageSummary[v]);
+    const villageLabels = Object.keys(villageSummary);
+    const villageData = villageLabels.map((v) => villageSummary[v]);
 
-      const villageCtx =
-        document.getElementById("villageAcresChart").getContext("2d");
-      villageAcresChartInstance = new Chart(villageCtx, {
-        type: "bar",
-        data: {
-          labels: villageLabels,
-          datasets: [
-            {
-              label: "Crop Area (Acres)",
-              data: villageData,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { precision: 0 },
-            },
+    const villageCtx = document
+      .getElementById("villageAcresChart")
+      .getContext("2d");
+    villageAcresChartInstance = new Chart(villageCtx, {
+      type: "bar",
+      data: {
+        labels: villageLabels,
+        datasets: [
+          {
+            label: "Crop Area (Acres)",
+            data: villageData,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 },
           },
         },
-      });
-    }
+      },
+    });
+  }
 
-    // ----------------- HELPERS -----------------
-    function setText(id, value) {
-      const el = document.getElementById(id);
-      if (el) {
-        el.textContent = value;
+  // ----------------- HELPERS -----------------
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = value;
+    }
+  }
+
+  function parseNumber(value) {
+    if (value === undefined || value === null) return NaN;
+    const n = parseFloat(value.toString().replace(/,/g, "").trim());
+    return isNaN(n) ? NaN : n;
+  }
+
+  // Find a column whose name contains any of the given keywords (case-insensitive)
+  function findField(row, keywords) {
+    const keys = Object.keys(row || {});
+    for (const key of keys) {
+      const lower = key.toLowerCase();
+      for (const kw of keywords) {
+        if (lower.includes(kw)) return key;
       }
     }
+    return null;
+  }
 
-    function parseNumber(value) {
-      if (value === undefined || value === null) return NaN;
-      const n = parseFloat(value.toString().replace(/,/g, "").trim());
-      return isNaN(n) ? NaN : n;
+  function getFarmers(row) {
+    const key = findField(row, ["farmer"]);
+    if (!key) return NaN;
+    return parseNumber(row[key]);
+  }
+
+  function getCropArea(row) {
+    // Try any column that mentions acres or area
+    const key = findField(row, ["acre", "area"]);
+    if (!key) return NaN;
+    return parseNumber(row[key]);
+  }
+
+  function getFeedback(row) {
+    const key = findField(row, ["feedback", "observation", "remark", "comment"]);
+    if (!key) return "";
+    return (row[key] || "").toString();
+  }
+
+  function getCoords(row) {
+    // 1) Single column like "Coordinates", "GPS", etc.
+    const coordKey = findField(row, ["coord", "gps"]);
+    if (coordKey && row[coordKey]) {
+      return row[coordKey].toString();
     }
 
-    function getCropArea(row) {
-      // Try different possible column names for crop area
-      const candidates = [
-        "Crop Area",
-        "Crop Area (Acres)",
-        "Total Acres",
-        "Wheat Acres",
-      ];
-      for (const key of candidates) {
-        if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
-          return parseNumber(row[key]);
-        }
-      }
-      return NaN;
+    // 2) Separate lat / lon columns
+    const latKey = findField(row, ["lat"]);
+    const lonKey = findField(row, ["lon", "lng", "long"]);
+    if (latKey && lonKey && row[latKey] && row[lonKey]) {
+      return row[latKey].toString() + ", " + row[lonKey].toString();
     }
 
-    function formatNumber(num) {
-      if (isNaN(num)) return "–";
-      return Math.round(num).toLocaleString();
-    }
+    return "";
+  }
 
-    function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-  </script>
+  function formatNumber(num) {
+    if (isNaN(num)) return "–";
+    return Math.round(num).toLocaleString();
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+</script>
+
 </body>
 </html>
