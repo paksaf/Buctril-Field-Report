@@ -1,624 +1,545 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2575.7">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel & Expense Summary - Buctril Tour 2025</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 25px 30px;
+            border-bottom: 5px solid #ff9800;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .report-meta {
+            text-align: right;
+        }
+
+        .date-range {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .report-id {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            padding: 25px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 18px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            border-left: 4px solid #2a5298;
+        }
+
+        .card.highlight {
+            border-left-color: #ff9800;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1e3c72;
+            display: flex;
+            align-items: center;
+        }
+
+        .card-title span.icon {
+            display: inline-flex;
+            width: 22px;
+            height: 22px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #2a5298;
+            color: #fff;
+            font-size: 13px;
+            margin-right: 8px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .metric-value {
+            font-weight: 700;
+            font-size: 17px;
+        }
+
+        .metric-small {
+            font-size: 12px;
+            color: #777;
+        }
+
+        .chart-container {
+            height: 220px;
+            margin-top: 10px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            background-color: #f1f5fd;
+            text-align: left;
+            padding: 8px 10px;
+            font-weight: 600;
+            color: #1e3c72;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .data-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table tr:nth-child(even) {
+            background-color: #fafbff;
+        }
+
+        .summary-section {
+            grid-column: 1 / -1;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 16px;
+            background-color: #f8f9fa;
+            color: #666;
+            font-size: 13px;
+            border-top: 1px solid #eee;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+            margin-bottom: 3px;
+        }
+
+        .tag-fuel { background-color: #fff3e0; color: #e65100; }
+        .tag-daily { background-color: #e3f2fd; color: #1565c0; }
+        .tag-fixed { background-color: #fce4ec; color: #c2185b; }
+        .tag-staff { background-color: #e8f5e9; color: #2e7d32; }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .report-meta {
+                text-align: center;
+                margin-top: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-<p class="p1">&lt;!DOCTYPE html&gt;</p>
-<p class="p1">&lt;html lang="en"&gt;</p>
-<p class="p1">&lt;head&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;title&gt;Fuel &amp; Expense Summary - Travel Report&lt;/title&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.jsdelivr.net/npm/chart.js"&gt;&lt;/script&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;style&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>* {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin: 0;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 0;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>box-sizing: border-box;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>body {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #f5f7fa;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #333;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>line-height: 1.6;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 20px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.container {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>max-width: 1400px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin: 0 auto;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: white;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>box-shadow: 0 5px 20px rgba(0,0,0,0.08);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>overflow: hidden;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>header {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: white;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 25px 30px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-bottom: 5px solid #ff9800;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.header-content {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: flex;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>justify-content: space-between;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>align-items: center;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>flex-wrap: wrap;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>h1 {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 28px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-bottom: 5px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.subtitle {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 16px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>opacity: 0.9;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.report-meta {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>text-align: right;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.date-range {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 16px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: 600;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-bottom: 5px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.report-id {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 14px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>opacity: 0.8;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.dashboard {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: grid;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));</p>
-<p class="p1"><span class="Apple-converted-space">            </span>gap: 20px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 25px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.card {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background: white;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 8px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 20px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>box-shadow: 0 3px 10px rgba(0,0,0,0.05);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-left: 4px solid #2a5298;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>transition: transform 0.3s ease, box-shadow 0.3s ease;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.card.highlight {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-left-color: #ff9800;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.card:hover {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>transform: translateY(-3px);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>box-shadow: 0 5px 15px rgba(0,0,0,0.1);</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.card-title {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 18px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: 600;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-bottom: 15px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #1e3c72;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: flex;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>align-items: center;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.card-title i {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-right: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 20px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.metric {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: flex;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>justify-content: space-between;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>align-items: center;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-bottom: 12px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding-bottom: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-bottom: 1px solid #eee;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.metric:last-child {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-bottom: none;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-bottom: 0;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding-bottom: 0;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.metric-label {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: 500;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #555;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.metric-value {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: 700;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 18px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.metric-small {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 13px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #777;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-top: 2px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.progress-bar {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>height: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #e0e0e0;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 5px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-top: 5px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>overflow: hidden;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.progress-fill {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>height: 100%;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background: linear-gradient(90deg, #4CAF50, #8BC34A);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 5px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>transition: width 1s ease;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.chart-container {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>height: 260px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-top: 15px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-table {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>width: 100%;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-collapse: collapse;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-top: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 14px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-table th {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #f1f5fd;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>text-align: left;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 10px 12px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: 600;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #1e3c72;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-bottom: 2px solid #ddd;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-table td {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 8px 12px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-bottom: 1px solid #eee;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-table tr:nth-child(even) {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #fafbff;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-table tr:hover {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #f5f7ff;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.summary-section {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>grid-column: 1 / -1;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-top: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.footer {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>text-align: center;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 20px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #f8f9fa;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #666;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 14px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-top: 1px solid #eee;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.value-up {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #4CAF50;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.value-down {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #F44336;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.value-neutral {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: #FF9800;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>@media (max-width: 768px) {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>.dashboard {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>grid-template-columns: 1fr;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>.header-content {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>flex-direction: column;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>text-align: center;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>.report-meta {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>text-align: center;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>margin-top: 15px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.icon {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: inline-block;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>width: 24px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>height: 24px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-right: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background-color: #2a5298;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 50%;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: white;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>text-align: center;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>line-height: 24px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: bold;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 14px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.tag {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: inline-block;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 3px 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 20px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 12px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: 600;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-right: 8px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin-bottom: 4px;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>.tag-fuel { background-color: #fff3e0; color: #e65100; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.tag-daily { background-color: #e3f2fd; color: #1565c0; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.tag-fixed { background-color: #fce4ec; color: #c2185b; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.tag-staff { background-color: #e8f5e9; color: #2e7d32; }</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</p>
-<p class="p1">&lt;/head&gt;</p>
-<p class="p1">&lt;body&gt;</p>
-<p class="p1">&lt;div class="container"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;header&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="header-content"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;h1&gt;Fuel &amp; Expense Summary – Travel Report&lt;/h1&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;p class="subtitle"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>Snapshot generated from &lt;strong&gt;summary_fuel.xlsx&lt;/strong&gt; (RAW, DISTANCE, FUEL SUM, Exp)</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/p&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="report-meta"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="date-range"&gt;November 23, 2025 – December 12, 2025&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="report-id"&gt;Report ID: EXP-FUEL-2025-01&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/header&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="dashboard"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Fuel Summary Card --&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="card-title"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="icon"&gt;1&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>Fuel Summary</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Total Fuel Cost&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 74,000&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Total Fuel Used&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;277.2 L&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Average Fuel Price&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 267.0 / L&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Average Consumption (Actual)&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;4.9 km/L&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Target Consumption&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;10.3 km/L&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Performance vs Target&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value value-down"&gt;-52.9%&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Expense Summary Card --&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card highlight"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="card-title"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="icon"&gt;2&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>Expense Summary</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Total Daily Expenses&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 269,580&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Fixed Expenses&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 6,820&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Staff Salaries (Pending)&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 143,000&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Grand Total (Daily + Fixed + Staff)&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 419,400&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Fuel Share of Total (without staff)&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;27.5%&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Fuel Amount inside Daily Expenses&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 74,000&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="chart-container"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;canvas id="expenseChart"&gt;&lt;/canvas&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Cost Efficiency Card --&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="card-title"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="icon"&gt;3&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>Cost Efficiency</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Total Distance (km)&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;1,351.5 km&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Cost per km (All Expenses)&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 199.5 / km&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Fuel Cost per km&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 54.8 / km&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Travel Days&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;18 days&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Cost per Travel Day&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;PKR 14,976.7&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="metric"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-label"&gt;Total Trip Span&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="metric-value"&gt;20 calendar days&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Daily Expense Breakdown --&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card summary-section"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="card-title"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="icon"&gt;4&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>Daily Expense Breakdown</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div style="margin-bottom:8px;"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="tag tag-daily"&gt;Daily&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="tag tag-fuel"&gt;Fuel&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;table class="data-table"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;thead&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;SN&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Header&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Days&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Qty / Day&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Rate (PKR)&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Total (PKR)&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/thead&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tbody&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Goodybag&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;14&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1,034&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;70&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;72,380&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Hotel Room&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;14&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;56,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;3&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;SG + Shahbaz Meal&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;14&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1,200&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;16,800&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;4&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Staff Meal&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;14&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;3&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1,200&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;50,400&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;5&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Fuel&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;0&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;74,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;74,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td colspan="5"&gt;&lt;strong&gt;Total Daily Expense (Exp!F10)&lt;/strong&gt;&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;&lt;strong&gt;269,580&lt;/strong&gt;&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tbody&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/table&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Fixed Expense Breakdown --&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card summary-section"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="card-title"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="icon"&gt;5&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>Fixed Expense Breakdown</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div style="margin-bottom:8px;"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="tag tag-fixed"&gt;Fixed&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;table class="data-table"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;thead&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;SN&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Header&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Qty&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Rate (PKR)&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Total (PKR)&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/thead&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tbody&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Carpet&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;96&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;45&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;4,320&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;TMA&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;-&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;-&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2,500&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;3&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Medical&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;-&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;-&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;-&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td colspan="4"&gt;&lt;strong&gt;Total Fixed Expense (Exp!F19)&lt;/strong&gt;&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;&lt;strong&gt;6,820&lt;/strong&gt;&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tbody&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/table&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Staff Salary Breakdown --&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="card summary-section"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="card-title"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;div class="icon"&gt;6&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>Staff Salary Breakdown (Running Expense Pending)</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;div style="margin-bottom:8px;"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;span class="tag tag-staff"&gt;Staff&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;table class="data-table"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;thead&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Name&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Rate / Day (PKR)&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Days&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Qty&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;th&gt;Total (PKR)&lt;/th&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/thead&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tbody&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Staff&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;11&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;44,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;Shahbaz&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;2,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;11&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;22,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;APV&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;5,500&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;14&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;1&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;77,000&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td colspan="4"&gt;&lt;strong&gt;Total Staff Cost (Exp!L10)&lt;/strong&gt;&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;td&gt;&lt;strong&gt;143,000&lt;/strong&gt;&lt;/td&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tr&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>&lt;/tbody&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;/table&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="footer"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;p&gt;Report generated from &lt;strong&gt;summary_fuel.xlsx&lt;/strong&gt; (Exp sheet) – overwrite this file on GitHub whenever you refresh the Excel.&lt;/p&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;p&gt;Date Range: November 23, 2025 – December 12, 2025&lt;/p&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
-<p class="p1">&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1">&lt;script&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>// Expense composition chart (Fuel vs Other Daily vs Fixed vs Staff)</p>
-<p class="p1"><span class="Apple-converted-space">    </span>const expenseCtx = document.getElementById('expenseChart').getContext('2d');</p>
-<p class="p1"><span class="Apple-converted-space">    </span>const expenseChart = new Chart(expenseCtx, {</p>
-<p class="p1"><span class="Apple-converted-space">        </span>type: 'pie',</p>
-<p class="p1"><span class="Apple-converted-space">        </span>data: {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>labels: [</p>
-<p class="p1"><span class="Apple-converted-space">                </span>'Fuel (17.6%)',</p>
-<p class="p1"><span class="Apple-converted-space">                </span>'Other Daily (46.6%)',</p>
-<p class="p1"><span class="Apple-converted-space">                </span>'Fixed (1.6%)',</p>
-<p class="p1"><span class="Apple-converted-space">                </span>'Staff Pending (34.1%)'</p>
-<p class="p1"><span class="Apple-converted-space">            </span>],</p>
-<p class="p1"><span class="Apple-converted-space">            </span>datasets: [{</p>
-<p class="p1"><span class="Apple-converted-space">                </span>data: [74000, 195580, 6820, 143000],</p>
-<p class="p1"><span class="Apple-converted-space">                </span>backgroundColor: [</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>'#FF6B6B',</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>'#4ECDC4',</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>'#45B7D1',</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>'#96CEB4'</p>
-<p class="p1"><span class="Apple-converted-space">                </span>],</p>
-<p class="p1"><span class="Apple-converted-space">                </span>borderWidth: 1,</p>
-<p class="p1"><span class="Apple-converted-space">                </span>borderColor: '#fff'</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}]</p>
-<p class="p1"><span class="Apple-converted-space">        </span>},</p>
-<p class="p1"><span class="Apple-converted-space">        </span>options: {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>responsive: true,</p>
-<p class="p1"><span class="Apple-converted-space">            </span>maintainAspectRatio: false,</p>
-<p class="p1"><span class="Apple-converted-space">            </span>plugins: {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>legend: {</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>position: 'bottom',</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>labels: {</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>padding: 20,</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>usePointStyle: true,</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>pointStyle: 'circle'</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
-<p class="p1"><span class="Apple-converted-space">                </span>}</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p1"><span class="Apple-converted-space">    </span>});</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>// Small animation for progress bars (if any)</p>
-<p class="p1"><span class="Apple-converted-space">    </span>document.addEventListener('DOMContentLoaded', function() {</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const progressBars = document.querySelectorAll('.progress-fill');</p>
-<p class="p1"><span class="Apple-converted-space">        </span>progressBars.forEach(bar =&gt; {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const width = bar.style.width || '100%';</p>
-<p class="p1"><span class="Apple-converted-space">            </span>bar.style.width = '0%';</p>
-<p class="p1"><span class="Apple-converted-space">            </span>setTimeout(() =&gt; {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>bar.style.width = width;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}, 300);</p>
-<p class="p1"><span class="Apple-converted-space">        </span>});</p>
-<p class="p1"><span class="Apple-converted-space">    </span>});</p>
-<p class="p1">&lt;/script&gt;</p>
-<p class="p1">&lt;/body&gt;</p>
-<p class="p1">&lt;/html&gt;</p>
+<div class="container">
+    <header>
+        <div class="header-content">
+            <div>
+                <h1>Fuel & Expense Summary – Buctril Tour 2025</h1>
+                <p class="subtitle">
+                    Static snapshot prepared from <strong>summary_fuel.xlsx</strong> (Exp sheet).
+                    Update this file manually whenever you revise the Excel.
+                </p>
+            </div>
+            <div class="report-meta">
+                <div class="date-range">November 23, 2025 – December 12, 2025</div>
+                <div class="report-id">Report ID: EXP-FUEL-2025-01</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <!-- Fuel Summary -->
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">1</span>
+                Fuel Summary
+            </div>
+            <div class="metric">
+                <span class="metric-label">Total Fuel Cost</span>
+                <span class="metric-value">PKR 74,000</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Total Fuel Used</span>
+                <span class="metric-value">277.2 L</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Average Fuel Price</span>
+                <span class="metric-value">PKR 267.0 / L</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Average Consumption (Actual)</span>
+                <span class="metric-value">4.9 km/L</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Target Consumption</span>
+                <span class="metric-value">10.3 km/L</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Performance vs Target</span>
+                <span class="metric-value" style="color:#d32f2f;">-52.9%</span>
+            </div>
+        </div>
+
+        <!-- Expense Summary -->
+        <div class="card highlight">
+            <div class="card-title">
+                <span class="icon">2</span>
+                Expense Summary
+            </div>
+            <div class="metric">
+                <span class="metric-label">Total Daily Expenses</span>
+                <span class="metric-value">PKR 269,580</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Fixed Expenses</span>
+                <span class="metric-value">PKR 6,820</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Staff Salaries (Pending)</span>
+                <span class="metric-value">PKR 143,000</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Grand Total (Daily + Fixed + Staff)</span>
+                <span class="metric-value">PKR 419,400</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Fuel Share of Total (without staff)</span>
+                <span class="metric-value">27.5%</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="expenseChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Cost Efficiency -->
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">3</span>
+                Cost Efficiency
+            </div>
+            <div class="metric">
+                <span class="metric-label">Total Distance (km)</span>
+                <span class="metric-value">1,351.5 km</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Cost per km (All Expenses)</span>
+                <span class="metric-value">PKR 199.5 / km</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Fuel Cost per km</span>
+                <span class="metric-value">PKR 54.8 / km</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Travel Days</span>
+                <span class="metric-value">18 days</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Cost per Travel Day</span>
+                <span class="metric-value">PKR 14,976.7</span>
+            </div>
+        </div>
+
+        <!-- Daily Expense Breakdown -->
+        <div class="card summary-section">
+            <div class="card-title">
+                <span class="icon">4</span>
+                Daily Expense Breakdown
+            </div>
+            <div style="margin-bottom:6px;">
+                <span class="tag tag-daily">Daily</span>
+                <span class="tag tag-fuel">Fuel</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>SN</th>
+                    <th>Header</th>
+                    <th>Days</th>
+                    <th>Qty / Day</th>
+                    <th>Rate (PKR)</th>
+                    <th>Total (PKR)</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>Goodybag</td>
+                    <td>14</td>
+                    <td>1,034</td>
+                    <td>70</td>
+                    <td>72,380</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Hotel Room</td>
+                    <td>14</td>
+                    <td>2</td>
+                    <td>2,000</td>
+                    <td>56,000</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>SG + Shahbaz Meal</td>
+                    <td>14</td>
+                    <td>1</td>
+                    <td>1,200</td>
+                    <td>16,800</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Staff Meal</td>
+                    <td>14</td>
+                    <td>3</td>
+                    <td>1,200</td>
+                    <td>50,400</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td>Fuel</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>74,000</td>
+                    <td>74,000</td>
+                </tr>
+                <tr>
+                    <td colspan="5"><strong>Total Daily Expense (Exp!F10)</strong></td>
+                    <td><strong>269,580</strong></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Fixed Expense Breakdown -->
+        <div class="card summary-section">
+            <div class="card-title">
+                <span class="icon">5</span>
+                Fixed Expense Breakdown
+            </div>
+            <div style="margin-bottom:6px;">
+                <span class="tag tag-fixed">Fixed</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>SN</th>
+                    <th>Header</th>
+                    <th>Qty</th>
+                    <th>Rate (PKR)</th>
+                    <th>Total (PKR)</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>Carpet</td>
+                    <td>96</td>
+                    <td>45</td>
+                    <td>4,320</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>TMA</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>2,500</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Medical</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td colspan="4"><strong>Total Fixed Expense (Exp!F19)</strong></td>
+                    <td><strong>6,820</strong></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Staff Salary Breakdown -->
+        <div class="card summary-section">
+            <div class="card-title">
+                <span class="icon">6</span>
+                Staff Salary Breakdown (Pending)
+            </div>
+            <div style="margin-bottom:6px;">
+                <span class="tag tag-staff">Staff</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Rate / Day (PKR)</th>
+                    <th>Days</th>
+                    <th>Qty</th>
+                    <th>Total (PKR)</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>Staff</td>
+                    <td>2,000</td>
+                    <td>11</td>
+                    <td>2</td>
+                    <td>44,000</td>
+                </tr>
+                <tr>
+                    <td>Shahbaz</td>
+                    <td>2,000</td>
+                    <td>11</td>
+                    <td>1</td>
+                    <td>22,000</td>
+                </tr>
+                <tr>
+                    <td>APV</td>
+                    <td>5,500</td>
+                    <td>14</td>
+                    <td>1</td>
+                    <td>77,000</td>
+                </tr>
+                <tr>
+                    <td colspan="4"><strong>Total Staff Cost (Exp!L10)</strong></td>
+                    <td><strong>143,000</strong></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        This page is independent of the main dashboard and is accessible at
+        <strong>/exp</strong> on GitHub Pages. Update the numbers here when you update <code>summary_fuel.xlsx</code>.
+    </div>
+</div>
+
+<script>
+    // Expense composition chart
+    const ctx = document.getElementById('expenseChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: [
+                'Fuel (17.6%)',
+                'Other Daily (46.6%)',
+                'Fixed (1.6%)',
+                'Staff Pending (34.1%)'
+            ],
+            datasets: [{
+                data: [74000, 195580, 6820, 143000],
+                backgroundColor: [
+                    '#FF6B6B',
+                    '#4ECDC4',
+                    '#45B7D1',
+                    '#96CEB4'
+                ],
+                borderWidth: 1,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                }
+            }
+        }
+    });
+</script>
 </body>
 </html>
