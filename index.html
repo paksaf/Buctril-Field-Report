@@ -1,297 +1,584 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Buctril Farmer Engagement Summary 2025</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <title>Buctril Farmer Engagement Summary 2025</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Leaflet CSS -->
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""
-    />
+  <!-- Leaflet CSS for map -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 
-    <!-- Simple page styling -->
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+  <style>
+    :root {
+      --bg-dark: rgba(6, 19, 38, 0.92);
+      --card: rgba(18, 31, 55, 0.96);
+      --accent: #ffb74d;
+      --accent-soft: rgba(255, 183, 77, 0.2);
+      --text-main: #fefefe;
+      --text-muted: #b3bed4;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.4);
+    }
 
-        body {
-            background: #0b1020;
-            color: #f1f5f9;
-        }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-        .video-bg {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: -1;
-        }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      color: var(--text-main);
+      background: #000;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-        .video-bg video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: brightness(0.35);
-        }
+    /* Background video/image */
 
-        .page {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 16px 16px 40px;
-        }
+    #bg-video {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: blur(1px) brightness(0.6);
+      z-index: -2;
+    }
 
-        header {
-            padding: 16px 12px 8px;
-        }
+    .bg-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      background: url("wheat-bg.jpg") center/cover no-repeat;
+      opacity: 0.6;
+    }
 
-        header h1 {
-            font-size: 1.8rem;
-            margin-bottom: 4px;
-        }
+    .overlay {
+      position: relative;
+      min-height: 100vh;
+      background: radial-gradient(
+          circle at top left,
+          rgba(255, 193, 7, 0.25),
+          transparent 55%
+        ),
+        radial-gradient(circle at bottom right, rgba(3, 155, 229, 0.25), transparent 55%),
+        linear-gradient(to bottom, rgba(2, 8, 23, 0.96), rgba(2, 6, 23, 0.98));
+      padding: 24px clamp(16px, 4vw, 40px);
+    }
 
-        header p {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
+    header {
+      margin-bottom: 20px;
+    }
 
-        .grid {
-            display: grid;
-            grid-template-columns: minmax(0, 2fr) minmax(0, 1.7fr);
-            gap: 16px;
-            margin-top: 16px;
-        }
+    .title-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
 
-        @media (max-width: 900px) {
-            .grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
+    .logo-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ffe082, #f57c00);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: #3e2723;
+      box-shadow: 0 0 0 2px rgba(255, 224, 130, 0.35);
+      margin-right: 6px;
+    }
 
-        .card {
-            background: rgba(15, 23, 42, 0.9);
-            border-radius: 10px;
-            padding: 12px 12px 14px;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            backdrop-filter: blur(6px);
-        }
+    h1 {
+      font-size: clamp(26px, 3vw, 34px);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+    }
 
-        .card-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+    .subtitle {
+      margin-top: 4px;
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 720px;
+    }
 
-        .card-title span.icon {
-            width: 20px;
-            height: 20px;
-            border-radius: 999px;
-            background: #f97316;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            color: #0b1020;
-        }
+    .subtitle code {
+      font-family: "Menlo", "SF Mono", ui-monospace, monospace;
+      font-size: 13px;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
 
-        #map {
-            width: 100%;
-            height: 420px;
-            border-radius: 8px;
-        }
+    .layout-main {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 6px;
-        }
+    @media (max-width: 900px) {
+      .layout-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
 
-        @media (max-width: 600px) {
-            .stats-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-soft);
+      padding: 14px 16px 18px;
+      backdrop-filter: blur(20px);
+      position: relative;
+      overflow: hidden;
+    }
 
-        .stat-box {
-            background: rgba(15, 23, 42, 0.9);
-            border-radius: 8px;
-            padding: 8px 9px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-        }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
 
-        .stat-label {
-            font-size: 0.75rem;
-            opacity: 0.8;
-            margin-bottom: 2px;
-        }
+    .pill-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      flex-shrink: 0;
+    }
 
-        .stat-value {
-            font-size: 1rem;
-            font-weight: 600;
-        }
+    .card-title-text {
+      font-size: 13px;
+      color: #e5e9f5;
+    }
 
-        .stat-sub {
-            font-size: 0.7rem;
-            opacity: 0.7;
-        }
+    /* Map card */
 
-        .table-card {
-            margin-top: 16px;
-        }
+    #route-map {
+      width: 100%;
+      min-height: 360px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: radial-gradient(
+        circle at top,
+        rgba(148, 163, 184, 0.25),
+        rgba(15, 23, 42, 0.9)
+      );
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.8rem;
-        }
+    /* Metrics card */
 
-        thead {
-            background: rgba(15, 23, 42, 0.97);
-        }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
 
-        th, td {
-            padding: 6px 8px;
-            border-bottom: 1px solid rgba(15, 23, 42, 0.9);
-        }
+    .metric-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+    }
 
-        tbody tr:nth-child(even) {
-            background: rgba(15, 23, 42, 0.7);
-        }
+    .metric {
+      background: radial-gradient(circle at top left, rgba(255, 183, 77, 0.08), transparent 55%),
+        rgba(13, 25, 48, 0.96);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
 
-        tbody tr:nth-child(odd) {
-            background: rgba(15, 23, 42, 0.45);
-        }
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
 
-        tbody tr:hover {
-            background: rgba(56, 189, 248, 0.16);
-        }
+    .metric-value {
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
 
-        .tag {
-            display: inline-block;
-            padding: 1px 6px;
-            border-radius: 999px;
-            font-size: 0.7rem;
-            border: 1px solid rgba(148, 163, 184, 0.6);
-        }
+    .metric-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
 
-        footer {
-            margin-top: 18px;
-            font-size: 0.75rem;
-            opacity: 0.75;
-        }
-    </style>
+    .metric-sub span {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Table card */
+
+    .table-card {
+      margin-top: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    thead {
+      background: linear-gradient(
+        to right,
+        rgba(30, 64, 175, 0.9),
+        rgba(2, 132, 199, 0.9)
+      );
+    }
+
+    thead th {
+      text-align: left;
+      padding: 8px 10px;
+      color: #e5f3ff;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(15, 23, 42, 0.85);
+    }
+
+    tbody tr:nth-child(odd) {
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    tbody td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.95);
+      color: #e2e8f0;
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-wrapper {
+      max-height: 260px;
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .footer-note {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .footer-note code {
+      font-family: "Menlo", "SF Mono", ui-monospace, monospace;
+      font-size: 11px;
+      background: rgba(15, 23, 42, 0.85);
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+  </style>
 </head>
-<body>
-<div class="video-bg">
-    <video autoplay muted loop playsinline>
-        <source src="tmp.mp4" type="video/mp4">
-    </video>
-</div>
 
-<div class="page">
+<body>
+  <!-- Optional background video (put wheat video as bg-video.mp4 in repo root) -->
+  <div class="bg-fallback"></div>
+  <video id="bg-video" autoplay muted loop playsinline>
+    <source src="bg-video.mp4" type="video/mp4" />
+  </video>
+
+  <div class="overlay">
     <header>
-        <h1>🌾 Buctril Farmer Engagement Summary 2025</h1>
-        <p>
-            This dashboard reads <strong>sum_sheet.csv</strong> directly from the repository and summarises
-            farmer engagement sessions, acres covered, and travel route for the APV 2016.
-        </p>
+      <div class="title-row">
+        <div class="logo-badge">🌾</div>
+        <h1>Buctril Farmer Engagement Summary 2025</h1>
+      </div>
+      <p class="subtitle">
+        This dashboard reads <code>sum_sheet.csv</code> directly from the repository and summarises farmer
+        engagement sessions, acres covered, and the travel route for the APV 2016. To update, overwrite
+        <code>sum_sheet.csv</code> with a new export using the same headers.
+      </p>
     </header>
 
-    <section class="grid">
-        <!-- MAP + ROUTE -->
-        <article class="card">
-            <div class="card-title">
-                <span class="icon">M</span>
-                Engagement Route Map
-            </div>
-            <div id="map"></div>
-        </article>
+    <main class="layout-main">
+      <!-- Left: Map -->
+      <section class="card">
+        <div class="card-header">
+          <div class="pill-icon">M</div>
+          <span class="card-title-text">Engagement Route Map</span>
+        </div>
+        <div id="route-map"></div>
+      </section>
 
-        <!-- SUMMARY STATS -->
-        <article class="card">
-            <div class="card-title">
-                <span class="icon">Σ</span>
-                Key Engagement Metrics
-            </div>
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-label">Total Sessions</div>
-                    <div class="stat-value" id="total-sessions">–</div>
-                    <div class="stat-sub">Rows in CSV (unique SN)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Total Farmers Reached (Approx)</div>
-                    <div class="stat-value" id="total-farmers">–</div>
-                    <div class="stat-sub" id="avg-farmers-per-session">–</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Total Wheat Area (Acres)</div>
-                    <div class="stat-value" id="total-acres">–</div>
-                    <div class="stat-sub" id="avg-acres-per-session">–</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Cities & Villages Covered</div>
-                    <div class="stat-value" id="total-locations">–</div>
-                    <div class="stat-sub" id="city-village-breakdown">–</div>
-                </div>
-            </div>
-        </article>
-    </section>
+      <!-- Right: Metrics -->
+      <section class="card">
+        <div class="card-header">
+          <div class="pill-icon">Σ</div>
+          <span class="card-title-text">Key Engagement Metrics</span>
+        </div>
 
-    <!-- TABLE -->
+        <div class="metrics-grid">
+          <div class="metric-row">
+            <div class="metric">
+              <div class="metric-label">Total Sessions</div>
+              <div class="metric-value" id="metric-total-sessions">–</div>
+              <div class="metric-sub">
+                Rows in CSV (unique SN):
+                <span id="metric-unique-sn">–</span>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="metric-label">Total Farmers Reached (Approx)</div>
+              <div class="metric-value" id="metric-total-farmers">–</div>
+              <div class="metric-sub">
+                Avg per session:
+                <span id="metric-farmers-per-session">–</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric">
+              <div class="metric-label">Total Wheat Area (Acres)</div>
+              <div class="metric-value" id="metric-total-acres">–</div>
+              <div class="metric-sub">
+                Avg acres per session:
+                <span id="metric-acres-per-session">–</span>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="metric-label">Cities &amp; Villages Covered</div>
+              <div class="metric-value" id="metric-locations">–</div>
+              <div class="metric-sub">
+                Sessions with GPS coordinates:
+                <span id="metric-sessions-with-coords">–</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Table -->
     <section class="card table-card">
-        <div class="card-title">
-            <span class="icon">T</span>
-            Session-wise Detail (from sum_sheet.csv)
-        </div>
-        <div style="max-height: 420px; overflow: auto; margin-top: 8px;">
-            <table>
-                <thead>
-                <tr>
-                    <th>SN</th>
-                    <th>Date</th>
-                    <th>From City</th>
-                    <th>To City</th>
-                    <th>Session Location</th>
-                    <th>Total Farmers</th>
-                    <th>Total Acres</th>
-                    <th>Coordinates</th>
-                </tr>
-                </thead>
-                <tbody id="session-table-body"></tbody>
-            </table>
-        </div>
+      <div class="card-header">
+        <div class="pill-icon">T</div>
+        <span class="card-title-text">
+          Session-wise Detail (from <code>sum_sheet.csv</code>)
+        </span>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>SN</th>
+              <th>Date</th>
+              <th>From City</th>
+              <th>To City</th>
+              <th>Session Location</th>
+              <th>Total Farmers</th>
+              <th>Total Acres</th>
+              <th>Coordinates (lat, lon)</th>
+            </tr>
+          </thead>
+          <tbody id="session-rows">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <p class="footer-note">
+        All values above (map, metrics, table) are loaded each time from
+        <code>sum_sheet.csv</code>. To update the report, export a new CSV with the same headers and
+        overwrite the file in GitHub.
+      </p>
     </section>
+  </div>
 
-    <footer>
-        All values above (map, metrics, table) are loaded each time from <code>sum_sheet.csv</code>.
-        To update the report, export a new CSV with the same headers and overwrite the file in GitHub.
-    </footer>
-</div>
-
-<!-- Leaflet JS -->
-<script
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin="">
-</script>
+    crossorigin=""
+  ></script>
 
-<!-- PapaParse for CSV -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- CSV & Dashboard Logic -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      loadDashboard();
+    });
 
-<!-- Our processing logic -->
-<script src="data_processor.js"></script>
-</body>
-</html>
+    async function loadDashboard() {
+      try {
+        // Avoid browser/GitHub caching issues
+        const response = await fetch("sum_sheet.csv?cache=" + Date.now());
+        if (!response.ok) {
+          throw new Error("Failed to fetch CSV: HTTP " + response.status);
+        }
+
+        const csvText = await response.text();
+
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const rows = results.data || [];
+            if (!rows.length) {
+              console.warn("CSV parsed but has no rows.");
+            }
+            updateMetrics(rows);
+            updateTable(rows);
+            initMap(rows);
+          },
+          error: (err) => {
+            console.error("PapaParse error:", err);
+          },
+        });
+      } catch (err) {
+        console.error("Error loading CSV:", err);
+      }
+    }
+
+    function updateMetrics(rows) {
+      const totalSessions = rows.length;
+      const uniqueSN = new Set();
+      let totalFarmers = 0;
+      let totalAcres = 0;
+      const locations = new Set();
+      let sessionsWithCoords = 0;
+
+      rows.forEach((r) => {
+        if (r["SN"]) uniqueSN.add(r["SN"]);
+
+        const farmers = parseFloat(
+          (r["Total Farmers"] || "").toString().replace(/,/g, "")
+        );
+        const acres = parseFloat(
+          (r["Total Acres"] || "").toString().replace(/,/g, "")
+        );
+
+        if (!isNaN(farmers)) totalFarmers += farmers;
+        if (!isNaN(acres)) totalAcres += acres;
+
+        if (r["Session Location"]) locations.add(r["Session Location"]);
+
+        if (r["Coordinates"] && r["Coordinates"].trim() !== "") {
+          sessionsWithCoords += 1;
+        }
+      });
+
+      const farmersPerSession =
+        totalSessions > 0 ? (totalFarmers / totalSessions).toFixed(1) : "–";
+      const acresPerSession =
+        totalSessions > 0 ? (totalAcres / totalSessions).toFixed(1) : "–";
+
+      setText("metric-total-sessions", totalSessions || "0");
+      setText("metric-unique-sn", uniqueSN.size || "0");
+
+      setText("metric-total-farmers", formatNumber(totalFarmers));
+      setText("metric-farmers-per-session", farmersPerSession);
+
+      setText("metric-total-acres", formatNumber(totalAcres));
+      setText("metric-acres-per-session", acresPerSession);
+
+      setText("metric-locations", locations.size || "0");
+      setText("metric-sessions-with-coords", sessionsWithCoords || "0");
+    }
+
+    function updateTable(rows) {
+      const tbody = document.getElementById("session-rows");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+
+      rows.forEach((r) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(r["SN"] || "")}</td>
+          <td>${escapeHtml(r["Date"] || "")}</td>
+          <td>${escapeHtml(r["From City"] || "")}</td>
+          <td>${escapeHtml(r["To City"] || "")}</td>
+          <td>${escapeHtml(r["Session Location"] || "")}</td>
+          <td>${escapeHtml(r["Total Farmers"] || "")}</td>
+          <td>${escapeHtml(r["Total Acres"] || "")}</td>
+          <td>${escapeHtml(r["Coordinates"] || "")}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function initMap(rows) {
+      const mapDiv = document.getElementById("route-map");
+      if (!mapDiv) return;
+
+      // Collect valid coordinate pairs from CSV
+      const points = [];
+      rows.forEach((r) => {
+        const coord = (r["Coordinates"] || "").trim();
+        if (!coord) return;
+
+        const parts = coord.split(",").map((x) => parseFloat(x.trim()));
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          points.push(parts);
+        }
+      });
+
+      if (!points.length) {
+        // No coordinates – leave background as-is
+        return;
+      }
+
+      const map = L.map("route-map", {
+        zoomControl: true,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      const latLngs = points.map((p) => L.latLng(p[0], p[1]));
+
+      latLngs.forEach((latLng, idx) => {
+        L.marker(latLng).addTo(map).bindPopup("Session " + (idx + 1));
+      });
+
+      L.polyline(latLngs, { weight:
