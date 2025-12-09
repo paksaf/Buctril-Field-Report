@@ -386,8 +386,9 @@ function updateSessionTable(rows) {
 
         let mediaHtml = "N/A";
         if (dateIndex > 0) {
-            const imgName = `${dateIndex}.jpg`;
-            const vidName = `${dateIndex}.mov`;
+            // Use .jpeg and .mp4 to match uploaded filenames
+            const imgName = `${dateIndex}.jpeg`;
+            const vidName = `${dateIndex}.mp4`;
             mediaHtml = `
                 <a href="${imgName}" target="_blank" class="media-link">🖼️ ${imgName}</a>
                 <a href="${vidName}" target="_blank" class="media-link">🎥 ${vidName}</a>
@@ -510,11 +511,11 @@ function updateMediaGallery() {
         const div = document.createElement("div");
         div.className = "media-item";
         div.innerHTML = `
-            <div class="media-placeholder" role="img"> ${dateIndex} </div>
+            <div class="media-placeholder" role="img">${dateIndex}</div>
             <div class="media-label">Date: ${escapeHtml(date)}</div>
             <div class="media-links">
-                <a href="${dateIndex}.jpg" target="_blank" class="media-link">🖼️ ${dateIndex}.jpg</a>
-                <a href="${dateIndex}.mov" target="_blank" class="media-link">🎥 ${dateIndex}.mov</a>
+                <a href="${dateIndex}.jpeg" target="_blank" class="media-link">🖼️ ${dateIndex}.jpeg</a>
+                <a href="${dateIndex}.mp4"  target="_blank" class="media-link">🎥 ${dateIndex}.mp4</a>
             </div>
         `;
         gallery.appendChild(div);
