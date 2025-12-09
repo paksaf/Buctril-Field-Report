@@ -86,6 +86,24 @@
         .card.highlight {
             border-left-color: #ff9800;
         }
+        
+        /* New Critical Status Card Styling */
+        .card.status-critical {
+            grid-column: 1 / -1;
+            border-left-color: #d32f2f;
+            background-color: #ffebee;
+        }
+        
+        .status-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .status-text strong {
+            color: #d32f2f;
+            font-weight: 700;
+        }
 
         .card-title {
             font-size: 17px;
@@ -223,7 +241,7 @@
                 <h1>Fuel & Expense Summary – Buctril Tour 2025</h1>
                 <p class="subtitle">
                     Static snapshot prepared from <strong>summary_fuel.xlsx</strong> (Exp sheet).
-                    Update this file manually whenever you revise the Excel.
+                    **Update the data in the script block below whenever you revise the Excel file.**
                 </p>
             </div>
             <div class="report-meta">
@@ -234,7 +252,17 @@
     </header>
 
     <div class="dashboard">
-        <!-- Fuel Summary -->
+        <div class="card status-critical">
+            <div class="card-title">
+                <span class="icon" style="background:#d32f2f;">!</span>
+                Overall Tour Status
+            </div>
+            <p class="status-text">
+                The tour has covered **1,351.5 km** at a **Grand Total Cost of PKR 419,400**. 
+                The most critical issue is the **Fuel Consumption** which is **52.9% below target** (4.9 km/L actual vs 10.3 km/L target), leading to a high Fuel Cost per km (**PKR 54.8**). Other Daily Expenses account for the largest share of the current spending.
+            </p>
+        </div>
+
         <div class="card">
             <div class="card-title">
                 <span class="icon">1</span>
@@ -242,90 +270,95 @@
             </div>
             <div class="metric">
                 <span class="metric-label">Total Fuel Cost</span>
-                <span class="metric-value">PKR 74,000</span>
+                <span class="metric-value" id="fuel-cost">PKR 74,000</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Total Fuel Used</span>
-                <span class="metric-value">277.2 L</span>
+                <span class="metric-value" id="fuel-used">277.2 L</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Average Fuel Price</span>
-                <span class="metric-value">PKR 267.0 / L</span>
+                <span class="metric-value" id="avg-price">PKR 267.0 / L</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Average Consumption (Actual)</span>
-                <span class="metric-value">4.9 km/L</span>
+                <span class="metric-value" id="avg-cons-actual">4.9 km/L</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Target Consumption</span>
-                <span class="metric-value">10.3 km/L</span>
+                <span class="metric-value" id="target-cons">10.3 km/L</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Performance vs Target</span>
-                <span class="metric-value" style="color:#d32f2f;">-52.9%</span>
+                <span class="metric-value" id="cons-performance" style="color:#d32f2f;">-52.9%</span>
             </div>
         </div>
 
-        <!-- Expense Summary -->
         <div class="card highlight">
             <div class="card-title">
                 <span class="icon">2</span>
                 Expense Summary
             </div>
             <div class="metric">
-                <span class="metric-label">Total Daily Expenses</span>
-                <span class="metric-value">PKR 269,580</span>
+                <span class="metric-label">Total Daily Expenses (Incl. Fuel)</span>
+                <span class="metric-value" id="total-daily">PKR 269,580</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Other Daily Expenses (Excl. Fuel)</span>
+                <span class="metric-value" id="other-daily">PKR 195,580</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Fixed Expenses</span>
-                <span class="metric-value">PKR 6,820</span>
+                <span class="metric-value" id="fixed-exp">PKR 6,820</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Staff Salaries (Pending)</span>
-                <span class="metric-value">PKR 143,000</span>
+                <span class="metric-value" id="staff-salary">PKR 143,000</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Grand Total (Daily + Fixed + Staff)</span>
-                <span class="metric-value">PKR 419,400</span>
+                <span class="metric-value" id="grand-total">PKR 419,400</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Fuel Share of Total (without staff)</span>
-                <span class="metric-value">27.5%</span>
+                <span class="metric-value" id="fuel-share">27.5%</span>
             </div>
             <div class="chart-container">
                 <canvas id="expenseChart"></canvas>
             </div>
         </div>
 
-        <!-- Cost Efficiency -->
         <div class="card">
             <div class="card-title">
                 <span class="icon">3</span>
                 Cost Efficiency
             </div>
             <div class="metric">
-                <span class="metric-label">Total Distance (km)</span>
-                <span class="metric-value">1,351.5 km</span>
+                <span class="metric-label">Total Distance Traveled</span>
+                <span class="metric-value" id="total-distance">1,351.5 km</span>
             </div>
             <div class="metric">
-                <span class="metric-label">Cost per km (All Expenses)</span>
-                <span class="metric-value">PKR 199.5 / km</span>
+                <span class="metric-label">Cost per km (All Expenses incl. Staff)</span>
+                <span class="metric-value" id="cost-per-km-all">PKR 310.3 / km</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Cost per km (Daily + Fixed only)</span>
+                <span class="metric-value" id="cost-per-km-daily">PKR 199.5 / km</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Fuel Cost per km</span>
-                <span class="metric-value">PKR 54.8 / km</span>
+                <span class="metric-value" id="fuel-cost-per-km">PKR 54.8 / km</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Travel Days</span>
-                <span class="metric-value">18 days</span>
+                <span class="metric-value" id="travel-days">18 days</span>
             </div>
             <div class="metric">
-                <span class="metric-label">Cost per Travel Day</span>
-                <span class="metric-value">PKR 14,976.7</span>
+                <span class="metric-label">Cost per Travel Day (Daily + Fixed)</span>
+                <span class="metric-value" id="cost-per-day">PKR 15,355.6</span>
             </div>
         </div>
 
-        <!-- Daily Expense Breakdown -->
         <div class="card summary-section">
             <div class="card-title">
                 <span class="icon">4</span>
@@ -353,7 +386,7 @@
                     <td>14</td>
                     <td>1,034</td>
                     <td>70</td>
-                    <td>72,380</td>
+                    <td id="goodybag-total">72,380</td>
                 </tr>
                 <tr>
                     <td>2</td>
@@ -361,7 +394,7 @@
                     <td>14</td>
                     <td>2</td>
                     <td>2,000</td>
-                    <td>56,000</td>
+                    <td id="hotel-total">56,000</td>
                 </tr>
                 <tr>
                     <td>3</td>
@@ -369,7 +402,7 @@
                     <td>14</td>
                     <td>1</td>
                     <td>1,200</td>
-                    <td>16,800</td>
+                    <td id="sg-meal-total">16,800</td>
                 </tr>
                 <tr>
                     <td>4</td>
@@ -377,25 +410,24 @@
                     <td>14</td>
                     <td>3</td>
                     <td>1,200</td>
-                    <td>50,400</td>
+                    <td id="staff-meal-total">50,400</td>
                 </tr>
                 <tr>
                     <td>5</td>
-                    <td>Fuel</td>
+                    <td>**Fuel** (See Card 1 for detail)</td>
                     <td>0</td>
                     <td>1</td>
                     <td>74,000</td>
-                    <td>74,000</td>
+                    <td id="fuel-daily-total">74,000</td>
                 </tr>
                 <tr>
-                    <td colspan="5"><strong>Total Daily Expense (Exp!F10)</strong></td>
-                    <td><strong>269,580</strong></td>
+                    <td colspan="5"><strong>Total Daily Expense (PKR)</strong></td>
+                    <td id="total-daily-table"><strong>269,580</strong></td>
                 </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Fixed Expense Breakdown -->
         <div class="card summary-section">
             <div class="card-title">
                 <span class="icon">5</span>
@@ -420,31 +452,30 @@
                     <td>Carpet</td>
                     <td>96</td>
                     <td>45</td>
-                    <td>4,320</td>
+                    <td id="carpet-total">4,320</td>
                 </tr>
                 <tr>
                     <td>2</td>
                     <td>TMA</td>
                     <td>-</td>
                     <td>-</td>
-                    <td>2,500</td>
+                    <td id="tma-total">2,500</td>
                 </tr>
                 <tr>
                     <td>3</td>
                     <td>Medical</td>
                     <td>-</td>
                     <td>-</td>
-                    <td>-</td>
+                    <td id="medical-total">-</td>
                 </tr>
                 <tr>
-                    <td colspan="4"><strong>Total Fixed Expense (Exp!F19)</strong></td>
-                    <td><strong>6,820</strong></td>
+                    <td colspan="4"><strong>Total Fixed Expense (PKR)</strong></td>
+                    <td id="total-fixed-table"><strong>6,820</strong></td>
                 </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Staff Salary Breakdown -->
         <div class="card summary-section">
             <div class="card-title">
                 <span class="icon">6</span>
@@ -469,25 +500,25 @@
                     <td>2,000</td>
                     <td>11</td>
                     <td>2</td>
-                    <td>44,000</td>
+                    <td id="staff-salary-total">44,000</td>
                 </tr>
                 <tr>
                     <td>Shahbaz</td>
                     <td>2,000</td>
                     <td>11</td>
                     <td>1</td>
-                    <td>22,000</td>
+                    <td id="shahbaz-salary-total">22,000</td>
                 </tr>
                 <tr>
                     <td>APV</td>
                     <td>5,500</td>
                     <td>14</td>
                     <td>1</td>
-                    <td>77,000</td>
+                    <td id="apv-salary-total">77,000</td>
                 </tr>
                 <tr>
-                    <td colspan="4"><strong>Total Staff Cost (Exp!L10)</strong></td>
-                    <td><strong>143,000</strong></td>
+                    <td colspan="4"><strong>Total Staff Cost (PKR)</strong></td>
+                    <td id="total-staff-table"><strong>143,000</strong></td>
                 </tr>
                 </tbody>
             </table>
@@ -497,29 +528,95 @@
 
     <div class="footer">
         This page is independent of the main dashboard and is accessible at
-        <strong>/exp</strong> on GitHub Pages. Update the numbers here when you update <code>summary_fuel.xlsx</code>.
+        <strong>/exp</strong> on GitHub Pages. Data last updated: <span id="update-date">December 9, 2025</span>.
     </div>
 </div>
 
 <script>
+    // --- START: MANUAL DATA INPUT BLOCK ---
+    // Update these variables whenever the Excel sheet changes.
+    const FUEL_COST = 74000;
+    const TOTAL_DAILY_EXP = 269580;
+    const FIXED_EXP = 6820;
+    const STAFF_PENDING = 143000;
+    
+    // Derived Calculations
+    const OTHER_DAILY_EXP = TOTAL_DAILY_EXP - FUEL_COST; // 195580
+    const TOTAL_DAILY_AND_FIXED = TOTAL_DAILY_EXP + FIXED_EXP; // 276400
+    const GRAND_TOTAL = TOTAL_DAILY_AND_FIXED + STAFF_PENDING; // 419400
+    
+    // Performance & Efficiency Metrics
+    const TOTAL_DISTANCE = 1351.5;
+    const TRAVEL_DAYS = 18;
+    const FUEL_SHARE = (FUEL_COST / TOTAL_DAILY_AND_FIXED) * 100; // 26.77%
+    const COST_PER_KM_ALL = GRAND_TOTAL / TOTAL_DISTANCE; // 310.31
+    const COST_PER_KM_DAILY = TOTAL_DAILY_AND_FIXED / TOTAL_DISTANCE; // 204.52 (Used 199.5 in the original code, updating for calculation accuracy)
+    const COST_PER_DAY = TOTAL_DAILY_AND_FIXED / TRAVEL_DAYS; // 15355.56
+    
+    // Fuel Metrics
+    const FUEL_USED = 277.2;
+    const FUEL_COST_PER_KM = FUEL_COST / TOTAL_DISTANCE; // 54.75
+    const AVG_CONS_ACTUAL = TOTAL_DISTANCE / FUEL_USED; // 4.876
+    const TARGET_CONS = 10.3; // Stays static
+    const CONS_PERFORMANCE = (AVG_CONS_ACTUAL / TARGET_CONS - 1) * 100; // -52.66%
+
+    // --- END: MANUAL DATA INPUT BLOCK ---
+
+    // Function to format number as PKR currency
+    const formatPKR = (num) => `PKR ${new Intl.NumberFormat('en-PK').format(num)}`;
+
+    // Update all metrics based on the variables above
+    document.getElementById('fuel-cost').textContent = formatPKR(FUEL_COST);
+    document.getElementById('fuel-used').textContent = `${FUEL_USED.toFixed(1)} L`;
+    document.getElementById('avg-price').textContent = `PKR ${(FUEL_COST / FUEL_USED).toFixed(1)} / L`;
+    document.getElementById('avg-cons-actual').textContent = `${AVG_CONS_ACTUAL.toFixed(1)} km/L`;
+    document.getElementById('target-cons').textContent = `${TARGET_CONS} km/L`;
+    document.getElementById('cons-performance').textContent = `${CONS_PERFORMANCE.toFixed(1)}%`;
+    
+    // Update performance color
+    if (CONS_PERFORMANCE < -10) {
+        document.getElementById('cons-performance').style.color = '#d32f2f'; // Red
+    } else if (CONS_PERFORMANCE < 0) {
+        document.getElementById('cons-performance').style.color = '#ff9800'; // Amber
+    }
+    
+    document.getElementById('total-daily').textContent = formatPKR(TOTAL_DAILY_EXP);
+    document.getElementById('other-daily').textContent = formatPKR(OTHER_DAILY_EXP);
+    document.getElementById('fixed-exp').textContent = formatPKR(FIXED_EXP);
+    document.getElementById('staff-salary').textContent = formatPKR(STAFF_PENDING);
+    document.getElementById('grand-total').textContent = formatPKR(GRAND_TOTAL);
+    document.getElementById('fuel-share').textContent = `${FUEL_SHARE.toFixed(1)}%`;
+    
+    document.getElementById('total-distance').textContent = `${TOTAL_DISTANCE.toLocaleString()} km`;
+    document.getElementById('cost-per-km-all').textContent = formatPKR(COST_PER_KM_ALL.toFixed(1)) + ' / km';
+    document.getElementById('cost-per-km-daily').textContent = formatPKR(COST_PER_KM_DAILY.toFixed(1)) + ' / km';
+    document.getElementById('fuel-cost-per-km').textContent = formatPKR(FUEL_COST_PER_KM.toFixed(1)) + ' / km';
+    document.getElementById('travel-days').textContent = `${TRAVEL_DAYS} days`;
+    document.getElementById('cost-per-day').textContent = formatPKR(COST_PER_DAY.toFixed(1));
+    
+    // Update table totals (for consistency)
+    document.getElementById('total-daily-table').textContent = formatPKR(TOTAL_DAILY_EXP).replace('PKR ', '');
+    document.getElementById('total-fixed-table').textContent = formatPKR(FIXED_EXP).replace('PKR ', '');
+    document.getElementById('total-staff-table').textContent = formatPKR(STAFF_PENDING).replace('PKR ', '');
+
     // Expense composition chart
     const ctx = document.getElementById('expenseChart').getContext('2d');
     new Chart(ctx, {
         type: 'pie',
         data: {
             labels: [
-                'Fuel (17.6%)',
-                'Other Daily (46.6%)',
-                'Fixed (1.6%)',
-                'Staff Pending (34.1%)'
+                `Fuel (${(FUEL_COST / GRAND_TOTAL * 100).toFixed(1)}%)`,
+                `Other Daily (${(OTHER_DAILY_EXP / GRAND_TOTAL * 100).toFixed(1)}%)`,
+                `Fixed (${(FIXED_EXP / GRAND_TOTAL * 100).toFixed(1)}%)`,
+                `Staff Pending (${(STAFF_PENDING / GRAND_TOTAL * 100).toFixed(1)}%)`
             ],
             datasets: [{
-                data: [74000, 195580, 6820, 143000],
+                data: [FUEL_COST, OTHER_DAILY_EXP, FIXED_EXP, STAFF_PENDING],
                 backgroundColor: [
-                    '#FF6B6B',
-                    '#4ECDC4',
-                    '#45B7D1',
-                    '#96CEB4'
+                    '#FF6B6B', // Red for Fuel
+                    '#4ECDC4', // Green/Teal for Other Daily
+                    '#45B7D1', // Blue for Fixed
+                    '#96CEB4'  // Light Green for Staff
                 ],
                 borderWidth: 1,
                 borderColor: '#fff'
