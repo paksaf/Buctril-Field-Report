@@ -1,19 +1,23 @@
-// ----------------- CONFIG: FILTERS -----------------
+// ----------------- CONFIG: DEFAULT FILTERS -----------------
 // Dates must be in YYYY-MM-DD format in the CSV for filtering to work correctly.
-const FILTER_START_DATE = "2025-01-05"; // inclusive
-const FILTER_END_DATE = "2025-12-31"; // inclusive (wider so you see data)
+let FILTER_START_DATE = "2025-01-05"; // inclusive
+let FILTER_END_DATE = "2025-12-31"; // inclusive (wider so you see data)
 // If you want to restrict to particular cities or villages, put names here.
 // Leave arrays empty [] to include all values.
-const ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
-const ALLOWED_TO_CITIES = []; // e.g. ["Chichawatni"]
-const ALLOWED_LOCATIONS = []; // e.g. ["Basti Joriya", "Chak 10"]
+let ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
+let ALLOWED_TO_CITIES = []; // e.g. ["Chichawatni"]
+let ALLOWED_LOCATIONS = []; // e.g. ["Basti Joriya", "Chak 10"]
 
 let cityFarmersChartInstance = null;
 let villageAcresChartInstance = null;
 let uniqueDates = []; // Stores the sorted, unique dates for media naming
+let allRows = []; // Cache all parsed rows for filtering
+let currentFilteredRows = []; // Current filtered data
 
 document.addEventListener("DOMContentLoaded", () => {
     loadDashboard();
+    populateFilterOptions(); // For dynamic city filter
+    setupFilterListeners();
 });
 
 async function loadDashboard() {
@@ -24,30 +28,94 @@ async function loadDashboard() {
             throw new Error("Failed to fetch CSV: HTTP " + response.status);
         }
         const csvText = await response.text();
-
         Papa.parse(csvText, {
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
-                const rows = results.data || [];
-                const filteredRows = filterRows(rows);
-                
-                // Pre-process dates to determine media naming convention
-                preProcessDates(rows);
-
-                updateMetrics(filteredRows);
-                updateSessionTable(filteredRows);
-                updateVillageSummary(filteredRows);
-                initMap(filteredRows);
-                buildCharts(filteredRows);
+                allRows = results.data || [];
+                // Pre-process dates to determine media naming convention (on all data)
+                preProcessDates(allRows);
+                applyFilters(); // Initial load with defaults
             },
             error: (err) => {
                 console.error("PapaParse error:", err);
+                document.body.innerHTML += '<div style="color: red; text-align: center;">Error parsing CSV. Ensure sum_sheet.csv is in the repo root.</div>';
             },
         });
     } catch (err) {
         console.error("Error loading CSV:", err);
+        document.body.innerHTML += '<div style="color: red; text-align: center;">Failed to load data. Check console for details.</div>';
     }
+}
+
+// ----------------- DYNAMIC FILTERS -----------------
+function setupFilterListeners() {
+    document.getElementById('start-date').addEventListener('change', (e) => { FILTER_START_DATE = e.target.value; });
+    document.getElementById('end-date').addEventListener('change', (e) => { FILTER_END_DATE = e.target.value; });
+    document.getElementById('from-city-filter').addEventListener('change', (e) => {
+        ALLOWED_FROM_CITIES = e.target.value ? [e.target.value] : [];
+    });
+}
+
+function populateFilterOptions() {
+    const cities = [...new Set(allRows.map(r => (r["From City"] || "").trim()).filter(Boolean))].sort();
+    const select = document.getElementById('from-city-filter');
+    cities.forEach(city => {
+        const option = document.createElement('option');
+        option.value = city;
+        option.textContent = city;
+        select.appendChild(option);
+    });
+}
+
+function applyFilters() {
+    currentFilteredRows = filterRows(allRows);
+    updateMetrics(currentFilteredRows);
+    updateSessionTable(currentFilteredRows);
+    updateVillageSummary(currentFilteredRows);
+    initMap(currentFilteredRows);
+    buildCharts(currentFilteredRows);
+    updateMediaGallery();
+}
+
+function resetFilters() {
+    FILTER_START_DATE = "2025-01-05";
+    FILTER_END_DATE = "2025-12-31";
+    ALLOWED_FROM_CITIES = [];
+    ALLOWED_TO_CITIES = [];
+    ALLOWED_LOCATIONS = [];
+    document.getElementById('start-date').value = FILTER_START_DATE;
+    document.getElementById('end-date').value = FILTER_END_DATE;
+    document.getElementById('from-city-filter').value = '';
+    applyFilters();
+}
+
+// ----------------- SHARING FUNCTIONS -----------------
+function shareOnX() {
+    if (navigator.share) {
+        navigator.share({
+            title: 'Buctril Farmer Engagement Summary 2025',
+            url: window.location.href
+        });
+    } else {
+        // Fallback to Twitter intent
+        window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=Buctril Farmer Engagement Summary 2025 - Check out this dynamic dashboard!`, '_blank');
+    }
+}
+
+function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        alert('Link copied to clipboard!');
+    }).catch(() => {
+        // Fallback
+        const el = document.createElement('textarea');
+        el.value = window.location.href;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        alert('Link copied to clipboard!');
+    });
 }
 
 // ----------------- DATE PRE-PROCESSING FOR MEDIA -----------------
@@ -60,7 +128,6 @@ function preProcessDates(rows) {
     // Store unique dates, sorted chronologically, to map them to 1, 2, 3...
     uniqueDates = Array.from(dates).sort();
 }
-
 
 // ----------------- FILTERING -----------------
 function filterRows(rows) {
@@ -96,7 +163,6 @@ function updateMetrics(rows) {
     let totalFarmers = 0;
     let totalAcres = 0;
     let sessionsWithCoords = 0;
-
     rows.forEach((r) => {
         if (r["SN"]) uniqueSN.add(r["SN"]);
         const fromCity = (r["From City"] || "").trim();
@@ -112,12 +178,10 @@ function updateMetrics(rows) {
         const coords = getCoords(r);
         if (coords) sessionsWithCoords += 1;
     });
-
     const farmersPerSession =
         totalSessions > 0 ? (totalFarmers / totalSessions).toFixed(1) : "–";
     const acresPerSession =
         totalSessions > 0 ? (totalAcres / totalSessions).toFixed(1) : "–";
-
     setText("metric-total-sessions", totalSessions || "0");
     setText("metric-unique-sn", uniqueSN.size || "0");
     setText("metric-total-farmers", formatNumber(totalFarmers));
@@ -134,26 +198,23 @@ function updateSessionTable(rows) {
     const tbody = document.getElementById("session-rows");
     if (!tbody) return;
     tbody.innerHTML = "";
-
     rows.forEach((r) => {
         const dateStr = (r["Date"] || "").trim();
         // Find the 1-based index of this date for file naming (e.g., first date is #1)
         const dateIndex = uniqueDates.indexOf(dateStr) + 1;
-
         let mediaHtml = '';
         if (dateIndex > 0) {
             const imgName = `${dateIndex}.jpg`;
             const vidName = `${dateIndex}.mov`;
-
             // Create media placeholders/links
             mediaHtml = `
-                <a href="${imgName}" target="_blank" class="media-link" title="View Image ${dateIndex}">🖼️ ${imgName}</a>
-                <a href="${vidName}" target="_blank" class="media-link" title="View Video ${dateIndex}">🎥 ${vidName}</a>
+                <a href="${imgName}" target="_blank" class="media-link" title="View Image ${dateIndex}" aria-label="Image for date ${dateStr}">🖼️ ${imgName}</a>
+                <a href="${vidName}" target="_blank" class="media-link" title="View Video ${dateIndex}" aria-label="Video for date ${dateStr}">🎥 ${vidName}</a>
             `;
         } else {
             mediaHtml = 'N/A';
         }
-        
+       
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${escapeHtml(r["SN"] || "")}</td>
@@ -174,12 +235,10 @@ function updateSessionTable(rows) {
 function updateVillageSummary(rows) {
     const tbody = document.getElementById("village-rows");
     if (!tbody) return;
-
     const summary = {};
     rows.forEach((r) => {
         const villageRaw = (r["Session Location"] || "").trim() || "Unknown";
         const village = villageRaw || "Unknown";
-
         if (!summary[village]) {
             summary[village] = {
                 sessions: 0,
@@ -198,11 +257,10 @@ function updateVillageSummary(rows) {
             summary[village].feedbackSamples.push(fb);
         }
     });
-
     const entries = Object.entries(summary).sort(
         (a, b) => b[1].farmers - a[1].farmers
     );
-    
+   
     tbody.innerHTML = "";
     entries.forEach(([village, data], idx) => {
         const tr = document.createElement("tr");
@@ -222,18 +280,42 @@ function updateVillageSummary(rows) {
     });
 }
 
+// ----------------- MEDIA GALLERY -----------------
+function updateMediaGallery() {
+    const gallery = document.getElementById("media-gallery");
+    if (!gallery) return;
+    gallery.innerHTML = "";
+    uniqueDates.forEach((date, idx) => {
+        const dateIndex = idx + 1;
+        const div = document.createElement("div");
+        div.className = "media-item";
+        div.innerHTML = `
+            <div class="media-placeholder" role="img" aria-label="Placeholder for media on ${date}">${dateIndex}</div>
+            <div class="media-label">Date: ${date}</div>
+            <div class="media-links">
+                <a href="${dateIndex}.jpg" target="_blank" class="media-link">🖼️ View Image</a>
+                <a href="${dateIndex}.mov" target="_blank" class="media-link">🎥 View Video</a>
+            </div>
+        `;
+        gallery.appendChild(div);
+    });
+    if (uniqueDates.length === 0) {
+        gallery.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">No dates with media in current filters.</div>';
+    }
+}
+
 // ----------------- MAP -----------------
 function initMap(rows) {
     const mapDiv = document.getElementById("route-map");
     if (!mapDiv) return;
-    
+   
     // Check if map is already initialized (important when adding filters later)
     let map = window.buctrilMap;
     if (map) {
         map.remove();
         map = null;
     }
-    
+   
     const points = [];
     rows.forEach((r) => {
         const coord = getCoords(r);
@@ -250,31 +332,26 @@ function initMap(rows) {
             date: (r["Date"] || "").trim(),
         });
     });
-
     if (!points.length) {
         mapDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No sessions with valid coordinates in the current filter range.</div>';
         return;
     }
-    
+   
     map = L.map("route-map", {
         zoomControl: true,
     });
     window.buctrilMap = map; // Store map instance globally
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
         attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
-
     const latLngs = [];
     points.forEach((p, idx) => {
         const latLng = L.latLng(p.lat, p.lon);
         latLngs.push(latLng);
-
         const acres = isNaN(p.acres) ? 0 : p.acres;
         // Scale circle radius based on the square root of acres for better visual distribution
         const radiusMeters = 100 + Math.sqrt(acres) * 40;
-
         L.circle(latLng, {
             radius: radiusMeters,
             fillOpacity: 0.4,
@@ -283,7 +360,6 @@ function initMap(rows) {
             color: '#ffb74d', // Accent color stroke
             weight: 2
         }).addTo(map);
-
         const popupHtml = `
             <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
             Date: ${escapeHtml(p.date)}<br/>
@@ -292,7 +368,6 @@ function initMap(rows) {
         `;
         L.marker(latLng).addTo(map).bindPopup(popupHtml);
     });
-
     if (latLngs.length > 1) {
         // Draw a polyline connecting all session points
         L.polyline(latLngs, { weight: 3, opacity: 0.9, color: '#ffb74d' }).addTo(map);
@@ -306,7 +381,6 @@ function initMap(rows) {
 function buildCharts(rows) {
     if (cityFarmersChartInstance) cityFarmersChartInstance.destroy();
     if (villageAcresChartInstance) villageAcresChartInstance.destroy();
-
     // Farmers by From City
     const cityTotals = {};
     rows.forEach((r) => {
@@ -315,11 +389,9 @@ function buildCharts(rows) {
         if (!cityTotals[city]) cityTotals[city] = 0;
         if (!isNaN(farmers)) cityTotals[city] += farmers;
     });
-
     const cityLabels = Object.keys(cityTotals);
     const cityData = cityLabels.map((c) => cityTotals[c]);
     const cityCtx = document.getElementById("cityFarmersChart").getContext("2d");
-
     cityFarmersChartInstance = new Chart(cityCtx, {
         type: "bar",
         data: {
@@ -341,10 +413,10 @@ function buildCharts(rows) {
                 y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e9f5' } },
                 x: { ticks: { color: '#e5e9f5' } }
             },
-            plugins: { legend: { display: false }, title: { display: false } }
+            plugins: { legend: { display: false }, title: { display: false } },
+            animation: { duration: 1000 } // Smooth animation for innovation
         },
     });
-
     // Acres by Village
     const villageSummary = {};
     rows.forEach((r) => {
@@ -353,11 +425,9 @@ function buildCharts(rows) {
         const acres = getCropArea(r);
         if (!isNaN(acres)) villageSummary[village] += acres;
     });
-
     const villageLabels = Object.keys(villageSummary);
     const villageData = villageLabels.map((v) => villageSummary[v]);
     const villageCtx = document.getElementById("villageAcresChart").getContext("2d");
-
     villageAcresChartInstance = new Chart(villageCtx, {
         type: "bar",
         data: {
@@ -379,7 +449,8 @@ function buildCharts(rows) {
                 y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e9f5' } },
                 x: { ticks: { color: '#e5e9f5' } }
             },
-            plugins: { legend: { display: false }, title: { display: false } }
+            plugins: { legend: { display: false }, title: { display: false } },
+            animation: { duration: 1000 } // Smooth animation
         },
     });
 }
@@ -395,7 +466,7 @@ function setText(id, value) {
 function parseNumber(value) {
     if (value === undefined || value === null) return NaN;
     // Remove commas, then parse
-    const n = parseFloat(value.toString().replace(/,/g, "").trim()); 
+    const n = parseFloat(value.toString().replace(/,/g, "").trim());
     return isNaN(n) ? NaN : n;
 }
 
