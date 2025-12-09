@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <title>Buctril Farmer Engagement Summary 2025</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Dynamic dashboard summarizing Buctril farmer engagements in 2025, with maps, charts, metrics, and media gallery for innovative sharing on GitHub Pages." />
+    <link rel="canonical" href="https://yourusername.github.io/repo-name/" />
+    <!-- Open Graph for sharing -->
+    <meta property="og:title" content="Buctril Farmer Engagement Summary 2025" />
+    <meta property="og:description" content="Interactive summary of farmer sessions, routes, and media." />
+    <meta property="og:image" content="wheat-bg.jpg" />
+    <meta property="og:type" content="website" />
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -106,6 +113,74 @@
             padding: 2px 6px;
             border-radius: 6px;
             border: 1px solid rgba(148, 163, 184, 0.4);
+        }
+        /* Sharing buttons for innovative report sharing */
+        .sharing-section {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .share-btn {
+            background: var(--accent-soft);
+            color: var(--accent);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .share-btn:hover {
+            background: var(--accent);
+            color: var(--text-main);
+        }
+        /* Filters for dynamic interaction */
+        .filters-section {
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            padding: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .filter-group label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .filter-group input, .filter-group select {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .filter-btn {
+            background: var(--accent);
+            color: var(--text-main);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .filter-btn:hover {
+            opacity: 0.9;
         }
         .layout-main {
             display: grid;
@@ -297,7 +372,56 @@
             display: block;
             font-size: 11px;
             margin-top: 2px;
+            color: var(--accent);
+            text-decoration: none;
         }
+        .media-link:hover {
+            text-decoration: underline;
+        }
+        /* Media Gallery Section */
+        .media-gallery {
+            margin-top: 24px;
+        }
+        .media-gallery .card-header {
+            margin-bottom: 16px;
+        }
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .media-item {
+            background: rgba(13, 25, 48, 0.96);
+            border-radius: var(--radius-lg);
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .media-placeholder {
+            width: 100%;
+            height: 120px;
+            background: var(--accent-soft);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            font-size: 48px;
+            color: var(--accent);
+        }
+        .media-label {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .media-links {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        /* Accessibility improvements */
+        img, video { max-width: 100%; height: auto; }
+        [role="img"] { border: 1px solid var(--border-subtle); }
     </style>
 </head>
 <body>
@@ -317,8 +441,29 @@
                 <strong>dates</strong>, <strong>farmers reached</strong>, <strong>crop area (acres)</strong>,
                 and <strong>feedback / observations</strong>.
             </p>
+            <div class="sharing-section">
+                <button class="share-btn" onclick="shareOnX()">📱 Share on X</button>
+                <a class="share-btn" href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://yourusername.github.io/repo-name/'); ?>&text=Buctril Farmer Engagement Summary 2025" target="_blank">🐦 Tweet</a>
+                <button class="share-btn" onclick="copyLink()">🔗 Copy Link</button>
+            </div>
         </header>
-
+        <!-- Dynamic Filters -->
+        <section class="filters-section">
+            <div class="filter-group">
+                <label for="start-date">Start Date</label>
+                <input type="date" id="start-date" value="2025-01-05" />
+            </div>
+            <div class="filter-group">
+                <label for="end-date">End Date</label>
+                <input type="date" id="end-date" value="2025-12-31" />
+            </div>
+            <div class="filter-group">
+                <label for="from-city-filter">From City</label>
+                <select id="from-city-filter"><option value="">All</option></select>
+            </div>
+            <button class="filter-btn" onclick="applyFilters()">Apply Filters</button>
+            <button class="filter-btn" onclick="resetFilters()" style="background: var(--text-muted);">Reset</button>
+        </section>
         <main class="layout-main">
             <section class="card">
                 <div class="card-header">
@@ -327,7 +472,6 @@
                 </div>
                 <div id="route-map"></div>
             </section>
-
             <section class="card">
                 <div class="card-header">
                     <div class="pill-icon">Σ</div>
@@ -375,7 +519,6 @@
                 </div>
             </section>
         </main>
-
         <section class="card table-card">
             <div class="card-header">
                 <div class="pill-icon">T</div>
@@ -396,17 +539,17 @@
                             <th>Crop Area (Acres)</th>
                             <th>Coordinates (lat, lon)</th>
                             <th>Feedback / Observations</th>
-                            <th>Media (Files are named 1.jpg/mov, 2.jpg/mov, etc., per date)</th> </tr>
+                            <th>Media (Files are named 1.jpg/mov, 2.jpg/mov, etc., per date)</th>
+                        </tr>
                     </thead>
                     <tbody id="session-rows">
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
             <p class="footer-note">
                 Media files are dynamically linked based on the chronological order of the unique dates found in the <code>sum_sheet.csv</code>, starting with 1.
             </p>
         </section>
-
         <section class="card table-card">
             <div class="card-header">
                 <div class="pill-icon">V</div>
@@ -427,22 +570,34 @@
                         </tr>
                     </thead>
                     <tbody id="village-rows">
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
             <div class="charts-grid">
                 <div class="chart-container">
                     <div class="chart-title">Farmers Engagement by From City</div>
-                    <canvas id="cityFarmersChart" height="160"></canvas>
+                    <canvas id="cityFarmersChart" height="160" aria-label="Bar chart showing farmers reached by city"></canvas>
                 </div>
                 <div class="chart-container">
                     <div class="chart-title">Crop Area (Acres) by Village / Session Location</div>
-                    <canvas id="villageAcresChart" height="160"></canvas>
+                    <canvas id="villageAcresChart" height="160" aria-label="Bar chart showing crop area by village"></canvas>
                 </div>
             </div>
         </section>
+        <!-- Media Gallery at End -->
+        <section class="media-gallery card">
+            <div class="card-header">
+                <div class="pill-icon">📸</div>
+                <span class="card-title-text">Media Gallery (By Unique Date - Placeholders for Images & Videos)</span>
+            </div>
+            <div class="media-grid" id="media-gallery">
+                <!-- Dynamically populated -->
+            </div>
+            <p class="footer-note">
+                Upload media files named sequentially (e.g., 1.jpg, 1.mov for first date) to the repo root for automatic display.
+            </p>
+        </section>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -450,7 +605,6 @@
         crossorigin=""
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
     <script src="dashboard.js"></script>
 </body>
 </html>
