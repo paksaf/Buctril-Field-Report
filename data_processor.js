@@ -1,34 +1,32 @@
-// ----------------- CONFIG: DEFAULT FILTERS -----------------
-// Dates in the CSV can be "YYYY-MM-DD" or like "23-Nov". We'll normalize them.
-let FILTER_START_DATE = "2025-01-05"; // inclusive
-let FILTER_END_DATE = "2025-12-31";   // inclusive
+// ----------------- CONFIG -----------------
+let FILTER_START_DATE = "2025-01-05";
+let FILTER_END_DATE = "2025-12-31";
 
-// If you want to restrict to particular cities or villages, put names here.
-// Leave arrays empty [] to include all values.
-let ALLOWED_FROM_CITIES = []; // e.g. ["Multan", "Khanewal"]
-let ALLOWED_TO_CITIES = [];   // e.g. ["Chichawatni"]
-let ALLOWED_LOCATIONS = [];   // e.g. ["Basti Joriya", "Chak 10"]
+let ALLOWED_FROM_CITIES = [];
+let ALLOWED_TO_CITIES = [];
+let ALLOWED_LOCATIONS = [];
 
 let cityFarmersChartInstance = null;
 let villageAcresChartInstance = null;
-let uniqueDates = [];          // Stores the sorted, unique dates for media naming
-let allRows = [];              // Cache all parsed + normalized rows
-let currentFilteredRows = [];  // Current filtered data
+let uniqueDates = [];
+let allRows = [];
+let currentFilteredRows = [];
+
+// How many categories to show in charts before grouping to "Others"
+const TOP_CATEGORIES_CITY = 6;
+const TOP_CATEGORIES_VILLAGE = 6;
 
 document.addEventListener("DOMContentLoaded", () => {
     setupFilterListeners();
     loadDashboard();
 });
 
-// ----------------- MAIN LOAD -----------------
+// ----------------- LOAD & NORMALISE CSV -----------------
 async function loadDashboard() {
     try {
         const loadingEl = document.getElementById("loading-message");
-        if (loadingEl) {
-            loadingEl.textContent = "Loading data from sum_sheet.csv…";
-        }
+        if (loadingEl) loadingEl.textContent = "Loading data from sum_sheet.csv…";
 
-        // Fetch CSV with a cache-buster to ensure the latest version is loaded on GitHub Pages
         const response = await fetch("sum_sheet.csv?cache=" + Date.now());
         if (!response.ok) {
             throw new Error("Failed to fetch CSV: HTTP " + response.status);
@@ -39,103 +37,79 @@ async function loadDashboard() {
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
-                const normalized = normalizeRows(results);
-                allRows = normalized || [];
-
-                // Pre-process dates (on all data) so media index (1.jpg, 1.mov, etc.) is stable
+                allRows = normalizeRows(results);
                 preProcessDates(allRows);
-
-                // Populate filters after data is available
                 populateFilterOptions();
-
-                // Initial load with defaults
                 applyFilters();
 
                 if (loadingEl) {
-                    loadingEl.textContent = "Data loaded. Adjust filters to explore sessions.";
+                    loadingEl.textContent =
+                        "Data loaded. Use filters to slice the pivot view.";
                 }
             },
             error: (err) => {
                 console.error("PapaParse error:", err);
                 if (loadingEl) {
-                    loadingEl.textContent = "Error parsing sum_sheet.csv. Check the file format.";
+                    loadingEl.textContent =
+                        "Error parsing sum_sheet.csv. Check the file format.";
                 }
-                document.body.innerHTML +=
-                    '<div style="color: red; text-align: center;">Error parsing CSV. Ensure sum_sheet.csv is in the repo root.</div>';
             },
         });
     } catch (err) {
         console.error("Error loading CSV:", err);
         const loadingEl = document.getElementById("loading-message");
         if (loadingEl) {
-            loadingEl.textContent = "Failed to load data. Check console for details.";
+            loadingEl.textContent =
+                "Failed to load sum_sheet.csv. See browser console for details.";
         }
-        document.body.innerHTML +=
-            '<div style="color: red; text-align: center;">Failed to load data. Check console for details.</div>';
     }
 }
 
-// ----------------- CSV NORMALIZATION -----------------
 /**
- * Your sum_sheet.csv has:
- * - Real header row in the *first data row* (values: "SN", "From City", "City", "Date", etc.)
- * - "Summary, Unnamed: 1, Unnamed: 2, ..." as technical header names.
- *
- * This function converts that into:
- *   { "SN": "0", "From City": "Multan", "City": "Multan", "Date": "23-Nov", ... }
+ * CSV structure:
+ *   Row 0: technical headers (Summary, Unnamed: 1, ..., etc.)
+ *   Row 1: logical headers ("SN", "From City", "City", "Date", "Session Location",
+ *                           "Total Farmers", "Total Wheat Acres", "Spot Coordinates", ...)
+ *   Row 2+: data rows.
  */
 function normalizeRows(results) {
     const rows = results.data || [];
     const fields = (results.meta && results.meta.fields) || [];
-
     if (!rows.length || !fields.length) return [];
 
-    const firstRow = rows[0] || {};
-    const firstValues = Object.values(firstRow).map((v) =>
-        (v || "").toString().toLowerCase()
-    );
+    const headerRow = rows[0]; // row with SN, From City, ...
 
-    // Heuristic: if first data row contains "sn" or "from city" or "session location", treat it as header row
-    const looksLikeHeaderRow =
-        firstValues.some((v) => v === "sn") ||
-        firstValues.some((v) => v.includes("from city")) ||
-        firstValues.some((v) => v.includes("session location"));
-
-    if (!looksLikeHeaderRow) {
-        // Already in normal "one row per session" shape
-        return rows;
-    }
-
-    // Build a map: originalFieldName -> "nice" header label from firstRow
+    // map original field -> human label from header row
     const headerLabels = {};
     fields.forEach((f) => {
-        const label = (firstRow[f] || f || "").toString().trim();
+        const rawLabel = headerRow[f];
+        const label = rawLabel == null ? "" : String(rawLabel).trim();
         headerLabels[f] = label || f;
     });
 
     const normalized = [];
     for (let i = 1; i < rows.length; i++) {
         const rawRow = rows[i];
-        // Skip completely empty rows
-        const isEmpty = fields.every((f) => {
-            const val = rawRow[f];
-            return val === null || val === undefined || String(val).trim() === "";
-        });
-        if (isEmpty) continue;
-
+        let hasValue = false;
         const obj = {};
+
         fields.forEach((f) => {
             const label = headerLabels[f];
             if (!label) return;
-            obj[label] = rawRow[f];
+            const v = rawRow[f];
+            if (v !== null && v !== undefined && String(v).trim() !== "") {
+                hasValue = true;
+            }
+            obj[label] = v;
         });
-        normalized.push(obj);
+
+        if (hasValue) normalized.push(obj);
     }
 
     return normalized;
 }
 
-// ----------------- DYNAMIC FILTERS -----------------
+// ----------------- FILTERS -----------------
 function setupFilterListeners() {
     const startInput = document.getElementById("start-date");
     const endInput = document.getElementById("end-date");
@@ -162,7 +136,6 @@ function populateFilterOptions() {
     const select = document.getElementById("from-city-filter");
     if (!select) return;
 
-    // Remove any existing dynamic options (keep the first "All")
     while (select.options.length > 1) {
         select.remove(1);
     }
@@ -187,6 +160,7 @@ function applyFilters() {
     currentFilteredRows = filterRows(allRows);
     updateMetrics(currentFilteredRows);
     updateSessionTable(currentFilteredRows);
+    updateCitySummary(currentFilteredRows);
     updateVillageSummary(currentFilteredRows);
     initMap(currentFilteredRows);
     buildCharts(currentFilteredRows);
@@ -211,26 +185,23 @@ function resetFilters() {
     applyFilters();
 }
 
-// ----------------- SHARING FUNCTIONS -----------------
+// ----------------- SHARING -----------------
 function shareOnX() {
     const url = window.location.href;
-    const text = "Buctril Farmer Engagement Summary 2025 - Dynamic dashboard of farmer sessions.";
-    const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(
+    const text =
+        "Buctril Farmer Engagement Summary 2025 – dynamic pivot dashboard of farmer sessions.";
+    const intent = `https://twitter.com/intent/tweet?url=${encodeURIComponent(
         url
     )}&text=${encodeURIComponent(text)}`;
 
     if (navigator.share) {
         navigator
-            .share({
-                title: "Buctril Farmer Engagement Summary 2025",
-                text: text,
-                url: url,
-            })
+            .share({ title: "Buctril Farmer Engagement Summary 2025", text, url })
             .catch(() => {
-                // If user cancels share, do nothing
+                window.open(intent, "_blank");
             });
     } else {
-        window.open(shareUrl, "_blank");
+        window.open(intent, "_blank");
     }
 }
 
@@ -256,18 +227,18 @@ function fallbackCopy(text) {
     alert("Link copied to clipboard!");
 }
 
-// ----------------- DATE UTILITIES -----------------
+// ----------------- DATE HELPERS -----------------
 function parseDateFlexible(dateStr) {
     if (!dateStr) return null;
     const trimmed = dateStr.toString().trim();
 
-    // 1) ISO "YYYY-MM-DD"
+    // yyyy-mm-dd
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
         const d = new Date(trimmed);
         return isNaN(d.getTime()) ? null : d;
     }
 
-    // 2) "DD-MMM" e.g. "23-Nov" / "05-Dec"
+    // dd-MMM (23-Nov, 05-Dec)
     const m = trimmed.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})$/);
     if (m) {
         const day = parseInt(m[1], 10);
@@ -287,23 +258,21 @@ function parseDateFlexible(dateStr) {
             dec: 11,
         };
         if (months.hasOwnProperty(monStr)) {
-            const year = new Date().getFullYear(); // assume current year for ordering
+            const year = new Date().getFullYear();
             const d = new Date(year, months[monStr], day);
             return isNaN(d.getTime()) ? null : d;
         }
     }
 
-    // 3) Fallback: let JS try
     const d = new Date(trimmed);
     return isNaN(d.getTime()) ? null : d;
 }
 
-// ----------------- DATE PRE-PROCESSING FOR MEDIA -----------------
 function preProcessDates(rows) {
     const dates = new Set();
     rows.forEach((r) => {
-        const dateStr = (r["Date"] || "").toString().trim();
-        if (dateStr) dates.add(dateStr);
+        const d = (r["Date"] || "").toString().trim();
+        if (d) dates.add(d);
     });
 
     uniqueDates = Array.from(dates).sort((a, b) => {
@@ -314,7 +283,6 @@ function preProcessDates(rows) {
     });
 }
 
-// ----------------- FILTERING -----------------
 function filterRows(rows) {
     const startDateObj = parseDateFlexible(FILTER_START_DATE);
     const endDateObj = parseDateFlexible(FILTER_END_DATE);
@@ -330,15 +298,12 @@ function filterRows(rows) {
         }
 
         const fromCity = (r["From City"] || "").toString().trim();
-        // Some files have "City" instead of "To City"
-        const toCity = (
-            r["To City"] ||
-            r["City"] ||
+        const toCity = (r["To City"] || r["City"] || "").toString().trim();
+        const loc = (
+            r["Session Location"] ||
+            r["Village / Mauza"] ||
             ""
         )
-            .toString()
-            .trim();
-        const loc = (r["Session Location"] || r["Village / Mauza"] || "")
             .toString()
             .trim();
 
@@ -371,18 +336,15 @@ function updateMetrics(rows) {
         }
 
         const fromCity = (r["From City"] || "").toString().trim();
-        const toCity = (
-            r["To City"] ||
-            r["City"] ||
-            ""
-        )
-            .toString()
-            .trim();
-
+        const toCity = (r["To City"] || r["City"] || "").toString().trim();
         if (fromCity) cities.add(fromCity);
         if (toCity) cities.add(toCity);
 
-        const loc = (r["Session Location"] || r["Village / Mauza"] || "")
+        const loc = (
+            r["Session Location"] ||
+            r["Village / Mauza"] ||
+            ""
+        )
             .toString()
             .trim();
         if (loc) villages.add(loc);
@@ -412,7 +374,7 @@ function updateMetrics(rows) {
     setText("metric-sessions-with-coords", sessionsWithCoords || "0");
 }
 
-// ----------------- TABLES -----------------
+// ----------------- SESSION TABLE -----------------
 function updateSessionTable(rows) {
     const tbody = document.getElementById("session-rows");
     if (!tbody) return;
@@ -420,7 +382,6 @@ function updateSessionTable(rows) {
 
     rows.forEach((r) => {
         const dateStr = (r["Date"] || "").toString().trim();
-        // Find the 1-based index of this date for file naming (e.g., first date is #1)
         const dateIndex = uniqueDates.indexOf(dateStr) + 1;
 
         let mediaHtml = "N/A";
@@ -428,8 +389,8 @@ function updateSessionTable(rows) {
             const imgName = `${dateIndex}.jpg`;
             const vidName = `${dateIndex}.mov`;
             mediaHtml = `
-                <a href="${imgName}" target="_blank" class="media-link" title="View Image ${dateIndex}" aria-label="Image for date ${escapeHtml(dateStr)}">🖼️ ${imgName}</a>
-                <a href="${vidName}" target="_blank" class="media-link" title="View Video ${dateIndex}" aria-label="Video for date ${escapeHtml(dateStr)}">🎥 ${vidName}</a>
+                <a href="${imgName}" target="_blank" class="media-link">🖼️ ${imgName}</a>
+                <a href="${vidName}" target="_blank" class="media-link">🎥 ${vidName}</a>
             `;
         }
 
@@ -439,12 +400,52 @@ function updateSessionTable(rows) {
             <td>${escapeHtml(r["Date"] || "")}</td>
             <td>${escapeHtml(r["From City"] || "")}</td>
             <td>${escapeHtml(r["To City"] || r["City"] || "")}</td>
-            <td>${escapeHtml(r["Session Location"] || r["Village / Mauza"] || "")}</td>
+            <td>${escapeHtml(
+                r["Session Location"] || r["Village / Mauza"] || ""
+            )}</td>
             <td>${escapeHtml(getFarmers(r))}</td>
             <td>${escapeHtml(getCropArea(r))}</td>
             <td>${escapeHtml(getCoords(r))}</td>
             <td>${escapeHtml(getFeedback(r))}</td>
             <td>${mediaHtml}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// ----------------- CITY & VILLAGE PIVOTS -----------------
+function updateCitySummary(rows) {
+    const tbody = document.getElementById("city-rows");
+    if (!tbody) return;
+
+    const summary = {};
+    rows.forEach((r) => {
+        const city =
+            (r["From City"] || r["City"] || "Unknown").toString().trim() ||
+            "Unknown";
+        if (!summary[city]) {
+            summary[city] = { sessions: 0, farmers: 0, acres: 0 };
+        }
+        summary[city].sessions += 1;
+        const farmers = getFarmers(r);
+        const acres = getCropArea(r);
+        if (!isNaN(farmers)) summary[city].farmers += farmers;
+        if (!isNaN(acres)) summary[city].acres += acres;
+    });
+
+    const entries = Object.entries(summary).sort(
+        (a, b) => b[1].farmers - a[1].farmers
+    );
+
+    tbody.innerHTML = "";
+    entries.forEach(([city, data], idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${escapeHtml(city)}</td>
+            <td>${data.sessions}</td>
+            <td>${formatNumber(data.farmers)}</td>
+            <td>${formatNumber(data.acres)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -456,50 +457,36 @@ function updateVillageSummary(rows) {
 
     const summary = {};
     rows.forEach((r) => {
-        const villageRaw =
-            (r["Session Location"] || r["Village / Mauza"] || "").toString().trim() ||
-            "Unknown";
-        const village = villageRaw || "Unknown";
-
+        const village =
+            (r["Session Location"] || r["Village / Mauza"] || "Unknown")
+                .toString()
+                .trim() || "Unknown";
         if (!summary[village]) {
-            summary[village] = {
-                sessions: 0,
-                farmers: 0,
-                acres: 0,
-                feedbackSamples: [],
-            };
+            summary[village] = { sessions: 0, farmers: 0, acres: 0 };
         }
         summary[village].sessions += 1;
-
         const farmers = getFarmers(r);
         const acres = getCropArea(r);
         if (!isNaN(farmers)) summary[village].farmers += farmers;
         if (!isNaN(acres)) summary[village].acres += acres;
-
-        const fb = getFeedback(r);
-        if (fb && summary[village].feedbackSamples.length < 3) {
-            summary[village].feedbackSamples.push(fb);
-        }
     });
 
     const entries = Object.entries(summary).sort(
         (a, b) => b[1].farmers - a[1].farmers
     );
 
+    // Only top 10 rows to keep mobile display compact
+    const topEntries = entries.slice(0, 10);
+
     tbody.innerHTML = "";
-    entries.forEach(([village, data], idx) => {
+    topEntries.forEach(([village, data], idx) => {
         const tr = document.createElement("tr");
-        const feedbackText =
-            data.feedbackSamples.length > 0
-                ? data.feedbackSamples.join(" | ")
-                : "";
         tr.innerHTML = `
             <td>${idx + 1}</td>
             <td>${escapeHtml(village)}</td>
             <td>${data.sessions}</td>
             <td>${formatNumber(data.farmers)}</td>
             <td>${formatNumber(data.acres)}</td>
-            <td>${escapeHtml(feedbackText)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -512,9 +499,9 @@ function updateMediaGallery() {
 
     gallery.innerHTML = "";
 
-    if (uniqueDates.length === 0) {
+    if (!uniqueDates.length) {
         gallery.innerHTML =
-            '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">No dates found in sum_sheet.csv.</div>';
+            '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">No dates found in the current data.</div>';
         return;
     }
 
@@ -523,13 +510,11 @@ function updateMediaGallery() {
         const div = document.createElement("div");
         div.className = "media-item";
         div.innerHTML = `
-            <div class="media-placeholder" role="img" aria-label="Placeholder for media on ${escapeHtml(
-                date
-            )}">${dateIndex}</div>
+            <div class="media-placeholder" role="img"> ${dateIndex} </div>
             <div class="media-label">Date: ${escapeHtml(date)}</div>
             <div class="media-links">
-                <a href="${dateIndex}.jpg" target="_blank" class="media-link">🖼️ View Image</a>
-                <a href="${dateIndex}.mov" target="_blank" class="media-link">🎥 View Video</a>
+                <a href="${dateIndex}.jpg" target="_blank" class="media-link">🖼️ ${dateIndex}.jpg</a>
+                <a href="${dateIndex}.mov" target="_blank" class="media-link">🎥 ${dateIndex}.mov</a>
             </div>
         `;
         gallery.appendChild(div);
@@ -541,7 +526,6 @@ function initMap(rows) {
     const mapDiv = document.getElementById("route-map");
     if (!mapDiv) return;
 
-    // Destroy previous map if exists (for filter changes)
     let map = window.buctrilMap;
     if (map) {
         map.remove();
@@ -562,7 +546,11 @@ function initMap(rows) {
         points.push({
             lat: parts[0],
             lon: parts[1],
-            village: (r["Session Location"] || r["Village / Mauza"] || "")
+            village: (
+                r["Session Location"] ||
+                r["Village / Mauza"] ||
+                ""
+            )
                 .toString()
                 .trim(),
             farmers: getFarmers(r),
@@ -573,13 +561,11 @@ function initMap(rows) {
 
     if (!points.length) {
         mapDiv.innerHTML =
-            '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No sessions with valid coordinates in the current filter range.</div>';
+            '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size:12px;">No sessions with valid coordinates in the current filter range.</div>';
         return;
     }
 
-    map = L.map("route-map", {
-        zoomControl: true,
-    });
+    map = L.map("route-map", { zoomControl: true });
     window.buctrilMap = map;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -593,7 +579,6 @@ function initMap(rows) {
         latLngs.push(latLng);
 
         const acres = isNaN(p.acres) ? 0 : p.acres;
-        // Scale circle radius based on sqrt(acres) so big sessions stand out without exploding the map
         const radiusMeters = 100 + Math.sqrt(acres || 0) * 40;
 
         L.circle(latLng, {
@@ -615,123 +600,121 @@ function initMap(rows) {
     });
 
     if (latLngs.length > 1) {
-        L.polyline(latLngs, { weight: 3, opacity: 0.9, color: "#ffb74d" }).addTo(
-            map
-        );
-        map.fitBounds(latLngs, { padding: [40, 40] });
+        L.polyline(latLngs, { weight: 3, opacity: 0.9, color: "#ffb74d" }).addTo(map);
+        map.fitBounds(latLngs, { padding: [32, 32] });
     } else {
-        map.setView(latLngs[0], 12);
+        map.setView(latLngs[0], 11);
     }
 }
 
-// ----------------- CHARTS -----------------
+// ----------------- CHARTS (PIVOT STYLE) -----------------
 function buildCharts(rows) {
     if (cityFarmersChartInstance) cityFarmersChartInstance.destroy();
     if (villageAcresChartInstance) villageAcresChartInstance.destroy();
 
-    // Farmers by From City
+    // City totals
     const cityTotals = {};
     rows.forEach((r) => {
-        const city = (r["From City"] || "Unknown").toString().trim() || "Unknown";
+        const city =
+            (r["From City"] || r["City"] || "Unknown").toString().trim() ||
+            "Unknown";
         const farmers = getFarmers(r);
         if (!cityTotals[city]) cityTotals[city] = 0;
         if (!isNaN(farmers)) cityTotals[city] += farmers;
     });
 
-    const cityLabels = Object.keys(cityTotals);
-    const cityData = cityLabels.map((c) => cityTotals[c]);
+    const cityPivot = buildTopNWithOthers(cityTotals, TOP_CATEGORIES_CITY);
     const cityCanvas = document.getElementById("cityFarmersChart");
-    if (cityCanvas && cityLabels.length) {
-        const cityCtx = cityCanvas.getContext("2d");
-        cityFarmersChartInstance = new Chart(cityCtx, {
-            type: "bar",
+    if (cityCanvas && cityPivot.labels.length) {
+        const ctx = cityCanvas.getContext("2d");
+        cityFarmersChartInstance = new Chart(ctx, {
+            type: "pie",
             data: {
-                labels: cityLabels,
+                labels: cityPivot.labels,
                 datasets: [
                     {
-                        label: "Farmers Reached",
-                        data: cityData,
-                        backgroundColor: "rgba(255, 183, 77, 0.7)",
-                        borderColor: "rgba(255, 183, 77, 1)",
-                        borderWidth: 1,
+                        label: "Farmers",
+                        data: cityPivot.data,
                     },
                 ],
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { precision: 0, color: "#e5e9f5" },
-                    },
-                    x: { ticks: { color: "#e5e9f5" } },
-                },
                 plugins: {
-                    legend: { display: false },
-                    title: { display: false },
+                    legend: { position: "bottom", labels: { font: { size: 10 } } },
                 },
-                animation: { duration: 900 },
             },
         });
     }
 
-    // Acres by Village
-    const villageSummary = {};
+    // Village totals
+    const villageTotals = {};
     rows.forEach((r) => {
-        const village = (r["Session Location"] || r["Village / Mauza"] || "Unknown")
-            .toString()
-            .trim() || "Unknown";
-        if (!villageSummary[village]) villageSummary[village] = 0;
+        const village =
+            (r["Session Location"] || r["Village / Mauza"] || "Unknown")
+                .toString()
+                .trim() || "Unknown";
         const acres = getCropArea(r);
-        if (!isNaN(acres)) villageSummary[village] += acres;
+        if (!villageTotals[village]) villageTotals[village] = 0;
+        if (!isNaN(acres)) villageTotals[village] += acres;
     });
 
-    const villageLabels = Object.keys(villageSummary);
-    const villageData = villageLabels.map((v) => villageSummary[v]);
+    const villagePivot = buildTopNWithOthers(
+        villageTotals,
+        TOP_CATEGORIES_VILLAGE
+    );
     const villageCanvas = document.getElementById("villageAcresChart");
-    if (villageCanvas && villageLabels.length) {
-        const villageCtx = villageCanvas.getContext("2d");
-        villageAcresChartInstance = new Chart(villageCtx, {
-            type: "bar",
+    if (villageCanvas && villagePivot.labels.length) {
+        const ctx = villageCanvas.getContext("2d");
+        villageAcresChartInstance = new Chart(ctx, {
+            type: "pie",
             data: {
-                labels: villageLabels,
+                labels: villagePivot.labels,
                 datasets: [
                     {
-                        label: "Crop Area (Acres)",
-                        data: villageData,
-                        backgroundColor: "rgba(106, 151, 255, 0.7)",
-                        borderColor: "rgba(106, 151, 255, 1)",
-                        borderWidth: 1,
+                        label: "Acres",
+                        data: villagePivot.data,
                     },
                 ],
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { precision: 0, color: "#e5e9f5" },
-                    },
-                    x: { ticks: { color: "#e5e9f5" } },
-                },
                 plugins: {
-                    legend: { display: false },
-                    title: { display: false },
+                    legend: { position: "bottom", labels: { font: { size: 10 } } },
                 },
-                animation: { duration: 900 },
             },
         });
     }
 }
 
+/**
+ * Convert an object { key: value } into top N + Others arrays for charts.
+ */
+function buildTopNWithOthers(map, topN) {
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return { labels: [], data: [] };
+
+    if (entries.length <= topN) {
+        return {
+            labels: entries.map((e) => e[0]),
+            data: entries.map((e) => e[1]),
+        };
+    }
+
+    const top = entries.slice(0, topN - 1);
+    const rest = entries.slice(topN - 1);
+    const othersValue = rest.reduce((sum, [, v]) => sum + v, 0);
+
+    const labels = top.map((e) => e[0]).concat(["Others"]);
+    const data = top.map((e) => e[1]).concat([othersValue]);
+
+    return { labels, data };
+}
+
 // ----------------- HELPERS -----------------
 function setText(id, value) {
     const el = document.getElementById(id);
-    if (el) {
-        el.textContent = value;
-    }
+    if (el) el.textContent = value;
 }
 
 function parseNumber(value) {
@@ -740,7 +723,6 @@ function parseNumber(value) {
     return isNaN(n) ? NaN : n;
 }
 
-// Find a column whose name contains any of the given keywords (case-insensitive)
 function findField(row, keywords) {
     const keys = Object.keys(row || {});
     for (const key of keys) {
@@ -759,24 +741,32 @@ function getFarmers(row) {
 }
 
 function getCropArea(row) {
-    const key = findField(row, ["total wheat acres", "acre", "area", "crop area"]);
+    const key = findField(row, [
+        "total wheat acres",
+        "acre",
+        "area",
+        "crop area",
+    ]);
     if (!key) return NaN;
     return parseNumber(row[key]);
 }
 
 function getFeedback(row) {
-    const key = findField(row, ["feedback", "observation", "remark", "comment"]);
+    const key = findField(row, [
+        "feedback",
+        "observation",
+        "remark",
+        "comment",
+    ]);
     if (!key) return "";
     return (row[key] || "").toString();
 }
 
 function getCoords(row) {
-    // 1) Single column like "Spot Coordinates", "Coordinates", "GPS", etc.
-    const coordKey = findField(row, ["coord", "gps"]);
+    const coordKey = findField(row, ["spot coordinates", "coord", "gps"]);
     if (coordKey && row[coordKey]) {
         return row[coordKey].toString();
     }
-    // 2) Separate lat / lon columns
     const latKey = findField(row, ["lat"]);
     const lonKey = findField(row, ["lon", "lng", "long"]);
     if (latKey && lonKey && row[latKey] && row[lonKey]) {
