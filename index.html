@@ -251,6 +251,21 @@
             color: #a7f3d0;
         }
 
+        .summary-chart-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        @media (max-width: 900px) {
+            .summary-chart-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .chart-container.summary-small {
+            min-height: 170px;
+        }
+
         /* Filters */
         .filters-section {
             background: var(--card);
@@ -485,15 +500,40 @@
         }
         .media-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 10px;
         }
         .media-item {
             background: rgba(13, 25, 48, 0.96);
             border-radius: var(--radius-lg);
             padding: 10px;
-            text-align: center;
+            text-align: left;
             border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .media-visuals {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        @media (max-width: 600px) {
+            .media-visuals {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .media-thumb-img,
+        .media-thumb-video {
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+            background: #000;
+        }
+        .media-thumb-img img,
+        .media-thumb-video video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
         }
         .media-placeholder {
             width: 100%;
@@ -515,7 +555,7 @@
             display: flex;
             flex-direction: column;
             gap: 3px;
-            margin-top: 6px;
+            margin-top: 4px;
         }
 
         /* Insight blocks */
@@ -593,7 +633,7 @@
             <div id="loading-message">Loading data from <code>sum_sheet.csv</code>…</div>
         </header>
 
-        <!-- High-level summary: overview + key KPIs -->
+        <!-- High-level summary: overview + key KPIs + charts -->
         <section class="card summary-card">
             <div class="card-header">
                 <div class="pill-icon">📊</div>
@@ -668,6 +708,18 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Small pivot-style charts under the KPIs -->
+            <div class="summary-chart-layout">
+                <div class="chart-container summary-small">
+                    <div class="chart-title">Farmer Conversion Funnel (%)</div>
+                    <canvas id="kpiFunnelChart"></canvas>
+                </div>
+                <div class="chart-container summary-small">
+                    <div class="chart-title">Campaign Rating (out of 10)</div>
+                    <canvas id="campaignRatingChart"></canvas>
                 </div>
             </div>
         </section>
@@ -948,13 +1000,13 @@
             <div class="card-header">
                 <div class="pill-icon">📸</div>
                 <span class="card-title-text">
-                    Media Gallery (One slot per unique date – reads <code>1.jpeg</code>/<code>1.mp4</code>, etc. from GitHub)
+                    Media Gallery (one slot per unique date – uses <code>1.jpeg</code> / <code>1.mp4</code>, etc.)
                 </span>
             </div>
             <div class="media-grid" id="media-gallery"></div>
             <p class="footer-note">
                 Place <code>1.jpeg</code>, <code>1.mp4</code>, <code>2.jpeg</code>, <code>2.mp4</code>, … in the same folder
-                as this page. Slots will automatically link to them by date index.
+                as this page. Thumbnails and hover-videos will load automatically.
             </p>
         </section>
     </div>
