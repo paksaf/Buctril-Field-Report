@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <title>Buctril Farmer Engagement Summary 2025</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Dynamic, pivot-style dashboard summarizing Buctril Super farmer engagements in 2025 with maps, charts, media gallery, and key marketing insights." />
+    <meta name="description" content="Dynamic, pivot-style dashboard summarizing Buctril farmer engagements in 2025 with maps, charts, and media gallery for GitHub Pages." />
     <link rel="canonical" href="https://yourusername.github.io/repo-name/" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Buctril Super Farmer Education Drive – 2025 Summary" />
-    <meta property="og:description" content="Interactive view of sessions, acres, farmers, media and key learnings from the Buctril Super Farmer Education Drive." />
+    <meta property="og:title" content="Buctril Farmer Engagement Summary 2025" />
+    <meta property="og:description" content="Interactive summary of farmer sessions, routes, and media." />
     <meta property="og:image" content="wheat-bg.jpg" />
     <meta property="og:type" content="website" />
 
@@ -103,12 +103,6 @@
             letter-spacing: 0.02em;
             text-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
         }
-        .tagline {
-            margin-top: 4px;
-            font-size: 13px;
-            color: var(--accent);
-            font-weight: 600;
-        }
         .subtitle {
             margin-top: 4px;
             font-size: 13px;
@@ -155,123 +149,12 @@
             color: var(--text-muted);
         }
 
-        /* Summary cards */
-        .summary-card {
-            margin-top: 12px;
-        }
-        .summary-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr);
-            gap: 12px;
-        }
-        @media (max-width: 900px) {
-            .summary-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .card {
-            background: var(--card);
-            border-radius: var(--radius-xl);
-            border: 1px solid var(--border-subtle);
-            box-shadow: var(--shadow-soft);
-            padding: 12px 14px 14px;
-            backdrop-filter: blur(20px);
-            position: relative;
-            overflow: hidden;
-        }
-        .card-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .pill-icon {
-            width: 22px;
-            height: 22px;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            background: var(--accent-soft);
-            color: var(--accent);
-            flex-shrink: 0;
-        }
-        .card-title-text {
-            font-size: 12px;
-            color: #e5e9f5;
-        }
-        .overview-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 8px;
-            margin-top: 6px;
-        }
-        .pill-badge {
-            border-radius: 999px;
-            padding: 6px 10px;
-            background: rgba(15, 23, 42, 0.9);
-            border: 1px solid rgba(148,163,184,0.35);
-            font-size: 11px;
-        }
-        .pill-badge span {
-            display: block;
-            font-size: 10px;
-            color: var(--text-muted);
-        }
-
-        .kpi-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 4px;
-            font-size: 11px;
-        }
-        .kpi-table th,
-        .kpi-table td {
-            padding: 4px 6px;
-            border-bottom: 1px solid rgba(51,65,85,0.9);
-        }
-        .kpi-table th {
-            text-align: left;
-            color: #e5f3ff;
-        }
-        .kpi-table tr:last-child td {
-            border-bottom: none;
-        }
-        .kpi-chip {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 999px;
-            background: rgba(22, 163, 74, 0.1);
-            color: #a7f3d0;
-        }
-
-        .summary-chart-layout {
-            display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-        }
-        @media (max-width: 900px) {
-            .summary-chart-layout {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .chart-container.summary-small {
-            min-height: 170px;
-        }
-
         /* Filters */
         .filters-section {
             background: var(--card);
             border-radius: var(--radius-lg);
             padding: 10px 12px;
-            margin: 16px 0 18px;
+            margin: 12px 0 18px;
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
@@ -312,7 +195,7 @@
             opacity: 0.9;
         }
 
-        /* Layout main (map + metrics) */
+        /* Cards / Layout */
         .layout-main {
             display: grid;
             grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
@@ -324,6 +207,43 @@
             .layout-main {
                 grid-template-columns: minmax(0, 1fr);
             }
+        }
+        .card {
+            background: var(--card);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-soft);
+            padding: 12px 14px 14px;
+            backdrop-filter: blur(20px);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .pill-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+        .card-title-text {
+            font-size: 12px;
+            color: #e5e9f5;
         }
 
         /* Map */
@@ -425,10 +345,6 @@
         tbody tr:last-child td {
             border-bottom: none;
         }
-        tbody tr.session-clickable:hover {
-            background: rgba(251, 191, 36, 0.25);
-            cursor: pointer;
-        }
         .table-wrapper {
             max-height: 230px;
             overflow: auto;
@@ -449,6 +365,17 @@
             padding: 1px 4px;
             border-radius: 4px;
             border: 1px solid rgba(148, 163, 184, 0.4);
+        }
+
+        .media-link {
+            display: block;
+            font-size: 10px;
+            margin-top: 2px;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .media-link:hover {
+            text-decoration: underline;
         }
 
         /* Pivot charts */
@@ -483,15 +410,136 @@
             flex: 1;
         }
 
-        .media-link {
-            display: block;
-            font-size: 10px;
-            margin-top: 2px;
-            color: var(--accent);
-            text-decoration: none;
+        /* Executive-summary grid */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
+            gap: 14px;
+            align-items: flex-start;
+            margin-bottom: 10px;
         }
-        .media-link:hover {
-            text-decoration: underline;
+        @media (max-width: 900px) {
+            .summary-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 6px;
+        }
+        .pill-badge {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            background: rgba(15, 23, 42, 0.9);
+            border-radius: 999px;
+            padding: 6px 10px;
+            border: 1px solid rgba(148, 163, 184, 0.5);
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .pill-badge span {
+            font-weight: 600;
+            color: #fefefe;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .summary-chart-layout {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
+        }
+        @media (max-width: 900px) {
+            .summary-chart-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .chart-container.summary-small {
+            min-height: 160px;
+        }
+
+        /* Executive-summary metric bars */
+        .kpi-table-exec {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 11px;
+        }
+        .kpi-table-exec th,
+        .kpi-table-exec td {
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.85);
+            vertical-align: middle;
+        }
+        .kpi-table-exec th {
+            text-align: left;
+            color: #e5f3ff;
+        }
+        .kpi-table-exec tr:last-child td {
+            border-bottom: none;
+        }
+        .metric-emoji {
+            font-size: 14px;
+        }
+        .bar-wrapper {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.95);
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #fbbf24, #f97316);
+            width: 0;
+            transition: width 0.7s ease-out;
+        }
+        .exec-note {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Insights block */
+        .insights-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr);
+            gap: 16px;
+        }
+        @media (max-width: 900px) {
+            .insights-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .insights-heading {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #fef9c3;
+            margin-bottom: 4px;
+        }
+        .insights-list {
+            font-size: 11px;
+            color: #e5e7eb;
+            margin-bottom: 8px;
+            padding-left: 16px;
+        }
+        .insights-list li {
+            margin-bottom: 3px;
+        }
+        .insight-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: rgba(34, 197, 94, 0.18);
+            border: 1px solid rgba(34, 197, 94, 0.35);
+            color: #bbf7d0;
+            margin-right: 4px;
         }
 
         /* Media Gallery */
@@ -500,52 +548,58 @@
         }
         .media-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 10px;
         }
         .media-item {
             background: rgba(13, 25, 48, 0.96);
             border-radius: var(--radius-lg);
             padding: 10px;
-            text-align: left;
+            text-align: center;
             border: 1px solid rgba(148, 163, 184, 0.35);
-        }
-        .media-visuals {
-            display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-            gap: 6px;
-            margin-bottom: 6px;
-        }
-        @media (max-width: 600px) {
-            .media-visuals {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .media-thumb-img,
-        .media-thumb-video {
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid var(--border-subtle);
-            background: #000;
-        }
-        .media-thumb-img img,
-        .media-thumb-video video {
-            width: 100%;
-            height: 100%;
-            display: block;
-            object-fit: cover;
         }
         .media-placeholder {
             width: 100%;
-            height: 100px;
-            background: var(--accent-soft);
+            height: 120px;
             border-radius: 8px;
+            margin-bottom: 6px;
+        }
+        .media-thumb {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--accent-soft);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 6px;
-            font-size: 34px;
-            color: var(--accent);
+        }
+        .media-thumb img,
+        .media-thumb video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .media-thumb video {
+            display: none;
+        }
+        .media-thumb.playing img {
+            display: none;
+        }
+        .media-thumb.playing video {
+            display: block;
+        }
+        .media-thumb-overlay {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #f9fafb;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 999px;
         }
         .media-label {
             font-size: 10px;
@@ -555,46 +609,7 @@
             display: flex;
             flex-direction: column;
             gap: 3px;
-            margin-top: 4px;
-        }
-
-        /* Insight blocks */
-        .insights-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 12px;
             margin-top: 6px;
-        }
-        @media (max-width: 900px) {
-            .insights-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .insights-column h4 {
-            font-size: 12px;
-            text-transform: uppercase;
-            color: var(--accent);
-            margin-bottom: 4px;
-        }
-        .insights-column ul {
-            list-style: none;
-            padding-left: 0;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .insights-column li::before {
-            content: "• ";
-            color: var(--accent);
-        }
-        .snapshot-list {
-            list-style: none;
-            padding-left: 0;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .snapshot-list li span {
-            color: var(--accent);
-            font-weight: 600;
         }
 
         img, video {
@@ -616,15 +631,13 @@
         <header>
             <div class="title-row">
                 <div class="logo-badge">🌾</div>
-                <div>
-                    <h1>Buctril Super Farmer Education Drive – 2025</h1>
-                    <div class="tagline">Turning Knowledge into Acres</div>
-                </div>
+                <h1>Buctril Farmer Engagement Summary 2025</h1>
             </div>
             <p class="subtitle">
                 Pivot-style dashboard reading <code>sum_sheet.csv</code> directly from the repository and summarising
                 farmer engagement by <strong>cities</strong>, <strong>villages</strong>, <strong>dates</strong>,
-                <strong>farmers reached</strong>, <strong>crop area (acres)</strong>, and <strong>feedback</strong>.
+                <strong>farmers reached</strong>, and <strong>crop area (acres)</strong>. Media and videos are loaded
+                directly from the GitHub repository.
             </p>
             <div class="sharing-section">
                 <button class="share-btn" type="button" onclick="shareOnX()">📱 Share on X</button>
@@ -632,97 +645,6 @@
             </div>
             <div id="loading-message">Loading data from <code>sum_sheet.csv</code>…</div>
         </header>
-
-        <!-- High-level summary: overview + key KPIs + charts -->
-        <section class="card summary-card">
-            <div class="card-header">
-                <div class="pill-icon">📊</div>
-                <span class="card-title-text">Campaign Overview &amp; Key Performance</span>
-            </div>
-            <div class="summary-grid">
-                <!-- Overview -->
-                <div>
-                    <div class="overview-grid">
-                        <div class="pill-badge">
-                            Period
-                            <span id="summary-period">–</span>
-                        </div>
-                        <div class="pill-badge">
-                            Territories
-                            <span id="summary-territories">–</span>
-                        </div>
-                        <div class="pill-badge">
-                            Sessions Held
-                            <span id="summary-sessions">–</span>
-                        </div>
-                        <div class="pill-badge">
-                            Farmers Engaged
-                            <span id="summary-farmers">–</span>
-                        </div>
-                        <div class="pill-badge">
-                            Wheat Acres Represented
-                            <span id="summary-acres">–</span>
-                        </div>
-                        <div class="pill-badge">
-                            Overall Campaign Rating
-                            <span id="summary-rating">–</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- KPI table -->
-                <div>
-                    <table class="kpi-table">
-                        <thead>
-                            <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                                <th>Insight</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Farmers aware of Buctril Super</td>
-                                <td id="kpm-aware">–</td>
-                                <td><span class="kpi-chip">Strong brand recognition</span></td>
-                            </tr>
-                            <tr>
-                                <td>Used last year</td>
-                                <td id="kpm-used">–</td>
-                                <td><span class="kpi-chip">High loyalty</span></td>
-                            </tr>
-                            <tr>
-                                <td>Committed this season</td>
-                                <td id="kpm-committed">–</td>
-                                <td><span class="kpi-chip">Strong conversion</span></td>
-                            </tr>
-                            <tr>
-                                <td>Estimated Buctril acres</td>
-                                <td id="kpm-est-acres">–</td>
-                                <td><span class="kpi-chip">High adoption</span></td>
-                            </tr>
-                            <tr>
-                                <td>Message clarity score</td>
-                                <td id="kpm-clarity">–</td>
-                                <td><span class="kpi-chip">Clear communication</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Small pivot-style charts under the KPIs -->
-            <div class="summary-chart-layout">
-                <div class="chart-container summary-small">
-                    <div class="chart-title">Farmer Conversion Funnel (%)</div>
-                    <canvas id="kpiFunnelChart"></canvas>
-                </div>
-                <div class="chart-container summary-small">
-                    <div class="chart-title">Campaign Rating (out of 10)</div>
-                    <canvas id="campaignRatingChart"></canvas>
-                </div>
-            </div>
-        </section>
 
         <!-- Filters -->
         <section class="filters-section">
@@ -744,6 +666,127 @@
             <button class="filter-btn" type="button" onclick="resetFilters()" style="background: var(--text-muted);">
                 Reset
             </button>
+        </section>
+
+        <!-- Executive marketing summary -->
+        <section class="card summary-card">
+            <div class="card-header">
+                <div class="pill-icon">🚜</div>
+                <span class="card-title-text">Buctril Super Farmer Education Drive – Marketing Team Executive Summary</span>
+            </div>
+
+            <div class="summary-grid">
+                <!-- Overview tags -->
+                <div>
+                    <div class="overview-grid">
+                        <div class="pill-badge">
+                            Period
+                            <span id="summary-period">Nov 23 – Dec 8, 2025</span>
+                        </div>
+                        <div class="pill-badge">
+                            Territories
+                            <span id="summary-territories">Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia &amp; others</span>
+                        </div>
+                        <div class="pill-badge">
+                            Sessions Executed
+                            <span id="summary-sessions">26 of 34 planned</span>
+                        </div>
+                        <div class="pill-badge">
+                            Farmers Reached
+                            <span id="summary-farmers">1,123 wheat farmers</span>
+                        </div>
+                        <div class="pill-badge">
+                            Wheat Acres Represented
+                            <span id="summary-acres">19,025 acres</span>
+                        </div>
+                        <div class="pill-badge">
+                            Overall Campaign Rating
+                            <span id="summary-rating">8.5 / 10</span>
+                        </div>
+                    </div>
+
+                    <p class="exec-note">
+                        Data source: field session reports &amp; <code>sum_sheet.csv</code> (Days 1–13 complete).
+                        Prepared for Bayer Marketing Team – “From education to acres: building trust that converts.”
+                    </p>
+                </div>
+
+                <!-- Metric table -->
+                <div>
+                    <table class="kpi-table-exec">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Campaign Result</th>
+                                <th>Visual</th>
+                                <th>Insight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Sessions executed</td>
+                                <td id="kpm-sessions-val">–</td>
+                                <td>
+                                    <div class="bar-wrapper" title="Completion vs 34 planned">
+                                        <div class="bar-fill" data-percent="76"></div>
+                                    </div>
+                                </td>
+                                <td>76% of planned sessions delivered.</td>
+                            </tr>
+                            <tr>
+                                <td>Farmers reached</td>
+                                <td id="kpm-farmers-val">–</td>
+                                <td class="metric-emoji">🧑‍🌾 × 1,123</td>
+                                <td>Broad wheat-farmer coverage across focus districts.</td>
+                            </tr>
+                            <tr>
+                                <td>Acres represented</td>
+                                <td id="kpm-acres-val">–</td>
+                                <td class="metric-emoji">🌾 × 19,025</td>
+                                <td>Large impact base for Buctril Super adoption.</td>
+                            </tr>
+                            <tr>
+                                <td>Message clarity score</td>
+                                <td id="kpm-clarity-val">–</td>
+                                <td>
+                                    <div class="bar-wrapper" title="Message clarity (max 3.0)">
+                                        <div class="bar-fill" data-percent="97"></div>
+                                    </div>
+                                </td>
+                                <td>2.9 / 3.0 – outstanding understanding of dose &amp; use.</td>
+                            </tr>
+                            <tr>
+                                <td>Definite use intent</td>
+                                <td id="kpm-intent-val">–</td>
+                                <td>
+                                    <div class="bar-wrapper" title="Average commitment to use">
+                                        <div class="bar-fill" data-percent="88"></div>
+                                    </div>
+                                </td>
+                                <td>~88% average commitment – strong conversion intent.</td>
+                            </tr>
+                            <tr>
+                                <td>Influencers identified</td>
+                                <td id="kpm-influencers-val">–</td>
+                                <td class="metric-emoji">🤝 × 200+</td>
+                                <td>Farmer captain network ready for testimonials &amp; advocacy.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- KPI mini charts -->
+            <div class="summary-chart-layout">
+                <div class="chart-container summary-small">
+                    <div class="chart-title">Message Clarity vs. Definite Use Intent (%)</div>
+                    <canvas id="kpiFunnelChart"></canvas>
+                </div>
+                <div class="chart-container summary-small">
+                    <div class="chart-title">Campaign Rating (out of 10)</div>
+                    <canvas id="campaignRatingChart"></canvas>
+                </div>
+            </div>
         </section>
 
         <!-- Map + Key Metrics -->
@@ -809,7 +852,7 @@
             <div class="card-header">
                 <div class="pill-icon">T</div>
                 <span class="card-title-text">
-                    Session-wise Detail (click a row to focus map – media from GitHub)
+                    Session-wise Detail (Filtered Range &amp; Media Placeholders)
                 </span>
             </div>
             <div class="table-wrapper">
@@ -832,7 +875,7 @@
                 </table>
             </div>
             <p class="footer-note">
-                Media files are linked as <code>1.jpeg</code>/<code>1.mp4</code>, <code>2.jpeg</code>/<code>2.mp4</code>, …
+                Media files are linked as <code>1.jpeg</code>/<code>1.mp4</code>, <code>2.jpeg</code>/<code>2.mp4</code>, etc.
                 based on the chronological order of unique dates in <code>sum_sheet.csv</code>.
             </p>
         </section>
@@ -895,102 +938,92 @@
             </div>
         </section>
 
-        <!-- Insight & strategy summary -->
-        <section class="card">
+        <!-- Key insights, barriers & next steps -->
+        <section class="card table-card">
             <div class="card-header">
-                <div class="pill-icon">💡</div>
-                <span class="card-title-text">Key Insights, Barriers &amp; Next Steps</span>
+                <div class="pill-icon">⭐</div>
+                <span class="card-title-text">Key Insights, Barriers &amp; Next Steps (From Field Reports)</span>
             </div>
-
             <div class="insights-grid">
-                <div class="insights-column">
-                    <h4>Strengths</h4>
-                    <ul>
-                        <li>🏆 High brand loyalty – 80%+ repeat users.</li>
-                        <li>📈 Strong conversion – 88% farmers committed to Buctril Super.</li>
-                        <li>🎯 Targeted reach – nearly all wheat growers touched in SKR, RYK, DGK, FSD, GUJ.</li>
-                        <li>🔊 Clear messaging – message clarity score 2.8/3.0.</li>
+                <div>
+                    <div class="insights-heading">Strengths</div>
+                    <ul class="insights-list">
+                        <li><span class="insight-tag">Brand loyalty</span>80%+ repeat users across sessions.</li>
+                        <li><span class="insight-tag">Conversion</span>~88% farmers committed to Buctril Super.</li>
+                        <li><span class="insight-tag">Reach</span>Nearly all wheat growers touched in SKR, RYK, DGK, FSD, GUJ.</li>
+                        <li><span class="insight-tag">Messaging</span>Message clarity average score 2.8–2.9 / 3.0.</li>
                     </ul>
 
-                    <h4 style="margin-top:8px;">Why farmers choose Buctril Super</h4>
-                    <ul>
+                    <div class="insights-heading">Why farmers choose Buctril Super</div>
+                    <ul class="insights-list">
                         <li>Trust in Bayer brand – 32 mentions.</li>
-                        <li>Better weed control – 30 mentions.</li>
+                        <li>Better weed control vs alternatives – 30 mentions.</li>
                         <li>Good past experience – 30 mentions.</li>
                         <li>Safe on crop (no burn) – 29 mentions.</li>
                     </ul>
 
-                    <h4 style="margin-top:8px;">Farmer requests &amp; opportunities</h4>
-                    <ul>
+                    <div class="insights-heading">Farmer requests &amp; opportunities</div>
+                    <ul class="insights-list">
                         <li>High demand for demo plots in key villages.</li>
                         <li>45+ farmers ready for social media advocacy.</li>
                         <li>Competitor mentions: Evyol &amp; Suncrop monitored for benchmarking.</li>
                     </ul>
-                </div>
 
-                <div class="insights-column">
-                    <h4>Areas for attention</h4>
-                    <ul>
-                        <li>💰 Price sensitivity among 15–20% of hesitant farmers.</li>
-                        <li>🧪 Preference for generic alternatives in some pockets.</li>
-                        <li>🏦 Credit constraints and delayed payments highlighted in multiple sessions.</li>
-                    </ul>
-
-                    <h4 style="margin-top:8px;">Barriers to conversion</h4>
-                    <ul>
-                        <li>Price too high – 15 mentions.</li>
-                        <li>Fear of crop damage – 7 mentions.</li>
-                        <li>Happy with generic brand – 4 mentions.</li>
-                        <li>No money/credit – 5 mentions.</li>
-                    </ul>
-
-                    <h4 style="margin-top:8px;">Field team feedback</h4>
-                    <ul>
-                        <li>✅ Engagement highest in Q&amp;A sessions.</li>
-                        <li>⚠️ Price concerns call for dealer schemes / smaller packs.</li>
-                        <li>📅 Timing – pre-sowing sessions drive strongest commitment.</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="insights-grid" style="margin-top:10px;">
-                <div class="insights-column">
-                    <h4>Key influencers identified</h4>
-                    <ul>
-                        <li>SKR – 12+ farmers, keen on demo plots.</li>
+                    <div class="insights-heading">Key influencers identified</div>
+                    <ul class="insights-list">
+                        <li>SKR – 12+ farmers keen on demo plots.</li>
                         <li>RYK – 8+ community leaders.</li>
                         <li>DGK – 10+ farmers active in local groups.</li>
                         <li>FSD – 6+ young, tech-savvy farmers.</li>
-                        <li>Spotlight: <strong>Shat Ullah (0305-3126621)</strong> – 23 acres, ideal for testimonials.</li>
-                    </ul>
-
-                    <h4 style="margin-top:8px;">Recommended next steps</h4>
-                    <ul>
-                        <li><strong>Immediate (next 30 days):</strong> 3–5 demo plots, 10–15 influencer testimonials, address pricing with dealer schemes.</li>
-                        <li><strong>Medium term (next season):</strong> launch “Farmer Captains”, develop local-language visuals, pre-sowing education calendar.</li>
-                        <li><strong>Long term:</strong> build a digital insight repository, strengthen dealer feedback loop, and expand to new territories.</li>
+                        <li>Spotlight: Shat Ullah (0305-3126621) – 23 acres, ideal for testimonials.</li>
                     </ul>
                 </div>
 
-                <div class="insights-column">
-                    <h4>Session effectiveness snapshot</h4>
-                    <ul class="snapshot-list">
-                        <li><span>Farmer awareness:</span> ★★★★★ (90%+ awareness).</li>
-                        <li><span>Message recall:</span> ★★★★☆ (strong on safety &amp; use).</li>
-                        <li><span>Conversion intent:</span> ★★★★★ (88% definite usage).</li>
-                        <li><span>Influencer identification:</span> ★★★★☆ (45+ farmers identified).</li>
-                        <li><span>Price sensitivity:</span> ★★☆☆☆ (needs improvement).</li>
+                <div>
+                    <div class="insights-heading">Areas for attention</div>
+                    <ul class="insights-list">
+                        <li>Price sensitivity among 15–20% of hesitant farmers.</li>
+                        <li>Preference for generic alternatives in some pockets.</li>
+                        <li>Credit constraints highlighted in multiple sessions.</li>
                     </ul>
 
-                    <h4 style="margin-top:8px;">Conclusion</h4>
-                    <ul class="snapshot-list">
-                        <li><span>Impact:</span> 19 sessions | 567 farmers | 7,265 acres represented.</li>
-                        <li><span>Overall rating:</span> 8.5 / 10 – high trust, clear messaging, strong engagement.</li>
-                        <li><span>Focus forward:</span> demo plots, pricing schemes, and influencer outreach will convert more hesitant acres.</li>
+                    <div class="insights-heading">Barriers to conversion</div>
+                    <ul class="insights-list">
+                        <li>Price too high – 15 mentions.</li>
+                        <li>Fear of crop damage – 7 mentions.</li>
+                        <li>Happy with generic brand – 4 mentions.</li>
+                        <li>No money / credit – 5 mentions.</li>
                     </ul>
-                    <p style="margin-top:8px;font-size:11px;color:var(--text-muted);font-style:italic;">
-                        “When the farmer understands, the farmer commits. This campaign turned knowledge into acres.” — Field Supervisor Summary
-                    </p>
+
+                    <div class="insights-heading">Field team feedback</div>
+                    <ul class="insights-list">
+                        <li>Engagement highest in live Q&amp;A sessions.</li>
+                        <li>Price concerns call for dealer schemes / smaller packs.</li>
+                        <li>Timing: pre-sowing sessions drive strongest commitment.</li>
+                    </ul>
+
+                    <div class="insights-heading">Session effectiveness snapshot</div>
+                    <ul class="insights-list">
+                        <li>Farmer awareness: ★★★★★ (90%+ awareness).</li>
+                        <li>Message recall: ★★★★☆ (strong on safety &amp; use).</li>
+                        <li>Conversion intent: ★★★★★ (~88% definite usage).</li>
+                        <li>Influencer ID: ★★★★☆ (45+ farmer influencers identified).</li>
+                        <li>Price sensitivity: ★★☆☆☆ (needs improvement).</li>
+                    </ul>
+
+                    <div class="insights-heading">Recommended next steps</div>
+                    <ul class="insights-list">
+                        <li><strong>Immediate (next 30 days):</strong> 3–5 demo plots, 10–15 influencer testimonials, address pricing with dealer schemes.</li>
+                        <li><strong>Medium term (next season):</strong> launch “Farmer Captains”, develop local-language visuals, pre-sowing educational calendar.</li>
+                        <li><strong>Long term:</strong> build digital insight repository, strengthen dealer feedback loop, expand to new territories.</li>
+                    </ul>
+
+                    <div class="insights-heading">Conclusion</div>
+                    <ul class="insights-list">
+                        <li>Impact: 19 sessions | 567 farmers | 7,265 acres represented (first phase).</li>
+                        <li>Overall rating: 8.5 / 10 – high trust, clear messaging, strong engagement.</li>
+                        <li>Next focus: demo plots, pricing schemes &amp; influencer outreach to convert remaining hesitant farmers.</li>
+                    </ul>
                 </div>
             </div>
         </section>
@@ -1000,13 +1033,13 @@
             <div class="card-header">
                 <div class="pill-icon">📸</div>
                 <span class="card-title-text">
-                    Media Gallery (one slot per unique date – uses <code>1.jpeg</code> / <code>1.mp4</code>, etc.)
+                    Media Gallery (One slot per unique date – reads <code>1.jpeg</code>/<code>1.mp4</code>, etc. from GitHub)
                 </span>
             </div>
             <div class="media-grid" id="media-gallery"></div>
             <p class="footer-note">
                 Place <code>1.jpeg</code>, <code>1.mp4</code>, <code>2.jpeg</code>, <code>2.mp4</code>, … in the same folder
-                as this page. Thumbnails and hover-videos will load automatically.
+                as this page. Slots will automatically display image thumbnails; videos play on hover / tap and pause when out of view.
             </p>
         </section>
     </div>
