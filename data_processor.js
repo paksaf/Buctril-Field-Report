@@ -28,6 +28,9 @@ let ALLOWED_LOCATIONS = [];
 
 let cityFarmersChartInstance = null;
 let villageAcresChartInstance = null;
+let kpiFunnelChartInstance = null;
+let ratingChartInstance = null;
+
 let uniqueDates = [];
 let allRows = [];
 let currentFilteredRows = [];
@@ -59,8 +62,74 @@ function renderStaticSummary() {
     setText("kpm-aware", `${s.aware} (${s.awarePct}% )`);
     setText("kpm-used", `${s.usedLastYear} (${s.usedLastYearPct}% )`);
     setText("kpm-committed", `${s.committed} (${s.committedPct}% )`);
-    setText("kpm-est-acres", `${s.estimatedAcres.toLocaleString()} (${s.estimatedAcresPct}% of total)` );
+    setText(
+        "kpm-est-acres",
+        `${s.estimatedAcres.toLocaleString()} (${s.estimatedAcresPct}% of total)`
+    );
     setText("kpm-clarity", `${s.clarityScore}/${s.clarityMax}`);
+
+    buildSummaryCharts();
+}
+
+function buildSummaryCharts() {
+    const s = CAMPAIGN_SUMMARY;
+
+    // destroy old charts if needed
+    if (kpiFunnelChartInstance) kpiFunnelChartInstance.destroy();
+    if (ratingChartInstance) ratingChartInstance.destroy();
+
+    const funnelCanvas = document.getElementById("kpiFunnelChart");
+    if (funnelCanvas) {
+        const ctxFunnel = funnelCanvas.getContext("2d");
+        kpiFunnelChartInstance = new Chart(ctxFunnel, {
+            type: "bar",
+            data: {
+                labels: ["Aware", "Used last year", "Committed"],
+                datasets: [
+                    {
+                        label: "% of farmers",
+                        data: [s.awarePct, s.usedLastYearPct, s.committedPct]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { stepSize: 20 }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    const ratingCanvas = document.getElementById("campaignRatingChart");
+    if (ratingCanvas) {
+        const ctxRating = ratingCanvas.getContext("2d");
+        ratingChartInstance = new Chart(ctxRating, {
+            type: "doughnut",
+            data: {
+                labels: ["Score", "Remaining"],
+                datasets: [
+                    {
+                        data: [s.overallRating, 10 - s.overallRating]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                cutout: "60%",
+                plugins: {
+                    legend: { position: "bottom", labels: { font: { size: 10 } } }
+                }
+            }
+        });
+    }
 }
 
 // ----------------- LOAD & NORMALISE CSV -----------------
@@ -117,7 +186,7 @@ async function loadDashboard() {
 function normalizeRows(results) {
     const rows = results.data || [];
     const fields = (results.meta && results.meta.fields) || [];
-    if (!rows.length || !fields.length) return [];
+       if (!rows.length || !fields.length) return [];
 
     const headerRow = rows[0]; // row with SN, From City, ...
 
@@ -432,7 +501,6 @@ function updateSessionTable(rows) {
 
         let mediaHtml = "N/A";
         if (dateIndex > 0) {
-            // Use .jpeg and .mp4 to match uploaded filenames
             const imgName = `${dateIndex}.jpeg`;
             const vidName = `${dateIndex}.mp4`;
             mediaHtml = `
@@ -443,9 +511,8 @@ function updateSessionTable(rows) {
 
         const tr = document.createElement("tr");
         tr.className = "session-clickable";
-        if (coordKey) {
-            tr.dataset.mapId = coordKey;
-        }
+        if (coordKey) tr.dataset.mapId = coordKey;
+
         tr.innerHTML = `
             <td>${escapeHtml(r["SN"] || "")}</td>
             <td>${escapeHtml(r["Date"] || "")}</td>
@@ -460,6 +527,7 @@ function updateSessionTable(rows) {
             <td>${escapeHtml(getFeedback(r))}</td>
             <td>${mediaHtml}</td>
         `;
+
         if (coordKey) {
             tr.addEventListener("click", () => focusOnMap(coordKey));
         }
@@ -561,17 +629,56 @@ function updateMediaGallery() {
 
     uniqueDates.forEach((date, idx) => {
         const dateIndex = idx + 1;
+        const imgName = `${dateIndex}.jpeg`;
+        const vidName = `${dateIndex}.mp4`;
+
         const div = document.createElement("div");
         div.className = "media-item";
         div.innerHTML = `
-            <div class="media-placeholder" role="img">${dateIndex}</div>
+            <div class="media-visuals">
+                <a href="${imgName}" class="media-thumb-img" target="_blank">
+                    <img src="${imgName}" alt="Session ${dateIndex} photo (${escapeHtml(
+            date
+        )})" loading="lazy" />
+                </a>
+                <div class="media-thumb-video">
+                    <video class="media-video" muted playsinline preload="metadata" poster="${imgName}">
+                        <source src="${vidName}" type="video/mp4" />
+                    </video>
+                </div>
+            </div>
             <div class="media-label">Date: ${escapeHtml(date)}</div>
             <div class="media-links">
-                <a href="${dateIndex}.jpeg" target="_blank" class="media-link">🖼️ ${dateIndex}.jpeg</a>
-                <a href="${dateIndex}.mp4"  target="_blank" class="media-link">🎥 ${dateIndex}.mp4</a>
+                <span>Photo: <code>${imgName}</code> · Video: <code>${vidName}</code></span>
             </div>
         `;
         gallery.appendChild(div);
+    });
+
+    attachMediaHoverHandlers();
+}
+
+function attachMediaHoverHandlers() {
+    const videos = document.querySelectorAll(".media-video");
+    videos.forEach((video) => {
+        // Desktop hover
+        video.addEventListener("mouseenter", () => {
+            video.play().catch(() => {});
+        });
+        video.addEventListener("mouseleave", () => {
+            video.pause();
+            video.currentTime = 0;
+        });
+
+        // Touch devices – tap to play/pause
+        video.addEventListener("touchstart", () => {
+            video.play().catch(() => {});
+        });
+        video.addEventListener("touchend", () => {
+            setTimeout(() => {
+                video.pause();
+            }, 200);
+        });
     });
 }
 
@@ -621,7 +728,7 @@ function initMap(rows) {
             '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size:12px;">No sessions with valid coordinates in the current filter range.</div>';
         return;
     } else {
-        mapDiv.innerHTML = ""; // clear "no sessions" text if previously set
+        mapDiv.innerHTML = ""; // clear previous text
     }
 
     buctrilMap = L.map("route-map", { zoomControl: true });
