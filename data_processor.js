@@ -1,36 +1,31 @@
-// ----------------- CONFIG -----------------
-let FILTER_START_DATE = "2025-01-05";
+// ----------------- STATIC CAMPAIGN SUMMARY -----------------
+const CAMPAIGN_SUMMARY = {
+    sessions_planned: 34,
+    sessions_executed: 26,
+    farmers_total: 1123,
+    acres_total: 19025,
+    message_clarity: 2.9,
+    message_clarity_max: 3.0,
+    clarity_pct: 97,
+    definite_intent_pct: 88,
+    influencers: 201,
+    acres_benefited: 16742,
+    overall_rating: 8.5
+};
+
+// ----------------- CONFIG & STATE -----------------
+let FILTER_START_DATE = "2025-11-23";
 let FILTER_END_DATE = "2025-12-31";
 
 let ALLOWED_FROM_CITIES = [];
 let ALLOWED_TO_CITIES = [];
 let ALLOWED_LOCATIONS = [];
 
-// Executive campaign summary (static from marketing analysis)
-const CAMPAIGN_SUMMARY = {
-    period: "Nov 23 – Dec 8, 2025",
-    territories:
-        "13 districts incl. Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia & others",
-
-    sessionsExecuted: 26,
-    sessionsPlanned: 34,
-    sessionsCompletionPct: 76,
-    farmers: 1123,
-    acres: 19025,
-
-    clarityScore: 2.9,
-    clarityMax: 3.0,
-    clarityPct: 97,
-    definiteIntentPct: 88,
-
-    influencers: 201,
-    overallRating: 8.5
-};
-
 let cityFarmersChartInstance = null;
 let villageAcresChartInstance = null;
 let kpiFunnelChartInstance = null;
 let ratingChartInstance = null;
+let keyDriversChartInstance = null;
 
 let uniqueDates = [];
 let allRows = [];
@@ -42,8 +37,9 @@ const TOP_CATEGORIES_VILLAGE = 6;
 
 document.addEventListener("DOMContentLoaded", () => {
     setupFilterListeners();
-    renderStaticSummary();
+    hydrateImpactStrip();
     loadDashboard();
+    initMiniBars();
 });
 
 // ----------------- LOAD & NORMALISE CSV -----------------
@@ -65,20 +61,22 @@ async function loadDashboard() {
                 allRows = normalizeRows(results);
                 preProcessDates(allRows);
                 populateFilterOptions();
-                applyFilters();
+                applyFilters();       // builds map, metrics, pivots, gallery
+
+                buildSummaryCharts(); // static charts based on CAMPAIGN_SUMMARY
 
                 if (loadingEl) {
                     loadingEl.textContent =
-                        "Data loaded. Use filters to slice the pivot view.";
+                        "Data loaded. Use filters to explore sessions and pivots.";
                 }
             },
             error: (err) => {
                 console.error("PapaParse error:", err);
                 if (loadingEl) {
                     loadingEl.textContent =
-                        "Error parsing sum_sheet.csv. Check the file format.";
+                        "Error parsing sum_sheet.csv. Please check the file format.";
                 }
-            }
+            },
         });
     } catch (err) {
         console.error("Error loading CSV:", err);
@@ -92,7 +90,7 @@ async function loadDashboard() {
 
 /**
  * CSV structure:
- *   Row 0: technical headers
+ *   Row 0: technical headers (Summary, Unnamed: 1, ..., etc.)
  *   Row 1: logical headers ("SN", "From City", "City", "Date", "Session Location",
  *                           "Total Farmers", "Total Wheat Acres", "Spot Coordinates", ...)
  *   Row 2+: data rows.
@@ -170,7 +168,7 @@ function populateFilterOptions() {
             allRows
                 .map((r) => (r["From City"] || "").toString().trim())
                 .filter(Boolean)
-        )
+        ),
     ].sort();
 
     cities.forEach((city) => {
@@ -193,7 +191,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-    FILTER_START_DATE = "2025-01-05";
+    FILTER_START_DATE = "2025-11-23";
     FILTER_END_DATE = "2025-12-31";
     ALLOWED_FROM_CITIES = [];
     ALLOWED_TO_CITIES = [];
@@ -214,7 +212,7 @@ function resetFilters() {
 function shareOnX() {
     const url = window.location.href;
     const text =
-        "Buctril Farmer Engagement Summary 2025 – dynamic pivot dashboard of farmer sessions.";
+        "Buctril Super Farmer Education Drive – dynamic dashboard of sessions, acres and farmer engagement.";
     const intent = `https://twitter.com/intent/tweet?url=${encodeURIComponent(
         url
     )}&text=${encodeURIComponent(text)}`;
@@ -280,10 +278,10 @@ function parseDateFlexible(dateStr) {
             sep: 8,
             oct: 9,
             nov: 10,
-            dec: 11
+            dec: 11,
         };
-        if (months.hasOwnProperty(monStr)) {
-            const year = new Date().getFullYear();
+        if (Object.prototype.hasOwnProperty.call(months, monStr)) {
+            const year = 2025; // campaign year
             const d = new Date(year, months[monStr], day);
             return isNaN(d.getTime()) ? null : d;
         }
@@ -532,95 +530,63 @@ function updateMediaGallery() {
 
     uniqueDates.forEach((date, idx) => {
         const dateIndex = idx + 1;
+        const div = document.createElement("div");
+        div.className = "media-item";
+
         const imgName = `${dateIndex}.jpeg`;
         const vidName = `${dateIndex}.mp4`;
 
-        const div = document.createElement("div");
-        div.className = "media-item";
         div.innerHTML = `
-            <div class="media-placeholder" role="img" aria-label="Media for ${escapeHtml(
-                date
-            )}">
-                <div class="media-thumb" data-index="${dateIndex}">
-                    <img src="${imgName}" alt="Session media ${dateIndex}" loading="lazy" />
-                    <video src="${vidName}" muted playsinline loop preload="metadata"></video>
-                    <div class="media-thumb-overlay">#${dateIndex}</div>
-                </div>
+            <div class="media-thumb-wrapper">
+                <span class="media-number">${dateIndex}</span>
+                <img src="${imgName}" alt="Session image ${dateIndex}" loading="lazy" />
             </div>
             <div class="media-label">Date: ${escapeHtml(date)}</div>
             <div class="media-links">
-                <a href="${imgName}" target="_blank" class="media-link">🖼️ Open image</a>
+                <a href="${imgName}" target="_blank" class="media-link">🖼️ Open photo</a>
                 <a href="${vidName}" target="_blank" class="media-link">🎥 Open video</a>
             </div>
         `;
+
         gallery.appendChild(div);
     });
 
-    initMediaHoverBehaviour();
-}
+    // Add hover preview videos on top of images (lightweight: only created on hover)
+    gallery.querySelectorAll(".media-thumb-wrapper").forEach((wrapper, idx) => {
+        const dateIndex = idx + 1;
+        const vidSrc = `${dateIndex}.mp4`;
 
-// Hover / tap behaviour for media thumbnails, plus auto-pause off-screen
-function initMediaHoverBehaviour() {
-    const thumbs = document.querySelectorAll(".media-thumb");
-    if (!thumbs.length) return;
+        const handleEnter = () => {
+            if (wrapper.querySelector("video")) return;
+            const img = wrapper.querySelector("img");
+            if (img) img.style.display = "none";
 
-    let observer = null;
-    if ("IntersectionObserver" in window) {
-        observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    const thumb = entry.target;
-                    if (!entry.isIntersecting && thumb._pauseVideo) {
-                        thumb._pauseVideo();
-                    }
-                });
-            },
-            { threshold: 0.1 }
-        );
-    }
-
-    thumbs.forEach((thumb) => {
-        const video = thumb.querySelector("video");
-        if (!video) return;
-
-        const img = thumb.querySelector("img");
-
-        const playVideo = () => {
-            thumb.classList.add("playing");
-            video.muted = true;
-            video.play().catch(() => {
-                // ignore autoplay issues
-            });
+            const vid = document.createElement("video");
+            vid.src = vidSrc;
+            vid.muted = true;
+            vid.loop = true;
+            vid.playsInline = true;
+            vid.autoplay = true;
+            vid.style.width = "100%";
+            vid.style.height = "110px";
+            vid.style.objectFit = "cover";
+            wrapper.appendChild(vid);
         };
 
-        const pauseVideo = () => {
-            video.pause();
-            video.currentTime = 0;
-            thumb.classList.remove("playing");
-        };
-
-        thumb._pauseVideo = pauseVideo;
-
-        thumb.addEventListener("mouseenter", playVideo);
-        thumb.addEventListener("mouseleave", pauseVideo);
-
-        // Tap / click toggle for mobile
-        thumb.addEventListener("click", () => {
-            if (video.paused) {
-                playVideo();
-            } else {
-                pauseVideo();
+        const handleLeave = () => {
+            const vid = wrapper.querySelector("video");
+            const img = wrapper.querySelector("img");
+            if (vid) {
+                vid.pause();
+                wrapper.removeChild(vid);
             }
-        });
-
-        // If video fails to load, fall back to static image only
-        video.addEventListener("error", () => {
-            pauseVideo();
-            video.style.display = "none";
             if (img) img.style.display = "block";
-        });
+        };
 
-        if (observer) observer.observe(thumb);
+        wrapper.addEventListener("mouseenter", handleEnter);
+        wrapper.addEventListener("mouseleave", handleLeave);
+        wrapper.addEventListener("touchstart", handleEnter, { passive: true });
+        wrapper.addEventListener("touchend", handleLeave);
     });
 }
 
@@ -658,7 +624,7 @@ function initMap(rows) {
                 .trim(),
             farmers: getFarmers(r),
             acres: getCropArea(r),
-            date: (r["Date"] || "").toString().trim()
+            date: (r["Date"] || "").toString().trim(),
         });
     });
 
@@ -666,6 +632,8 @@ function initMap(rows) {
         mapDiv.innerHTML =
             '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size:12px;">No sessions with valid coordinates in the current filter range.</div>';
         return;
+    } else {
+        mapDiv.innerHTML = "";
     }
 
     map = L.map("route-map", { zoomControl: true });
@@ -673,7 +641,7 @@ function initMap(rows) {
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
-        attribution: "&copy; OpenStreetMap contributors"
+        attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
     const latLngs = [];
@@ -686,18 +654,18 @@ function initMap(rows) {
 
         L.circle(latLng, {
             radius: radiusMeters,
-            fillOpacity: 0.4,
+            fillOpacity: 0.35,
             fillColor: "#6a97ff",
             stroke: true,
             color: "#ffb74d",
-            weight: 2
+            weight: 2,
         }).addTo(map);
 
         const popupHtml = `
             <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
             Date: ${escapeHtml(p.date)}<br/>
             Farmers: ${formatNumber(p.farmers)}<br/>
-            Crop Area: ${formatNumber(acres)} acres
+            Crop area: ${formatNumber(acres)} acres
         `;
         L.marker(latLng).addTo(map).bindPopup(popupHtml);
     });
@@ -723,297 +691,4 @@ function buildCharts(rows) {
             "Unknown";
         const farmers = getFarmers(r);
         if (!cityTotals[city]) cityTotals[city] = 0;
-        if (!isNaN(farmers)) cityTotals[city] += farmers;
-    });
-
-    const cityPivot = buildTopNWithOthers(cityTotals, TOP_CATEGORIES_CITY);
-    const cityCanvas = document.getElementById("cityFarmersChart");
-    if (cityCanvas && cityPivot.labels.length) {
-        const ctx = cityCanvas.getContext("2d");
-        cityFarmersChartInstance = new Chart(ctx, {
-            type: "pie",
-            data: {
-                labels: cityPivot.labels,
-                datasets: [
-                    {
-                        label: "Farmers",
-                        data: cityPivot.data
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: "bottom", labels: { font: { size: 10 } } }
-                }
-            }
-        });
-    }
-
-    // Village totals
-    const villageTotals = {};
-    rows.forEach((r) => {
-        const village =
-            (r["Session Location"] || r["Village / Mauza"] || "Unknown")
-                .toString()
-                .trim() || "Unknown";
-        const acres = getCropArea(r);
-        if (!villageTotals[village]) villageTotals[village] = 0;
-        if (!isNaN(acres)) villageTotals[village] += acres;
-    });
-
-    const villagePivot = buildTopNWithOthers(
-        villageTotals,
-        TOP_CATEGORIES_VILLAGE
-    );
-    const villageCanvas = document.getElementById("villageAcresChart");
-    if (villageCanvas && villagePivot.labels.length) {
-        const ctx = villageCanvas.getContext("2d");
-        villageAcresChartInstance = new Chart(ctx, {
-            type: "pie",
-            data: {
-                labels: villagePivot.labels,
-                datasets: [
-                    {
-                        label: "Acres",
-                        data: villagePivot.data
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: "bottom", labels: { font: { size: 10 } } }
-                }
-            }
-        });
-    }
-}
-
-/**
- * Convert an object { key: value } into top N + Others arrays for charts.
- */
-function buildTopNWithOthers(map, topN) {
-    const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    if (!entries.length) return { labels: [], data: [] };
-
-    if (entries.length <= topN) {
-        return {
-            labels: entries.map((e) => e[0]),
-            data: entries.map((e) => e[1])
-        };
-    }
-
-    const top = entries.slice(0, topN - 1);
-    const rest = entries.slice(topN - 1);
-    const othersValue = rest.reduce((sum, [, v]) => sum + v, 0);
-
-    const labels = top.map((e) => e[0]).concat(["Others"]);
-    const data = top.map((e) => e[1]).concat([othersValue]);
-
-    return { labels, data };
-}
-
-// ----------------- EXECUTIVE SUMMARY RENDERING -----------------
-function renderStaticSummary() {
-    const s = CAMPAIGN_SUMMARY;
-
-    // Top impact tiles
-    setText("impact-farmers", s.farmers.toLocaleString());
-    setText("impact-acres", s.acres.toLocaleString());
-    setText("impact-clarity", `${s.clarityScore.toFixed(1)}/${s.clarityMax.toFixed(1)}`);
-    setText("impact-intent", `${s.definiteIntentPct}%`);
-
-    // Top pills
-    setText("summary-period", s.period);
-    setText("summary-territories", s.territories);
-    setText(
-        "summary-sessions",
-        `${s.sessionsExecuted} of ${s.sessionsPlanned} planned`
-    );
-    setText("summary-farmers", `${s.farmers.toLocaleString()} wheat farmers`);
-    setText("summary-acres", `${s.acres.toLocaleString()} acres`);
-    setText("summary-rating", `${s.overallRating} / 10`);
-
-    // Executive metric table values
-    setText(
-        "kpm-sessions-val",
-        `${s.sessionsExecuted} / ${s.sessionsPlanned} sessions`
-    );
-    setText(
-        "kpm-farmers-val",
-        `${s.farmers.toLocaleString()} farmers reached`
-    );
-    setText(
-        "kpm-acres-val",
-        `${s.acres.toLocaleString()} acres represented`
-    );
-    setText(
-        "kpm-clarity-val",
-        `${s.clarityScore.toFixed(1)} / ${s.clarityMax.toFixed(
-            1
-        )} (${s.clarityPct}% clarity)`
-    );
-    setText(
-        "kpm-intent-val",
-        `${s.definiteIntentPct}% avg. definite use intent`
-    );
-    setText(
-        "kpm-influencers-val",
-        `${s.influencers.toLocaleString()} key farmers`
-    );
-
-    buildSummaryCharts();
-    initMiniBars();
-}
-
-function buildSummaryCharts() {
-    const s = CAMPAIGN_SUMMARY;
-
-    if (kpiFunnelChartInstance) kpiFunnelChartInstance.destroy();
-    if (ratingChartInstance) ratingChartInstance.destroy();
-
-    const funnelCanvas = document.getElementById("kpiFunnelChart");
-    if (funnelCanvas) {
-        const ctxFunnel = funnelCanvas.getContext("2d");
-        kpiFunnelChartInstance = new Chart(ctxFunnel, {
-            type: "bar",
-            data: {
-                labels: ["Message clarity", "Definite use intent"],
-                datasets: [
-                    {
-                        label: "% of farmers",
-                        data: [s.clarityPct, s.definiteIntentPct]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: { stepSize: 20 }
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
-        });
-    }
-
-    const ratingCanvas = document.getElementById("campaignRatingChart");
-    if (ratingCanvas) {
-        const ctxRating = ratingCanvas.getContext("2d");
-        ratingChartInstance = new Chart(ctxRating, {
-            type: "doughnut",
-            data: {
-                labels: ["Score", "Remaining"],
-                datasets: [
-                    {
-                        data: [s.overallRating, 10 - s.overallRating]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                cutout: "60%",
-                plugins: {
-                    legend: {
-                        position: "bottom",
-                        labels: { font: { size: 10 } }
-                    }
-                }
-            }
-        });
-    }
-}
-
-// Animate / set widths for executive-summary bars
-function initMiniBars() {
-    const fills = document.querySelectorAll(".bar-fill[data-percent]");
-    fills.forEach((el) => {
-        const pct = parseFloat(el.dataset.percent);
-        const clamped = isNaN(pct) ? 0 : Math.max(0, Math.min(100, pct));
-        el.style.width = clamped + "%";
-    });
-}
-
-// ----------------- HELPERS -----------------
-function setText(id, value) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-}
-
-function parseNumber(value) {
-    if (value === undefined || value === null) return NaN;
-    const n = parseFloat(value.toString().replace(/,/g, "").trim());
-    return isNaN(n) ? NaN : n;
-}
-
-function findField(row, keywords) {
-    const keys = Object.keys(row || {});
-    for (const key of keys) {
-        const lower = key.toLowerCase();
-        for (const kw of keywords) {
-            if (lower.includes(kw)) return key;
-        }
-    }
-    return null;
-}
-
-function getFarmers(row) {
-    const key = findField(row, ["total farmers", "farmers"]);
-    if (!key) return NaN;
-    return parseNumber(row[key]);
-}
-
-function getCropArea(row) {
-    const key = findField(row, [
-        "total wheat acres",
-        "acre",
-        "area",
-        "crop area"
-    ]);
-    if (!key) return NaN;
-    return parseNumber(row[key]);
-}
-
-function getFeedback(row) {
-    const key = findField(row, [
-        "feedback",
-        "observation",
-        "remark",
-        "comment"
-    ]);
-    if (!key) return "";
-    return (row[key] || "").toString();
-}
-
-function getCoords(row) {
-    const coordKey = findField(row, ["spot coordinates", "coord", "gps"]);
-    if (coordKey && row[coordKey]) {
-        return row[coordKey].toString();
-    }
-    const latKey = findField(row, ["lat"]);
-    const lonKey = findField(row, ["lon", "lng", "long"]);
-    if (latKey && lonKey && row[latKey] && row[lonKey]) {
-        return row[latKey].toString() + ", " + row[lonKey].toString();
-    }
-    return "";
-}
-
-function formatNumber(num) {
-    if (isNaN(num)) return "–";
-    return Math.round(num).toLocaleString();
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
+        if (!isNaN(farmers)) cityTotals
