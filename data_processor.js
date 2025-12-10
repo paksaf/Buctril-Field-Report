@@ -9,11 +9,12 @@ let ALLOWED_LOCATIONS = [];
 // Executive campaign summary (static from marketing analysis)
 const CAMPAIGN_SUMMARY = {
     period: "Nov 23 – Dec 8, 2025",
-    territories: "Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia & others",
+    territories:
+        "13 districts incl. Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia & others",
 
     sessionsExecuted: 26,
     sessionsPlanned: 34,
-    sessionsCompletionPct: 76, // 26/34
+    sessionsCompletionPct: 76,
     farmers: 1123,
     acres: 19025,
 
@@ -90,7 +91,7 @@ async function loadDashboard() {
 }
 
 /**
- * CSV structure (as used in the Excel summary sheet):
+ * CSV structure:
  *   Row 0: technical headers
  *   Row 1: logical headers ("SN", "From City", "City", "Date", "Session Location",
  *                           "Total Farmers", "Total Wheat Acres", "Spot Coordinates", ...)
@@ -565,14 +566,17 @@ function initMediaHoverBehaviour() {
 
     let observer = null;
     if ("IntersectionObserver" in window) {
-        observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                const thumb = entry.target;
-                if (!entry.isIntersecting && thumb._pauseVideo) {
-                    thumb._pauseVideo();
-                }
-            });
-        }, { threshold: 0.1 });
+        observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    const thumb = entry.target;
+                    if (!entry.isIntersecting && thumb._pauseVideo) {
+                        thumb._pauseVideo();
+                    }
+                });
+            },
+            { threshold: 0.1 }
+        );
     }
 
     thumbs.forEach((thumb) => {
@@ -584,11 +588,9 @@ function initMediaHoverBehaviour() {
         const playVideo = () => {
             thumb.classList.add("playing");
             video.muted = true;
-            video
-                .play()
-                .catch(() => {
-                    // ignore autoplay issues
-                });
+            video.play().catch(() => {
+                // ignore autoplay issues
+            });
         };
 
         const pauseVideo = () => {
@@ -815,6 +817,12 @@ function buildTopNWithOthers(map, topN) {
 // ----------------- EXECUTIVE SUMMARY RENDERING -----------------
 function renderStaticSummary() {
     const s = CAMPAIGN_SUMMARY;
+
+    // Top impact tiles
+    setText("impact-farmers", s.farmers.toLocaleString());
+    setText("impact-acres", s.acres.toLocaleString());
+    setText("impact-clarity", `${s.clarityScore.toFixed(1)}/${s.clarityMax.toFixed(1)}`);
+    setText("impact-intent", `${s.definiteIntentPct}%`);
 
     // Top pills
     setText("summary-period", s.period);
