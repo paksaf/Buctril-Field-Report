@@ -1,3 +1,23 @@
+// ----------------- STATIC CAMPAIGN SUMMARY (for top cards) -----------------
+const CAMPAIGN_SUMMARY = {
+    period: "Nov–Dec 2025",
+    territories: "SKR, RYK, DGK, FSD, GUJ",
+    sessions: 19,
+    farmers: 567,
+    acres: 7265,
+    aware: 512,
+    awarePct: 90.3,
+    usedLastYear: 463,
+    usedLastYearPct: 81.7,
+    committed: 497,
+    committedPct: 87.7,
+    estimatedAcres: 6894,
+    estimatedAcresPct: 95,
+    clarityScore: 2.8,
+    clarityMax: 3,
+    overallRating: 8.5
+};
+
 // ----------------- CONFIG -----------------
 let FILTER_START_DATE = "2025-01-05";
 let FILTER_END_DATE = "2025-12-31";
@@ -12,14 +32,36 @@ let uniqueDates = [];
 let allRows = [];
 let currentFilteredRows = [];
 
+// map marker registry (for click-through from table)
+let markerByCoordKey = {};
+let buctrilMap = null;
+
 // How many categories to show in charts before grouping to "Others"
 const TOP_CATEGORIES_CITY = 6;
 const TOP_CATEGORIES_VILLAGE = 6;
 
 document.addEventListener("DOMContentLoaded", () => {
+    renderStaticSummary();
     setupFilterListeners();
     loadDashboard();
 });
+
+// ----------------- RENDER STATIC SUMMARY -----------------
+function renderStaticSummary() {
+    const s = CAMPAIGN_SUMMARY;
+    setText("summary-period", s.period);
+    setText("summary-territories", s.territories);
+    setText("summary-sessions", s.sessions);
+    setText("summary-farmers", s.farmers.toLocaleString());
+    setText("summary-acres", s.acres.toLocaleString() + " acres");
+    setText("summary-rating", s.overallRating + "/10");
+
+    setText("kpm-aware", `${s.aware} (${s.awarePct}% )`);
+    setText("kpm-used", `${s.usedLastYear} (${s.usedLastYearPct}% )`);
+    setText("kpm-committed", `${s.committed} (${s.committedPct}% )`);
+    setText("kpm-est-acres", `${s.estimatedAcres.toLocaleString()} (${s.estimatedAcresPct}% of total)` );
+    setText("kpm-clarity", `${s.clarityScore}/${s.clarityMax}`);
+}
 
 // ----------------- LOAD & NORMALISE CSV -----------------
 async function loadDashboard() {
@@ -136,6 +178,7 @@ function populateFilterOptions() {
     const select = document.getElementById("from-city-filter");
     if (!select) return;
 
+    // remove previous dynamic options
     while (select.options.length > 1) {
         select.remove(1);
     }
@@ -384,6 +427,9 @@ function updateSessionTable(rows) {
         const dateStr = (r["Date"] || "").toString().trim();
         const dateIndex = uniqueDates.indexOf(dateStr) + 1;
 
+        const coordStr = getCoords(r);
+        const coordKey = coordStr ? coordStr.toString().trim() : "";
+
         let mediaHtml = "N/A";
         if (dateIndex > 0) {
             // Use .jpeg and .mp4 to match uploaded filenames
@@ -396,6 +442,10 @@ function updateSessionTable(rows) {
         }
 
         const tr = document.createElement("tr");
+        tr.className = "session-clickable";
+        if (coordKey) {
+            tr.dataset.mapId = coordKey;
+        }
         tr.innerHTML = `
             <td>${escapeHtml(r["SN"] || "")}</td>
             <td>${escapeHtml(r["Date"] || "")}</td>
@@ -406,10 +456,13 @@ function updateSessionTable(rows) {
             )}</td>
             <td>${escapeHtml(getFarmers(r))}</td>
             <td>${escapeHtml(getCropArea(r))}</td>
-            <td>${escapeHtml(getCoords(r))}</td>
+            <td>${escapeHtml(coordStr)}</td>
             <td>${escapeHtml(getFeedback(r))}</td>
             <td>${mediaHtml}</td>
         `;
+        if (coordKey) {
+            tr.addEventListener("click", () => focusOnMap(coordKey));
+        }
         tbody.appendChild(tr);
     });
 }
@@ -527,10 +580,12 @@ function initMap(rows) {
     const mapDiv = document.getElementById("route-map");
     if (!mapDiv) return;
 
-    let map = window.buctrilMap;
-    if (map) {
-        map.remove();
-        map = null;
+    // reset marker registry
+    markerByCoordKey = {};
+
+    if (buctrilMap) {
+        buctrilMap.remove();
+        buctrilMap = null;
     }
 
     const points = [];
@@ -545,6 +600,7 @@ function initMap(rows) {
         if (parts.length < 2) return;
 
         points.push({
+            coordKey: coord.toString().trim(),
             lat: parts[0],
             lon: parts[1],
             village: (
@@ -564,15 +620,16 @@ function initMap(rows) {
         mapDiv.innerHTML =
             '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size:12px;">No sessions with valid coordinates in the current filter range.</div>';
         return;
+    } else {
+        mapDiv.innerHTML = ""; // clear "no sessions" text if previously set
     }
 
-    map = L.map("route-map", { zoomControl: true });
-    window.buctrilMap = map;
+    buctrilMap = L.map("route-map", { zoomControl: true });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
         attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
+    }).addTo(buctrilMap);
 
     const latLngs = [];
     points.forEach((p, idx) => {
@@ -589,7 +646,7 @@ function initMap(rows) {
             stroke: true,
             color: "#ffb74d",
             weight: 2,
-        }).addTo(map);
+        }).addTo(buctrilMap);
 
         const popupHtml = `
             <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
@@ -597,15 +654,29 @@ function initMap(rows) {
             Farmers: ${formatNumber(p.farmers)}<br/>
             Crop Area: ${formatNumber(acres)} acres
         `;
-        L.marker(latLng).addTo(map).bindPopup(popupHtml);
+        const marker = L.marker(latLng).addTo(buctrilMap).bindPopup(popupHtml);
+
+        if (p.coordKey) {
+            markerByCoordKey[p.coordKey] = marker;
+        }
     });
 
     if (latLngs.length > 1) {
-        L.polyline(latLngs, { weight: 3, opacity: 0.9, color: "#ffb74d" }).addTo(map);
-        map.fitBounds(latLngs, { padding: [32, 32] });
+        L.polyline(latLngs, { weight: 3, opacity: 0.9, color: "#ffb74d" }).addTo(buctrilMap);
+        buctrilMap.fitBounds(latLngs, { padding: [32, 32] });
     } else {
-        map.setView(latLngs[0], 11);
+        buctrilMap.setView(latLngs[0], 11);
     }
+}
+
+// focus from table row
+function focusOnMap(coordKey) {
+    if (!buctrilMap) return;
+    const marker = markerByCoordKey[coordKey];
+    if (!marker) return;
+    const latLng = marker.getLatLng();
+    buctrilMap.setView(latLng, 13);
+    marker.openPopup();
 }
 
 // ----------------- CHARTS (PIVOT STYLE) -----------------
