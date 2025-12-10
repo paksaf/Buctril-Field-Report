@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Buctril Farmer Engagement Summary 2025</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Dynamic, pivot-style dashboard summarizing Buctril farmer engagements in 2025 with maps, charts, and media gallery for GitHub Pages." />
+    <meta name="description" content="Dynamic, pivot-style dashboard summarizing Buctril Super farmer engagements in 2025 with maps, charts, and media gallery for GitHub Pages." />
     <link rel="canonical" href="https://yourusername.github.io/repo-name/" />
 
     <!-- Open Graph -->
@@ -102,6 +102,14 @@
             font-weight: 700;
             letter-spacing: 0.02em;
             text-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+        }
+        .tagline {
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .tagline strong {
+            color: #fef9c3;
         }
         .subtitle {
             margin-top: 4px;
@@ -417,6 +425,7 @@
             gap: 14px;
             align-items: flex-start;
             margin-bottom: 10px;
+            margin-top: 10px;
         }
         @media (max-width: 900px) {
             .summary-grid {
@@ -505,7 +514,117 @@
             margin-top: 6px;
         }
 
-        /* Insights block */
+        /* Impact at a glance */
+        .impact-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+        .impact-text-block {
+            max-width: 320px;
+        }
+        .impact-title-main {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .impact-title-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .impact-title-tag {
+            font-size: 11px;
+            color: #fef9c3;
+            margin-top: 4px;
+        }
+        .impact-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            flex: 1;
+            min-width: 260px;
+        }
+        @media (max-width: 900px) {
+            .impact-metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        .impact-metric {
+            background: radial-gradient(circle at top, rgba(250, 204, 21, 0.2), transparent 55%),
+                rgba(13, 25, 48, 0.96);
+            border-radius: 12px;
+            padding: 6px 8px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .impact-icon {
+            font-size: 14px;
+        }
+        .impact-label {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        .impact-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Core insights layout inside summary */
+        .core-insights-layout {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr);
+            gap: 12px;
+        }
+        @media (max-width: 900px) {
+            .core-insights-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .insights-heading-inline {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #fef9c3;
+            margin-bottom: 4px;
+        }
+        .insights-list-inline {
+            font-size: 11px;
+            color: #e5e7eb;
+            margin-bottom: 6px;
+            padding-left: 16px;
+        }
+        .insights-list-inline li {
+            margin-bottom: 3px;
+        }
+
+        .regional-table-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .stars {
+            font-size: 12px;
+        }
+
+        .snapshot-wrapper {
+            margin-top: 10px;
+        }
+        .snapshot-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        /* Insights block (lower card) */
         .insights-grid {
             display: grid;
             grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr);
@@ -631,7 +750,12 @@
         <header>
             <div class="title-row">
                 <div class="logo-badge">🌾</div>
-                <h1>Buctril Farmer Engagement Summary 2025</h1>
+                <div>
+                    <h1>Buctril Super Farmer Education Drive</h1>
+                    <div class="tagline">
+                        November – December 2025 | <strong>Bayer Marketing Team Executive Summary</strong>
+                    </div>
+                </div>
             </div>
             <p class="subtitle">
                 Pivot-style dashboard reading <code>sum_sheet.csv</code> directly from the repository and summarising
@@ -672,9 +796,46 @@
         <section class="card summary-card">
             <div class="card-header">
                 <div class="pill-icon">🚜</div>
-                <span class="card-title-text">Buctril Super Farmer Education Drive – Marketing Team Executive Summary</span>
+                <span class="card-title-text">From Education to Acres: Building Trust That Converts</span>
             </div>
 
+            <!-- Impact at a glance -->
+            <div class="impact-header">
+                <div class="impact-text-block">
+                    <div class="impact-title-main">Buctril Super Farmer Education Drive</div>
+                    <div class="impact-title-sub">
+                        November – December 2025 | Prepared by <strong>INTERACT</strong> for Bayer Marketing Team.
+                        Data Period: Nov 23 – Dec 8, 2025 (Days 1–13 complete; partial gaps Days 14–17).
+                    </div>
+                    <div class="impact-title-tag">
+                        Campaign Impact at a Glance – transforming farmer education into market share across 13 districts.
+                    </div>
+                </div>
+                <div class="impact-metrics">
+                    <div class="impact-metric">
+                        <div class="impact-icon">🎯</div>
+                        <div class="impact-label">Farmers Reached</div>
+                        <div class="impact-value" id="impact-farmers">–</div>
+                    </div>
+                    <div class="impact-metric">
+                        <div class="impact-icon">🌾</div>
+                        <div class="impact-label">Wheat Acres</div>
+                        <div class="impact-value" id="impact-acres">–</div>
+                    </div>
+                    <div class="impact-metric">
+                        <div class="impact-icon">⭐</div>
+                        <div class="impact-label">Message Clarity</div>
+                        <div class="impact-value" id="impact-clarity">–</div>
+                    </div>
+                    <div class="impact-metric">
+                        <div class="impact-icon">📈</div>
+                        <div class="impact-label">Definite Use Intent</div>
+                        <div class="impact-value" id="impact-intent">–</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overview + metric table -->
             <div class="summary-grid">
                 <!-- Overview tags -->
                 <div>
@@ -685,7 +846,7 @@
                         </div>
                         <div class="pill-badge">
                             Territories
-                            <span id="summary-territories">Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia &amp; others</span>
+                            <span id="summary-territories">13 districts including Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia</span>
                         </div>
                         <div class="pill-badge">
                             Sessions Executed
@@ -706,8 +867,9 @@
                     </div>
 
                     <p class="exec-note">
-                        Data source: field session reports &amp; <code>sum_sheet.csv</code> (Days 1–13 complete).
-                        Prepared for Bayer Marketing Team – “From education to acres: building trust that converts.”
+                        <strong>Theme:</strong> “From education to acres: building trust that converts.”
+                        High trust, outstanding message clarity and strong engagement built an advocacy network.
+                        Next priority: address price sensitivity with tailored schemes to capture remaining market share.
                     </p>
                 </div>
 
@@ -731,19 +893,19 @@
                                         <div class="bar-fill" data-percent="76"></div>
                                     </div>
                                 </td>
-                                <td>76% of planned sessions delivered.</td>
+                                <td>26 of 34 planned – 76% completion of field plan.</td>
                             </tr>
                             <tr>
                                 <td>Farmers reached</td>
                                 <td id="kpm-farmers-val">–</td>
                                 <td class="metric-emoji">🧑‍🌾 × 1,123</td>
-                                <td>Broad wheat-farmer coverage across focus districts.</td>
+                                <td>Direct contact establishing strong presence across wheat growers.</td>
                             </tr>
                             <tr>
                                 <td>Acres represented</td>
                                 <td id="kpm-acres-val">–</td>
                                 <td class="metric-emoji">🌾 × 19,025</td>
-                                <td>Large impact base for Buctril Super adoption.</td>
+                                <td>Core market penetration and high impact base for Buctril Super.</td>
                             </tr>
                             <tr>
                                 <td>Message clarity score</td>
@@ -753,7 +915,7 @@
                                         <div class="bar-fill" data-percent="97"></div>
                                     </div>
                                 </td>
-                                <td>2.9 / 3.0 – outstanding understanding of dose &amp; use.</td>
+                                <td>2.9 / 3.0 – outstanding education on Golden Period &amp; safety.</td>
                             </tr>
                             <tr>
                                 <td>Definite use intent</td>
@@ -763,16 +925,147 @@
                                         <div class="bar-fill" data-percent="88"></div>
                                     </div>
                                 </td>
-                                <td>~88% average commitment – strong conversion intent.</td>
+                                <td>~88% average commitment – strong conversion from awareness to action.</td>
                             </tr>
                             <tr>
                                 <td>Influencers identified</td>
                                 <td id="kpm-influencers-val">–</td>
-                                <td class="metric-emoji">🤝 × 200+</td>
-                                <td>Farmer captain network ready for testimonials &amp; advocacy.</td>
+                                <td class="metric-emoji">🤝 × 201</td>
+                                <td>Farmer Captain network ready for testimonials &amp; advocacy.</td>
+                            </tr>
+                            <tr>
+                                <td>Data completeness</td>
+                                <td>Partial</td>
+                                <td>
+                                    <div class="bar-wrapper" title="Data coverage">
+                                        <div class="bar-fill" data-percent="60"></div>
+                                    </div>
+                                </td>
+                                <td>Days 14–17 &amp; Sargodha/Phalia metrics partly missing – improve tracking.</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Core performance insights & regional performance -->
+            <div class="core-insights-layout">
+                <div>
+                    <div class="insights-heading-inline">Core performance insights – what worked brilliantly</div>
+                    <ul class="insights-list-inline">
+                        <li><strong>Brand trust as #1 driver:</strong> “Trust in Bayer” cited as top purchase reason in ~90% of sessions, reinforcing brand equity and beating price-only competitors.</li>
+                        <li><strong>Education drives conversion:</strong> 97% clarity directly linked to 88% definite use intent; awareness turned into commitment.</li>
+                        <li><strong>Influencer network built:</strong> 200+ Farmer Captains identified for testimonials and peer advocacy.</li>
+                        <li><strong>Timing &amp; credibility:</strong> Pre-sowing sessions delivered by field teams and dealers created memorable, credible education.</li>
+                    </ul>
+
+                    <div class="insights-heading-inline">Critical opportunities &amp; barriers</div>
+                    <ul class="insights-list-inline">
+                        <li>Price sensitivity among ~12% hesitant farmers, especially in regions like Mianwali.</li>
+                        <li>Data gaps for Sargodha/Phalia and some later sessions – require tighter tracking for full insight.</li>
+                        <li>High farmer demand for physical demo plots as proof points.</li>
+                        <li>Need regional customisation – e.g. focus on pricing narratives where resistance is highest.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div class="regional-table-title">Regional performance highlights</div>
+                    <table class="kpi-table-exec">
+                        <thead>
+                            <tr>
+                                <th>Region</th>
+                                <th>Rating</th>
+                                <th>Key insight / visual</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Ghotki / Ubaro</td>
+                                <td><span class="stars">⭐⭐⭐⭐⭐</span></td>
+                                <td>Highest conversion (90–97%); deep market penetration ██████████</td>
+                            </tr>
+                            <tr>
+                                <td>Muzaffar Ghar</td>
+                                <td><span class="stars">⭐⭐⭐⭐⭐</span></td>
+                                <td>Strong influencer base and engagement █████████▓</td>
+                            </tr>
+                            <tr>
+                                <td>Mianwali</td>
+                                <td><span class="stars">⭐⭐⭐⭐☆</span></td>
+                                <td>First significant price concerns noted ████████▒░ – Influencer spotlight: Shat Ullah (23 acres, Captain).</td>
+                            </tr>
+                            <tr>
+                                <td>Sargodha / Phalia</td>
+                                <td><span class="stars">⭐⭐⭐⭐☆</span></td>
+                                <td>Sessions held with good engagement but data gap on metrics ░░░░░░░░░░.</td>
+                            </tr>
+                            <tr>
+                                <td>All regions</td>
+                                <td><span class="stars">⭐⭐⭐⭐⭐</span></td>
+                                <td>Consistently high engagement and trust-driven success ██████████.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="snapshot-wrapper">
+                        <div class="snapshot-title">Campaign snapshot – visual rating</div>
+                        <table class="kpi-table-exec">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Result</th>
+                                    <th>Bar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Sessions executed</td>
+                                    <td>26 / 34</td>
+                                    <td>
+                                        <div class="bar-wrapper">
+                                            <div class="bar-fill" data-percent="76"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Farmer engagement</td>
+                                    <td>1,123</td>
+                                    <td>
+                                        <div class="bar-wrapper">
+                                            <div class="bar-fill" data-percent="100"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Message clarity</td>
+                                    <td>2.9 / 3</td>
+                                    <td>
+                                        <div class="bar-wrapper">
+                                            <div class="bar-fill" data-percent="97"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Conversion rate</td>
+                                    <td>~88%</td>
+                                    <td>
+                                        <div class="bar-wrapper">
+                                            <div class="bar-fill" data-percent="88"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Data completeness</td>
+                                    <td>Partial</td>
+                                    <td>
+                                        <div class="bar-wrapper">
+                                            <div class="bar-fill" data-percent="60"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -783,7 +1076,7 @@
                     <canvas id="kpiFunnelChart"></canvas>
                 </div>
                 <div class="chart-container summary-small">
-                    <div class="chart-title">Campaign Rating (out of 10)</div>
+                    <div class="chart-title">Overall Campaign Rating (out of 10)</div>
                     <canvas id="campaignRatingChart"></canvas>
                 </div>
             </div>
@@ -938,91 +1231,78 @@
             </div>
         </section>
 
-        <!-- Key insights, barriers & next steps -->
+        <!-- Key insights, barriers, business impact & next steps -->
         <section class="card table-card">
             <div class="card-header">
                 <div class="pill-icon">⭐</div>
-                <span class="card-title-text">Key Insights, Barriers &amp; Next Steps (From Field Reports)</span>
+                <span class="card-title-text">Key Insights, Business Impact &amp; Next Steps</span>
             </div>
             <div class="insights-grid">
                 <div>
-                    <div class="insights-heading">Strengths</div>
+                    <div class="insights-heading">Top success factors</div>
                     <ul class="insights-list">
-                        <li><span class="insight-tag">Brand loyalty</span>80%+ repeat users across sessions.</li>
-                        <li><span class="insight-tag">Conversion</span>~88% farmers committed to Buctril Super.</li>
-                        <li><span class="insight-tag">Reach</span>Nearly all wheat growers touched in SKR, RYK, DGK, FSD, GUJ.</li>
-                        <li><span class="insight-tag">Messaging</span>Message clarity average score 2.8–2.9 / 3.0.</li>
-                    </ul>
-
-                    <div class="insights-heading">Why farmers choose Buctril Super</div>
-                    <ul class="insights-list">
-                        <li>Trust in Bayer brand – 32 mentions.</li>
-                        <li>Better weed control vs alternatives – 30 mentions.</li>
-                        <li>Good past experience – 30 mentions.</li>
-                        <li>Safe on crop (no burn) – 29 mentions.</li>
+                        <li><span class="insight-tag">Brand trust leader</span>“Trust in Bayer” is the #1 purchase reason.</li>
+                        <li><span class="insight-tag">Education excellence</span>97% message clarity – farmers clearly understand dose, timing and safety.</li>
+                        <li><span class="insight-tag">Strong conversion</span>88% definite use intent among engaged farmers.</li>
+                        <li><span class="insight-tag">Network built</span>200+ Farmer Captains ready for advocacy and referrals.</li>
                     </ul>
 
                     <div class="insights-heading">Farmer requests &amp; opportunities</div>
                     <ul class="insights-list">
-                        <li>High demand for demo plots in key villages.</li>
-                        <li>45+ farmers ready for social media advocacy.</li>
-                        <li>Competitor mentions: Evyol &amp; Suncrop monitored for benchmarking.</li>
+                        <li>High demand for demo plots in key villages as physical proof of performance.</li>
+                        <li>45+ farmers willing to share experiences on social media / WhatsApp.</li>
+                        <li>Competitor mentions (Evyol, Suncrop) monitored for benchmarking.</li>
                     </ul>
 
-                    <div class="insights-heading">Key influencers identified</div>
+                    <div class="insights-heading">Business impact assessment</div>
                     <ul class="insights-list">
-                        <li>SKR – 12+ farmers keen on demo plots.</li>
-                        <li>RYK – 8+ community leaders.</li>
-                        <li>DGK – 10+ farmers active in local groups.</li>
-                        <li>FSD – 6+ young, tech-savvy farmers.</li>
-                        <li>Spotlight: Shat Ullah (0305-3126621) – 23 acres, ideal for testimonials.</li>
+                        <li><strong>Market penetration:</strong> 26 targeted education sessions addressing 19,025+ acres.</li>
+                        <li><strong>Brand equity reinforcement:</strong> trust-first model differentiates Buctril from price-only competitors.</li>
+                        <li><strong>Conversion pipeline:</strong> 88% intent gives strong seasonal forecast accuracy.</li>
+                        <li><strong>Competitive advantage:</strong> farmer education plus safety benefits create moat vs generics.</li>
+                    </ul>
+
+                    <div class="insights-heading">Brand equity dashboard</div>
+                    <ul class="insights-list">
+                        <li><strong>Salience – Market reach:</strong> 1,123 farmers ✅</li>
+                        <li><strong>Performance – Clarity:</strong> 97% understanding ✅</li>
+                        <li><strong>Imagery – Purchase driver:</strong> “Trust in Bayer”.</li>
+                        <li><strong>Judgements – Conversion:</strong> 88% definite use ✅</li>
+                        <li><strong>Feelings – Confidence:</strong> high confidence reported across sessions ✅</li>
                     </ul>
                 </div>
 
                 <div>
-                    <div class="insights-heading">Areas for attention</div>
+                    <div class="insights-heading">Challenges &amp; price sensitivity</div>
                     <ul class="insights-list">
-                        <li>Price sensitivity among 15–20% of hesitant farmers.</li>
-                        <li>Preference for generic alternatives in some pockets.</li>
-                        <li>Credit constraints highlighted in multiple sessions.</li>
+                        <li>Price seen as high by 15–20% of hesitant farmers; more pronounced in some pockets (e.g. Mianwali).</li>
+                        <li>Credit constraints and delayed payments noted; require dealer schemes / micro-packs.</li>
+                        <li>Partial data for some sessions – tracking must be tightened for complete view.</li>
                     </ul>
 
-                    <div class="insights-heading">Barriers to conversion</div>
+                    <div class="insights-heading">Recommended marketing actions</div>
                     <ul class="insights-list">
-                        <li>Price too high – 15 mentions.</li>
-                        <li>Fear of crop damage – 7 mentions.</li>
-                        <li>Happy with generic brand – 4 mentions.</li>
-                        <li>No money / credit – 5 mentions.</li>
+                        <li><strong>Immediate (next 30 days):</strong> launch micro-packs, establish five demo plots (Ubaro, Ghotki, Daud Khail and similar high-conversion villages), activate top 20 influencers with testimonials.</li>
+                        <li><strong>Next season:</strong> formalise “Farmer Captain” program, run pre-sowing refresher sessions, build local-language visual guides for dose and water volume.</li>
+                        <li><strong>Longer term:</strong> strengthen dealer feedback loop, build digital insight repository, expand to new territories using this engagement template.</li>
                     </ul>
 
-                    <div class="insights-heading">Field team feedback</div>
+                    <div class="insights-heading">Growth template – the Buctril engagement framework</div>
                     <ul class="insights-list">
-                        <li>Engagement highest in live Q&amp;A sessions.</li>
-                        <li>Price concerns call for dealer schemes / smaller packs.</li>
-                        <li>Timing: pre-sowing sessions drive strongest commitment.</li>
+                        <li><strong>Timing:</strong> align sessions with pre-sowing decision window.</li>
+                        <li><strong>Clarity:</strong> keep 2–3 simple, memorable key messages.</li>
+                        <li><strong>Credibility:</strong> field team expertise plus dealer partners.</li>
+                        <li><strong>Community:</strong> local influencers driving peer-to-peer recommendation.</li>
+                        <li><strong>Consistency:</strong> standardised session structure across regions.</li>
+                        <li><strong>Feedback loop:</strong> capture and act on farmer concerns in near-real time.</li>
                     </ul>
 
-                    <div class="insights-heading">Session effectiveness snapshot</div>
+                    <div class="insights-heading">Final verdict</div>
                     <ul class="insights-list">
-                        <li>Farmer awareness: ★★★★★ (90%+ awareness).</li>
-                        <li>Message recall: ★★★★☆ (strong on safety &amp; use).</li>
-                        <li>Conversion intent: ★★★★★ (~88% definite usage).</li>
-                        <li>Influencer ID: ★★★★☆ (45+ farmer influencers identified).</li>
-                        <li>Price sensitivity: ★★☆☆☆ (needs improvement).</li>
-                    </ul>
-
-                    <div class="insights-heading">Recommended next steps</div>
-                    <ul class="insights-list">
-                        <li><strong>Immediate (next 30 days):</strong> 3–5 demo plots, 10–15 influencer testimonials, address pricing with dealer schemes.</li>
-                        <li><strong>Medium term (next season):</strong> launch “Farmer Captains”, develop local-language visuals, pre-sowing educational calendar.</li>
-                        <li><strong>Long term:</strong> build digital insight repository, strengthen dealer feedback loop, expand to new territories.</li>
-                    </ul>
-
-                    <div class="insights-heading">Conclusion</div>
-                    <ul class="insights-list">
-                        <li>Impact: 19 sessions | 567 farmers | 7,265 acres represented (first phase).</li>
-                        <li>Overall rating: 8.5 / 10 – high trust, clear messaging, strong engagement.</li>
-                        <li>Next focus: demo plots, pricing schemes &amp; influencer outreach to convert remaining hesitant farmers.</li>
+                        <li><strong>Overall rating:</strong> 8.5 / 10.</li>
+                        <li><strong>Key insight:</strong> education builds trust, and trust drives conversion.</li>
+                        <li><strong>Next priority:</strong> address price sensitivity and credit barriers to capture the remaining ~12% hesitant farmers.</li>
+                        <li>Job performed in field and reported by agency <strong>INTERACT</strong>; prepared for Bayer Marketing Team.</li>
                     </ul>
                 </div>
             </div>
