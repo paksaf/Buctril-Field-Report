@@ -1,23 +1,3 @@
-// ----------------- STATIC CAMPAIGN SUMMARY (for top cards) -----------------
-const CAMPAIGN_SUMMARY = {
-    period: "Nov–Dec 2025",
-    territories: "SKR, RYK, DGK, FSD, GUJ",
-    sessions: 19,
-    farmers: 567,
-    acres: 7265,
-    aware: 512,
-    awarePct: 90.3,
-    usedLastYear: 463,
-    usedLastYearPct: 81.7,
-    committed: 497,
-    committedPct: 87.7,
-    estimatedAcres: 6894,
-    estimatedAcresPct: 95,
-    clarityScore: 2.8,
-    clarityMax: 3,
-    overallRating: 8.5
-};
-
 // ----------------- CONFIG -----------------
 let FILTER_START_DATE = "2025-01-05";
 let FILTER_END_DATE = "2025-12-31";
@@ -25,6 +5,26 @@ let FILTER_END_DATE = "2025-12-31";
 let ALLOWED_FROM_CITIES = [];
 let ALLOWED_TO_CITIES = [];
 let ALLOWED_LOCATIONS = [];
+
+// Executive campaign summary (static from marketing analysis)
+const CAMPAIGN_SUMMARY = {
+    period: "Nov 23 – Dec 8, 2025",
+    territories: "Ghotki/Ubaro, Muzaffar Ghar, Mianwali, Sargodha, Phalia & others",
+
+    sessionsExecuted: 26,
+    sessionsPlanned: 34,
+    sessionsCompletionPct: 76, // 26/34
+    farmers: 1123,
+    acres: 19025,
+
+    clarityScore: 2.9,
+    clarityMax: 3.0,
+    clarityPct: 97,
+    definiteIntentPct: 88,
+
+    influencers: 201,
+    overallRating: 8.5
+};
 
 let cityFarmersChartInstance = null;
 let villageAcresChartInstance = null;
@@ -35,102 +35,15 @@ let uniqueDates = [];
 let allRows = [];
 let currentFilteredRows = [];
 
-// map marker registry (for click-through from table)
-let markerByCoordKey = {};
-let buctrilMap = null;
-
 // How many categories to show in charts before grouping to "Others"
 const TOP_CATEGORIES_CITY = 6;
 const TOP_CATEGORIES_VILLAGE = 6;
 
 document.addEventListener("DOMContentLoaded", () => {
-    renderStaticSummary();
     setupFilterListeners();
+    renderStaticSummary();
     loadDashboard();
 });
-
-// ----------------- RENDER STATIC SUMMARY -----------------
-function renderStaticSummary() {
-    const s = CAMPAIGN_SUMMARY;
-    setText("summary-period", s.period);
-    setText("summary-territories", s.territories);
-    setText("summary-sessions", s.sessions);
-    setText("summary-farmers", s.farmers.toLocaleString());
-    setText("summary-acres", s.acres.toLocaleString() + " acres");
-    setText("summary-rating", s.overallRating + "/10");
-
-    setText("kpm-aware", `${s.aware} (${s.awarePct}% )`);
-    setText("kpm-used", `${s.usedLastYear} (${s.usedLastYearPct}% )`);
-    setText("kpm-committed", `${s.committed} (${s.committedPct}% )`);
-    setText(
-        "kpm-est-acres",
-        `${s.estimatedAcres.toLocaleString()} (${s.estimatedAcresPct}% of total)`
-    );
-    setText("kpm-clarity", `${s.clarityScore}/${s.clarityMax}`);
-
-    buildSummaryCharts();
-}
-
-function buildSummaryCharts() {
-    const s = CAMPAIGN_SUMMARY;
-
-    // destroy old charts if needed
-    if (kpiFunnelChartInstance) kpiFunnelChartInstance.destroy();
-    if (ratingChartInstance) ratingChartInstance.destroy();
-
-    const funnelCanvas = document.getElementById("kpiFunnelChart");
-    if (funnelCanvas) {
-        const ctxFunnel = funnelCanvas.getContext("2d");
-        kpiFunnelChartInstance = new Chart(ctxFunnel, {
-            type: "bar",
-            data: {
-                labels: ["Aware", "Used last year", "Committed"],
-                datasets: [
-                    {
-                        label: "% of farmers",
-                        data: [s.awarePct, s.usedLastYearPct, s.committedPct]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: { stepSize: 20 }
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
-        });
-    }
-
-    const ratingCanvas = document.getElementById("campaignRatingChart");
-    if (ratingCanvas) {
-        const ctxRating = ratingCanvas.getContext("2d");
-        ratingChartInstance = new Chart(ctxRating, {
-            type: "doughnut",
-            data: {
-                labels: ["Score", "Remaining"],
-                datasets: [
-                    {
-                        data: [s.overallRating, 10 - s.overallRating]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                cutout: "60%",
-                plugins: {
-                    legend: { position: "bottom", labels: { font: { size: 10 } } }
-                }
-            }
-        });
-    }
-}
 
 // ----------------- LOAD & NORMALISE CSV -----------------
 async function loadDashboard() {
@@ -164,7 +77,7 @@ async function loadDashboard() {
                     loadingEl.textContent =
                         "Error parsing sum_sheet.csv. Check the file format.";
                 }
-            },
+            }
         });
     } catch (err) {
         console.error("Error loading CSV:", err);
@@ -177,8 +90,8 @@ async function loadDashboard() {
 }
 
 /**
- * CSV structure:
- *   Row 0: technical headers (Summary, Unnamed: 1, ..., etc.)
+ * CSV structure (as used in the Excel summary sheet):
+ *   Row 0: technical headers
  *   Row 1: logical headers ("SN", "From City", "City", "Date", "Session Location",
  *                           "Total Farmers", "Total Wheat Acres", "Spot Coordinates", ...)
  *   Row 2+: data rows.
@@ -186,7 +99,7 @@ async function loadDashboard() {
 function normalizeRows(results) {
     const rows = results.data || [];
     const fields = (results.meta && results.meta.fields) || [];
-       if (!rows.length || !fields.length) return [];
+    if (!rows.length || !fields.length) return [];
 
     const headerRow = rows[0]; // row with SN, From City, ...
 
@@ -247,7 +160,6 @@ function populateFilterOptions() {
     const select = document.getElementById("from-city-filter");
     if (!select) return;
 
-    // remove previous dynamic options
     while (select.options.length > 1) {
         select.remove(1);
     }
@@ -257,7 +169,7 @@ function populateFilterOptions() {
             allRows
                 .map((r) => (r["From City"] || "").toString().trim())
                 .filter(Boolean)
-        ),
+        )
     ].sort();
 
     cities.forEach((city) => {
@@ -367,7 +279,7 @@ function parseDateFlexible(dateStr) {
             sep: 8,
             oct: 9,
             nov: 10,
-            dec: 11,
+            dec: 11
         };
         if (months.hasOwnProperty(monStr)) {
             const year = new Date().getFullYear();
@@ -496,9 +408,6 @@ function updateSessionTable(rows) {
         const dateStr = (r["Date"] || "").toString().trim();
         const dateIndex = uniqueDates.indexOf(dateStr) + 1;
 
-        const coordStr = getCoords(r);
-        const coordKey = coordStr ? coordStr.toString().trim() : "";
-
         let mediaHtml = "N/A";
         if (dateIndex > 0) {
             const imgName = `${dateIndex}.jpeg`;
@@ -510,9 +419,6 @@ function updateSessionTable(rows) {
         }
 
         const tr = document.createElement("tr");
-        tr.className = "session-clickable";
-        if (coordKey) tr.dataset.mapId = coordKey;
-
         tr.innerHTML = `
             <td>${escapeHtml(r["SN"] || "")}</td>
             <td>${escapeHtml(r["Date"] || "")}</td>
@@ -523,14 +429,10 @@ function updateSessionTable(rows) {
             )}</td>
             <td>${escapeHtml(getFarmers(r))}</td>
             <td>${escapeHtml(getCropArea(r))}</td>
-            <td>${escapeHtml(coordStr)}</td>
+            <td>${escapeHtml(getCoords(r))}</td>
             <td>${escapeHtml(getFeedback(r))}</td>
             <td>${mediaHtml}</td>
         `;
-
-        if (coordKey) {
-            tr.addEventListener("click", () => focusOnMap(coordKey));
-        }
         tbody.appendChild(tr);
     });
 }
@@ -635,50 +537,88 @@ function updateMediaGallery() {
         const div = document.createElement("div");
         div.className = "media-item";
         div.innerHTML = `
-            <div class="media-visuals">
-                <a href="${imgName}" class="media-thumb-img" target="_blank">
-                    <img src="${imgName}" alt="Session ${dateIndex} photo (${escapeHtml(
-            date
-        )})" loading="lazy" />
-                </a>
-                <div class="media-thumb-video">
-                    <video class="media-video" muted playsinline preload="metadata" poster="${imgName}">
-                        <source src="${vidName}" type="video/mp4" />
-                    </video>
+            <div class="media-placeholder" role="img" aria-label="Media for ${escapeHtml(
+                date
+            )}">
+                <div class="media-thumb" data-index="${dateIndex}">
+                    <img src="${imgName}" alt="Session media ${dateIndex}" loading="lazy" />
+                    <video src="${vidName}" muted playsinline loop preload="metadata"></video>
+                    <div class="media-thumb-overlay">#${dateIndex}</div>
                 </div>
             </div>
             <div class="media-label">Date: ${escapeHtml(date)}</div>
             <div class="media-links">
-                <span>Photo: <code>${imgName}</code> · Video: <code>${vidName}</code></span>
+                <a href="${imgName}" target="_blank" class="media-link">🖼️ Open image</a>
+                <a href="${vidName}" target="_blank" class="media-link">🎥 Open video</a>
             </div>
         `;
         gallery.appendChild(div);
     });
 
-    attachMediaHoverHandlers();
+    initMediaHoverBehaviour();
 }
 
-function attachMediaHoverHandlers() {
-    const videos = document.querySelectorAll(".media-video");
-    videos.forEach((video) => {
-        // Desktop hover
-        video.addEventListener("mouseenter", () => {
-            video.play().catch(() => {});
-        });
-        video.addEventListener("mouseleave", () => {
+// Hover / tap behaviour for media thumbnails, plus auto-pause off-screen
+function initMediaHoverBehaviour() {
+    const thumbs = document.querySelectorAll(".media-thumb");
+    if (!thumbs.length) return;
+
+    let observer = null;
+    if ("IntersectionObserver" in window) {
+        observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                const thumb = entry.target;
+                if (!entry.isIntersecting && thumb._pauseVideo) {
+                    thumb._pauseVideo();
+                }
+            });
+        }, { threshold: 0.1 });
+    }
+
+    thumbs.forEach((thumb) => {
+        const video = thumb.querySelector("video");
+        if (!video) return;
+
+        const img = thumb.querySelector("img");
+
+        const playVideo = () => {
+            thumb.classList.add("playing");
+            video.muted = true;
+            video
+                .play()
+                .catch(() => {
+                    // ignore autoplay issues
+                });
+        };
+
+        const pauseVideo = () => {
             video.pause();
             video.currentTime = 0;
+            thumb.classList.remove("playing");
+        };
+
+        thumb._pauseVideo = pauseVideo;
+
+        thumb.addEventListener("mouseenter", playVideo);
+        thumb.addEventListener("mouseleave", pauseVideo);
+
+        // Tap / click toggle for mobile
+        thumb.addEventListener("click", () => {
+            if (video.paused) {
+                playVideo();
+            } else {
+                pauseVideo();
+            }
         });
 
-        // Touch devices – tap to play/pause
-        video.addEventListener("touchstart", () => {
-            video.play().catch(() => {});
+        // If video fails to load, fall back to static image only
+        video.addEventListener("error", () => {
+            pauseVideo();
+            video.style.display = "none";
+            if (img) img.style.display = "block";
         });
-        video.addEventListener("touchend", () => {
-            setTimeout(() => {
-                video.pause();
-            }, 200);
-        });
+
+        if (observer) observer.observe(thumb);
     });
 }
 
@@ -687,12 +627,10 @@ function initMap(rows) {
     const mapDiv = document.getElementById("route-map");
     if (!mapDiv) return;
 
-    // reset marker registry
-    markerByCoordKey = {};
-
-    if (buctrilMap) {
-        buctrilMap.remove();
-        buctrilMap = null;
+    let map = window.buctrilMap;
+    if (map) {
+        map.remove();
+        map = null;
     }
 
     const points = [];
@@ -707,7 +645,6 @@ function initMap(rows) {
         if (parts.length < 2) return;
 
         points.push({
-            coordKey: coord.toString().trim(),
             lat: parts[0],
             lon: parts[1],
             village: (
@@ -719,7 +656,7 @@ function initMap(rows) {
                 .trim(),
             farmers: getFarmers(r),
             acres: getCropArea(r),
-            date: (r["Date"] || "").toString().trim(),
+            date: (r["Date"] || "").toString().trim()
         });
     });
 
@@ -727,16 +664,15 @@ function initMap(rows) {
         mapDiv.innerHTML =
             '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size:12px;">No sessions with valid coordinates in the current filter range.</div>';
         return;
-    } else {
-        mapDiv.innerHTML = ""; // clear previous text
     }
 
-    buctrilMap = L.map("route-map", { zoomControl: true });
+    map = L.map("route-map", { zoomControl: true });
+    window.buctrilMap = map;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
-        attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(buctrilMap);
+        attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
 
     const latLngs = [];
     points.forEach((p, idx) => {
@@ -752,8 +688,8 @@ function initMap(rows) {
             fillColor: "#6a97ff",
             stroke: true,
             color: "#ffb74d",
-            weight: 2,
-        }).addTo(buctrilMap);
+            weight: 2
+        }).addTo(map);
 
         const popupHtml = `
             <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
@@ -761,29 +697,15 @@ function initMap(rows) {
             Farmers: ${formatNumber(p.farmers)}<br/>
             Crop Area: ${formatNumber(acres)} acres
         `;
-        const marker = L.marker(latLng).addTo(buctrilMap).bindPopup(popupHtml);
-
-        if (p.coordKey) {
-            markerByCoordKey[p.coordKey] = marker;
-        }
+        L.marker(latLng).addTo(map).bindPopup(popupHtml);
     });
 
     if (latLngs.length > 1) {
-        L.polyline(latLngs, { weight: 3, opacity: 0.9, color: "#ffb74d" }).addTo(buctrilMap);
-        buctrilMap.fitBounds(latLngs, { padding: [32, 32] });
+        L.polyline(latLngs, { weight: 3, opacity: 0.9, color: "#ffb74d" }).addTo(map);
+        map.fitBounds(latLngs, { padding: [32, 32] });
     } else {
-        buctrilMap.setView(latLngs[0], 11);
+        map.setView(latLngs[0], 11);
     }
-}
-
-// focus from table row
-function focusOnMap(coordKey) {
-    if (!buctrilMap) return;
-    const marker = markerByCoordKey[coordKey];
-    if (!marker) return;
-    const latLng = marker.getLatLng();
-    buctrilMap.setView(latLng, 13);
-    marker.openPopup();
 }
 
 // ----------------- CHARTS (PIVOT STYLE) -----------------
@@ -813,16 +735,16 @@ function buildCharts(rows) {
                 datasets: [
                     {
                         label: "Farmers",
-                        data: cityPivot.data,
-                    },
-                ],
+                        data: cityPivot.data
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 plugins: {
-                    legend: { position: "bottom", labels: { font: { size: 10 } } },
-                },
-            },
+                    legend: { position: "bottom", labels: { font: { size: 10 } } }
+                }
+            }
         });
     }
 
@@ -852,16 +774,16 @@ function buildCharts(rows) {
                 datasets: [
                     {
                         label: "Acres",
-                        data: villagePivot.data,
-                    },
-                ],
+                        data: villagePivot.data
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 plugins: {
-                    legend: { position: "bottom", labels: { font: { size: 10 } } },
-                },
-            },
+                    legend: { position: "bottom", labels: { font: { size: 10 } } }
+                }
+            }
         });
     }
 }
@@ -876,7 +798,7 @@ function buildTopNWithOthers(map, topN) {
     if (entries.length <= topN) {
         return {
             labels: entries.map((e) => e[0]),
-            data: entries.map((e) => e[1]),
+            data: entries.map((e) => e[1])
         };
     }
 
@@ -888,6 +810,126 @@ function buildTopNWithOthers(map, topN) {
     const data = top.map((e) => e[1]).concat([othersValue]);
 
     return { labels, data };
+}
+
+// ----------------- EXECUTIVE SUMMARY RENDERING -----------------
+function renderStaticSummary() {
+    const s = CAMPAIGN_SUMMARY;
+
+    // Top pills
+    setText("summary-period", s.period);
+    setText("summary-territories", s.territories);
+    setText(
+        "summary-sessions",
+        `${s.sessionsExecuted} of ${s.sessionsPlanned} planned`
+    );
+    setText("summary-farmers", `${s.farmers.toLocaleString()} wheat farmers`);
+    setText("summary-acres", `${s.acres.toLocaleString()} acres`);
+    setText("summary-rating", `${s.overallRating} / 10`);
+
+    // Executive metric table values
+    setText(
+        "kpm-sessions-val",
+        `${s.sessionsExecuted} / ${s.sessionsPlanned} sessions`
+    );
+    setText(
+        "kpm-farmers-val",
+        `${s.farmers.toLocaleString()} farmers reached`
+    );
+    setText(
+        "kpm-acres-val",
+        `${s.acres.toLocaleString()} acres represented`
+    );
+    setText(
+        "kpm-clarity-val",
+        `${s.clarityScore.toFixed(1)} / ${s.clarityMax.toFixed(
+            1
+        )} (${s.clarityPct}% clarity)`
+    );
+    setText(
+        "kpm-intent-val",
+        `${s.definiteIntentPct}% avg. definite use intent`
+    );
+    setText(
+        "kpm-influencers-val",
+        `${s.influencers.toLocaleString()} key farmers`
+    );
+
+    buildSummaryCharts();
+    initMiniBars();
+}
+
+function buildSummaryCharts() {
+    const s = CAMPAIGN_SUMMARY;
+
+    if (kpiFunnelChartInstance) kpiFunnelChartInstance.destroy();
+    if (ratingChartInstance) ratingChartInstance.destroy();
+
+    const funnelCanvas = document.getElementById("kpiFunnelChart");
+    if (funnelCanvas) {
+        const ctxFunnel = funnelCanvas.getContext("2d");
+        kpiFunnelChartInstance = new Chart(ctxFunnel, {
+            type: "bar",
+            data: {
+                labels: ["Message clarity", "Definite use intent"],
+                datasets: [
+                    {
+                        label: "% of farmers",
+                        data: [s.clarityPct, s.definiteIntentPct]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { stepSize: 20 }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    const ratingCanvas = document.getElementById("campaignRatingChart");
+    if (ratingCanvas) {
+        const ctxRating = ratingCanvas.getContext("2d");
+        ratingChartInstance = new Chart(ctxRating, {
+            type: "doughnut",
+            data: {
+                labels: ["Score", "Remaining"],
+                datasets: [
+                    {
+                        data: [s.overallRating, 10 - s.overallRating]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                cutout: "60%",
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: { font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Animate / set widths for executive-summary bars
+function initMiniBars() {
+    const fills = document.querySelectorAll(".bar-fill[data-percent]");
+    fills.forEach((el) => {
+        const pct = parseFloat(el.dataset.percent);
+        const clamped = isNaN(pct) ? 0 : Math.max(0, Math.min(100, pct));
+        el.style.width = clamped + "%";
+    });
 }
 
 // ----------------- HELPERS -----------------
@@ -924,7 +966,7 @@ function getCropArea(row) {
         "total wheat acres",
         "acre",
         "area",
-        "crop area",
+        "crop area"
     ]);
     if (!key) return NaN;
     return parseNumber(row[key]);
@@ -935,7 +977,7 @@ function getFeedback(row) {
         "feedback",
         "observation",
         "remark",
-        "comment",
+        "comment"
     ]);
     if (!key) return "";
     return (row[key] || "").toString();
