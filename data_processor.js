@@ -1,7 +1,14 @@
+/****************************************************
+ * Buctril Field Report – Data Processor
+ * Expects files in SAME FOLDER as index.html:
+ *   - sum_sheet.csv
+ *   - 1.jpeg, 1.mp4, 2.jpeg, 2.mp4, ...
+ ****************************************************/
+
 // ---------- BASIC HELPERS ----------
 function safeNumber(val) {
   if (val === null || val === undefined) return 0;
-  var n = parseFloat(String(val).replace(/,/g, ""));
+  var n = parseFloat(String(val).replace(/,/g, "").trim());
   return isNaN(n) ? 0 : n;
 }
 
@@ -34,10 +41,9 @@ var clarityChart = null;
 var cityFarmersChart = null;
 
 // ---------- CSV LOAD ----------
-// Your sum_sheet.csv has a "Summary,..." row before the real header,
-// so we parse WITHOUT header and promote the second row to header.
 function loadCSV() {
   var loadingEl = document.getElementById("loading-message");
+
   fetch("sum_sheet.csv?cache=" + Date.now())
     .then(function (resp) {
       if (!resp.ok) throw new Error("Failed to load CSV: " + resp.status);
@@ -48,76 +54,79 @@ function loadCSV() {
         header: false,
         skipEmptyLines: true,
         complete: function (result) {
-          var rows = result.data || [];
-          if (!rows.length) {
-            if (loadingEl) loadingEl.textContent = "No data found in sum_sheet.csv.";
-            showErrorModal("sum_sheet.csv appears to be empty.");
-            return;
-          }
+          try {
+            var rows = result.data || [];
+            if (!rows.length) {
+              if (loadingEl) loadingEl.textContent = "No data found in sum_sheet.csv.";
+              showErrorModal("sum_sheet.csv appears to be empty.");
+              return;
+            }
 
-          // Drop first line if it is the Summary row
-          if (
-            rows.length &&
-            rows[0][0] &&
-            String(rows[0][0]).trim().toLowerCase() === "summary"
-          ) {
-            rows.shift();
-          }
+            // 1) Drop the first BOM + Summary line
+            if (rows.length && rows[0].length) {
+              var firstCell = rows[0][0] || "";
+              var norm = String(firstCell)
+                .replace(/^\uFEFF/, "") // remove BOM
+                .trim()
+                .toLowerCase();
+              if (norm === "summary") {
+                rows.shift();
+              }
+            }
 
-          if (!rows.length) {
-            if (loadingEl) loadingEl.textContent = "No usable rows in sum_sheet.csv.";
-            showErrorModal("sum_sheet.csv does not contain any detail rows.");
-            return;
-          }
+            if (!rows.length) {
+              if (loadingEl) loadingEl.textContent = "No usable rows in sum_sheet.csv.";
+              showErrorModal("sum_sheet.csv does not contain any detail rows.");
+              return;
+            }
 
-          // Next row is the actual header row
-          var headerRow = rows.shift();
-          var headers = headerRow.map(function (h) {
-            if (h === null || h === undefined) return "";
-            return String(h).trim();
-          });
-
-          // Build array of row objects using the header row
-          allRows = rows.map(function (r, idx) {
-            var obj = {};
-            headers.forEach(function (h, colIdx) {
-              if (!h) return; // ignore empty header cells
-              obj[h] = r[colIdx];
+            // 2) Next row is the real header row (SN, From City, City, Date, ...)
+            var headerRow = rows.shift();
+            var headers = headerRow.map(function (h) {
+              if (h === null || h === undefined) return "";
+              return String(h).replace(/^\uFEFF/, "").trim();
             });
-            return normalizeRow(obj, idx);
-          });
 
-          preProcessDates(allRows);
-          populateFilterOptions(allRows);
-          applyFilters(); // initial render
+            // 3) Turn remaining rows into objects keyed by the headers
+            allRows = rows.map(function (r, idx) {
+              var obj = {};
+              headers.forEach(function (h, colIdx) {
+                if (!h) return; // ignore blank header cells
+                obj[h] = r[colIdx];
+              });
+              return normalizeRow(obj, idx);
+            });
 
-          if (loadingEl) {
-            var spinner = document.getElementById("spinner");
-            if (spinner && spinner.parentNode)
-              spinner.parentNode.removeChild(spinner);
-            loadingEl.textContent =
-              "Data loaded from sum_sheet.csv – filters are now active.";
+            preProcessDates(allRows);
+            populateFilterOptions(allRows);
+            applyFilters(); // initial render
+
+            if (loadingEl) {
+              var spinner = document.getElementById("spinner");
+              if (spinner && spinner.parentNode) spinner.parentNode.removeChild(spinner);
+              loadingEl.textContent = "Data loaded from sum_sheet.csv – filters are now active.";
+            }
+          } catch (e) {
+            console.error("Processing error:", e);
+            if (loadingEl) loadingEl.textContent = "Error processing data.";
+            showErrorModal("Error processing sum_sheet.csv – please check file format.");
           }
         },
         error: function (err) {
           console.error("CSV parse error:", err);
           if (loadingEl) loadingEl.textContent = "Error loading data.";
-          showErrorModal(
-            "Could not parse sum_sheet.csv. Please confirm file format."
-          );
-        },
+          showErrorModal("Could not parse sum_sheet.csv. Please confirm file format.");
+        }
       });
     })
     .catch(function (err) {
       console.error("CSV fetch error:", err);
       if (loadingEl) loadingEl.textContent = "Error loading data.";
-      showErrorModal(
-        "Could not load sum_sheet.csv. Please confirm it is in the same folder as index.html."
-      );
+      showErrorModal("Could not load sum_sheet.csv. Please confirm it is in the same folder as index.html.");
     });
 }
 
-// Trim keys/values, map expected fields and SN, farmers, acres
+// Normalize each row, trim keys/values, and compute helper fields
 function normalizeRow(row, index) {
   var obj = {};
   Object.keys(row).forEach(function (k) {
@@ -127,18 +136,21 @@ function normalizeRow(row, index) {
     obj[key] = val;
   });
 
-  var farmers =
-    safeNumber(obj["Total Farmers"] || obj["Farmers"] || obj["farmers"]);
-
-  // Your sheet uses Total Wheat Acres / Estimated Buctril Acres...
-  var acres = safeNumber(
-    obj["Total Acres"] ||
-      obj["Acres"] ||
-      obj["acres"] ||
-      obj["Total Wheat Acres"] ||
-      obj["Estimated Buctril Acres from this Session"]
+  // Farmers
+  var farmers = safeNumber(
+    obj["Total Farmers"] || obj["Farmers"] || obj["farmers"]
   );
 
+  // Acres: prefer Total Wheat Acres, then Estimated Buctril Acres, then generic Total Acres
+  var acres = safeNumber(
+    obj["Total Wheat Acres"] ||
+    obj["Estimated Buctril Acres from this Session"] ||
+    obj["Total Acres"] ||
+    obj["Acres"] ||
+    obj["acres"]
+  );
+
+  // Serial number
   var sn = obj["SN"] || obj["Sn"] || obj["sn"] || (index + 1);
 
   obj.__sn = sn;
@@ -152,24 +164,16 @@ function normalizeRow(row, index) {
 function parseDate(value) {
   if (!value) return null;
   var v = String(value).trim();
+
+  // Try built-in parsing first (covers e.g. 2024-11-23)
   var parsed = Date.parse(v);
   if (!isNaN(parsed)) return new Date(parsed);
 
   // pattern: 23-Nov-25 or 23/Nov/2025
   var m = v.match(/^(\d{1,2})[-\/](\w+)[-\/](\d{2,4})$/i);
   var months = {
-    jan: 0,
-    feb: 1,
-    mar: 2,
-    apr: 3,
-    may: 4,
-    jun: 5,
-    jul: 6,
-    aug: 7,
-    sep: 8,
-    oct: 9,
-    nov: 10,
-    dec: 11,
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
   };
 
   if (m) {
@@ -182,7 +186,7 @@ function parseDate(value) {
     return new Date(year, months[monStr], day);
   }
 
-  // pattern: 23-Nov (no year) – default to current year
+  // pattern: 23-Nov (no year) – assume current year
   var m2 = v.match(/^(\d{1,2})[-\/](\w+)$/i);
   if (m2) {
     var day2 = parseInt(m2[1], 10);
@@ -198,22 +202,16 @@ function parseDate(value) {
 function preProcessDates(rows) {
   uniqueDates = [];
   rows.forEach(function (row) {
-    var dateStr = row["Date"] || row["date"] || "";
+    var dateStr = row["Activity Date"] || row["Date"] || row["date"] || "";
     var d = parseDate(dateStr);
     row.__date_raw = dateStr;
     row.__date = d;
-    if (
-      d &&
-      !uniqueDates.find(function (x) {
-        return x.getTime() === d.getTime();
-      })
-    ) {
+    if (d && !uniqueDates.find(function (x) { return x.getTime() === d.getTime(); })) {
       uniqueDates.push(d);
     }
   });
-  uniqueDates.sort(function (a, b) {
-    return a - b;
-  });
+
+  uniqueDates.sort(function (a, b) { return a - b; });
 
   if (uniqueDates.length) {
     var start = uniqueDates[0].toISOString().slice(0, 10);
@@ -260,12 +258,9 @@ function applyFilters() {
   var endEl = document.getElementById("end-date");
   var cityEl = document.getElementById("from-city-filter");
 
-  var startDate =
-    startEl && startEl.value ? new Date(startEl.value + "T00:00:00") : null;
-  var endDate =
-    endEl && endEl.value ? new Date(endEl.value + "T23:59:59") : null;
-  var cityFilter =
-    cityEl && cityEl.value ? cityEl.value.trim().toLowerCase() : "";
+  var startDate = startEl && startEl.value ? new Date(startEl.value + "T00:00:00") : null;
+  var endDate = endEl && endEl.value ? new Date(endEl.value + "T23:59:59") : null;
+  var cityFilter = cityEl && cityEl.value ? cityEl.value.trim().toLowerCase() : "";
 
   filteredRows = allRows.filter(function (row) {
     var d = row.__date;
@@ -292,17 +287,13 @@ function applyFilters() {
 function buildCitySummary(rows) {
   var mapByCity = new Map();
   rows.forEach(function (row) {
+    // Use destination City primarily; fall back to From City
     var city =
-      (row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
+      (row["City"] || row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
     if (!mapByCity.has(city)) {
-      mapByCity.set(city, {
-        city: city,
-        sessions: 0,
-        farmers: 0,
-        acres: 0,
-      });
+      mapByCity.set(city, { city: city, sessions: 0, farmers: 0, acres: 0 });
     }
     var item = mapByCity.get(city);
     item.sessions += 1;
@@ -328,12 +319,8 @@ function formatFloat(value, decimals) {
 
 function updateHeroAndSnapshot(rows) {
   var totalSessions = rows.length;
-  var totalFarmers = rows.reduce(function (s, r) {
-    return s + (r.__farmers || 0);
-  }, 0);
-  var totalAcres = rows.reduce(function (s, r) {
-    return s + (r.__acres || 0);
-  }, 0);
+  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
+  var totalAcres = rows.reduce(function (s, r) { return s + (r.__acres || 0); }, 0);
 
   setText("hero-sessions", formatInt(totalSessions));
   setText("hero-farmers", formatInt(totalFarmers));
@@ -350,30 +337,19 @@ function updateHeroAndSnapshot(rows) {
   var cities = new Set();
   var villages = new Set();
   rows.forEach(function (row) {
-    var c = (row["From City"] || row["From"] || "").trim();
-    var v =
-      (row["Village"] ||
-        row["Session Location"] ||
-        row["Location"] ||
-        "").trim();
-    if (c) cities.add(c);
+    var city = (row["City"] || row["From City"] || row["From"] || "").trim();
+    var v = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
+    if (city) cities.add(city);
     if (v) villages.add(v);
   });
-  setText(
-    "snap-locations",
-    cities.size + " cities / " + villages.size + " villages"
-  );
+  setText("snap-locations", cities.size + " cities / " + villages.size + " villages");
 }
 
 // ---------- KEY METRICS ----------
 function updateKeyMetrics(rows) {
   var totalSessions = rows.length;
-  var totalFarmers = rows.reduce(function (s, r) {
-    return s + (r.__farmers || 0);
-  }, 0);
-  var totalAcres = rows.reduce(function (s, r) {
-    return s + (r.__acres || 0);
-  }, 0);
+  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
+  var totalAcres = rows.reduce(function (s, r) { return s + (r.__acres || 0); }, 0);
 
   setText("metric-total-sessions", formatInt(totalSessions));
   setText("metric-total-farmers", formatInt(totalFarmers));
@@ -392,15 +368,10 @@ function updateKeyMetrics(rows) {
   var sessionsWithCoords = 0;
 
   rows.forEach(function (row) {
-    var c = (row["From City"] || row["From"] || "").trim();
-    var v =
-      (row["Village"] ||
-        row["Session Location"] ||
-        row["Location"] ||
-        "").trim();
+    var c = (row["City"] || row["From City"] || row["From"] || "").trim();
+    var v = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
     if (c) cities.add(c);
     if (v) villages.add(v);
-
     var coordsObj = extractLatLng(row);
     if (coordsObj.lat && coordsObj.lng) sessionsWithCoords += 1;
   });
@@ -417,9 +388,7 @@ function updateKeyMetrics(rows) {
 // ---------- TABLES ----------
 function getMediaIndexForDate(date) {
   if (!date) return "";
-  var idx = uniqueDates.findIndex(function (d) {
-    return d.getTime() === date.getTime();
-  });
+  var idx = uniqueDates.findIndex(function (d) { return d.getTime() === date.getTime(); });
   return idx >= 0 ? idx + 1 : "";
 }
 
@@ -430,13 +399,11 @@ function updateSessionTable(rows) {
 
   rows.forEach(function (row) {
     var tr = document.createElement("tr");
-    var d = row.__date
-      ? row.__date.toISOString().slice(0, 10)
-      : row.__date_raw || "";
+    var d = row.__date ? row.__date.toISOString().slice(0, 10) : (row.__date_raw || "");
     var fromCity = row["From City"] || row["From"] || "";
-    var toCity = row["To City"] || row["To"] || "";
+    var toCity = row["City"] || row["To City"] || row["To"] || "";
     var loc =
-      row["Village"] || row["Session Location"] || row["Location"] || "";
+      row["Village / Mauza"] || row["Session Location"] || row["Location"] || "";
     var farmers = row.__farmers || "";
     var acres = row.__acres || "";
     var coordsObj = extractLatLng(row);
@@ -445,40 +412,21 @@ function updateSessionTable(rows) {
       row["Feedback/Observations"] ||
       row["Feedback"] ||
       row["Observations"] ||
+      row["Remarks"] ||
       "";
     var mediaIndex = row.__date ? getMediaIndexForDate(row.__date) : "";
 
     tr.innerHTML =
-      "<td>" +
-      (row.__sn || "") +
-      "</td>" +
-      "<td>" +
-      d +
-      "</td>" +
-      "<td>" +
-      fromCity +
-      "</td>" +
-      "<td>" +
-      toCity +
-      "</td>" +
-      "<td>" +
-      loc +
-      "</td>" +
-      "<td>" +
-      farmers +
-      "</td>" +
-      "<td>" +
-      acres +
-      "</td>" +
-      "<td>" +
-      coordsText +
-      "</td>" +
-      "<td>" +
-      feedback +
-      "</td>" +
-      "<td>" +
-      mediaIndex +
-      "</td>";
+      "<td>" + (row.__sn || "") + "</td>" +
+      "<td>" + d + "</td>" +
+      "<td>" + fromCity + "</td>" +
+      "<td>" + toCity + "</td>" +
+      "<td>" + loc + "</td>" +
+      "<td>" + farmers + "</td>" +
+      "<td>" + acres + "</td>" +
+      "<td>" + coordsText + "</td>" +
+      "<td>" + feedback + "</td>" +
+      "<td>" + mediaIndex + "</td>";
     tbody.appendChild(tr);
   });
 }
@@ -490,21 +438,11 @@ function updateCityTable() {
   citySummary.forEach(function (row, i) {
     var tr = document.createElement("tr");
     tr.innerHTML =
-      "<td>" +
-      (i + 1) +
-      "</td>" +
-      "<td>" +
-      row.city +
-      "</td>" +
-      "<td>" +
-      row.sessions +
-      "</td>" +
-      "<td>" +
-      formatInt(row.farmers) +
-      "</td>" +
-      "<td>" +
-      formatInt(row.acres) +
-      "</td>";
+      "<td>" + (i + 1) + "</td>" +
+      "<td>" + row.city + "</td>" +
+      "<td>" + row.sessions + "</td>" +
+      "<td>" + formatInt(row.farmers) + "</td>" +
+      "<td>" + formatInt(row.acres) + "</td>";
     tbody.appendChild(tr);
   });
 }
@@ -519,22 +457,20 @@ function initChartsIfNeeded() {
       type: "doughnut",
       data: {
         labels: ["Clarity", "Gap"],
-        datasets: [
-          {
-            data: [97, 3],
-            backgroundColor: ["#66bb6a", "#e0e0e0"],
-            borderWidth: 0,
-          },
-        ],
+        datasets: [{
+          data: [97, 3],
+          backgroundColor: ["#66bb6a", "#e0e0e0"],
+          borderWidth: 0
+        }]
       },
       options: {
         responsive: true,
         cutout: "70%",
         plugins: {
           legend: { display: false },
-          tooltip: { enabled: false },
-        },
-      },
+          tooltip: { enabled: false }
+        }
+      }
     });
   }
 
@@ -543,22 +479,20 @@ function initChartsIfNeeded() {
       type: "bar",
       data: {
         labels: [],
-        datasets: [
-          {
-            label: "Farmers",
-            data: [],
-            backgroundColor: "#66bb6a",
-          },
-        ],
+        datasets: [{
+          label: "Farmers",
+          data: [],
+          backgroundColor: "#66bb6a"
+        }]
       },
       options: {
         responsive: true,
         plugins: { legend: { display: false } },
         scales: {
           x: { ticks: { autoSkip: false }, grid: { display: false } },
-          y: { beginAtZero: true },
-        },
-      },
+          y: { beginAtZero: true }
+        }
+      }
     });
   }
 }
@@ -568,18 +502,12 @@ function updateCharts() {
   if (cityFarmersChart && citySummary.length) {
     var top = citySummary.slice(0, 6);
     var others = citySummary.slice(6);
-    var labels = top.map(function (c) {
-      return c.city;
-    });
-    var data = top.map(function (c) {
-      return c.farmers;
-    });
+    var labels = top.map(function (c) { return c.city; });
+    var data = top.map(function (c) { return c.farmers; });
     if (others.length) {
       labels.push("Others");
       data.push(
-        others.reduce(function (s, c) {
-          return s + c.farmers;
-        }, 0)
+        others.reduce(function (s, c) { return s + c.farmers; }, 0)
       );
     }
     cityFarmersChart.data.labels = labels;
@@ -588,7 +516,7 @@ function updateCharts() {
   }
 }
 
-// ---------- MAP / COORD PARSING ----------
+// ---------- MAP & COORD PARSING ----------
 function parseDMS(dmsStr) {
   if (!dmsStr) return null;
   var s = String(dmsStr).trim();
@@ -642,13 +570,11 @@ function initMap(rows) {
     map = L.map("route-map");
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
-      attribution: "&copy; OpenStreetMap contributors",
+      attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
   }
 
-  mapMarkers.forEach(function (mk) {
-    mk.remove();
-  });
+  mapMarkers.forEach(function (mk) { mk.remove(); });
   mapMarkers = [];
   var coordsArr = [];
 
@@ -661,28 +587,21 @@ function initMap(rows) {
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
     var loc =
-      row["Village"] || row["Session Location"] || row["Location"] || "Session";
+      row["Village / Mauza"] || row["Session Location"] || row["Location"] || "Session";
     var fromCity = row["From City"] || row["From"] || "";
-
     var radius = Math.max(4, Math.min(18, acres ? acres / 200 : 6));
+
     var popup =
-      "<strong>" +
-      loc +
-      "</strong><br/>" +
-      "From: " +
-      fromCity +
-      "<br/>" +
-      "Farmers: " +
-      farmers +
-      "<br/>" +
-      "Acres: " +
-      acres;
+      "<strong>" + loc + "</strong><br/>" +
+      "From: " + fromCity + "<br/>" +
+      "Farmers: " + farmers + "<br/>" +
+      "Acres: " + acres;
 
     var circle = L.circleMarker([lat, lng], {
       radius: radius,
       color: "#2e7d32",
       fillColor: "#66bb6a",
-      fillOpacity: 0.7,
+      fillOpacity: 0.7
     }).addTo(map);
 
     circle.bindPopup(popup);
@@ -715,9 +634,7 @@ function initMediaGallery(rows) {
     if (!byTime.has(t)) byTime.set(t, row);
   });
 
-  var times = Array.from(byTime.keys()).sort(function (a, b) {
-    return a - b;
-  });
+  var times = Array.from(byTime.keys()).sort(function (a, b) { return a - b; });
 
   times.forEach(function (t) {
     var row = byTime.get(t);
@@ -729,8 +646,8 @@ function initMediaGallery(rows) {
     var vidSrc = globalIndex + ".mp4";
 
     var loc =
-      row["Village"] || row["Session Location"] || row["Location"] || "";
-    var city = row["From City"] || row["From"] || "";
+      row["Village / Mauza"] || row["Session Location"] || row["Location"] || "";
+    var city = row["City"] || row["From City"] || row["From"] || "";
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
 
@@ -738,30 +655,14 @@ function initMediaGallery(rows) {
     card.className = "media-card";
     card.innerHTML =
       "<div class='media-thumb-wrap hover-video'>" +
-      "<img src='" +
-      imgSrc +
-      "' alt='Session photo " +
-      globalIndex +
-      "' onerror=\"this.style.display='none';\" />" +
+      "<img src='" + imgSrc + "' alt='Session photo " + globalIndex + "' onerror=\"this.style.display='none';\" />" +
       "<video muted loop playsinline onerror=\"this.style.display='none';\">" +
-      "<source src='" +
-      vidSrc +
-      "' type='video/mp4' />" +
+      "<source src='" + vidSrc + "' type='video/mp4' />" +
       "</video></div>" +
       "<div class='media-caption'>" +
-      "<strong>" +
-      (loc || "Session " + globalIndex) +
-      "</strong>" +
-      "<span>" +
-      city +
-      " • " +
-      farmers +
-      " farmers • " +
-      acres +
-      " acres</span>" +
-      "<span>" +
-      d.toISOString().slice(0, 10) +
-      "</span>" +
+      "<strong>" + (loc || ("Session " + globalIndex)) + "</strong>" +
+      "<span>" + city + " • " + farmers + " farmers • " + acres + " acres</span>" +
+      "<span>" + d.toISOString().slice(0, 10) + "</span>" +
       "</div>";
 
     card.addEventListener("click", function () {
