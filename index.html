@@ -369,6 +369,14 @@
       max-width: 130px;
       margin: 0 auto;
     }
+    .hero-donut-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
 
     .hero-donut-main {
       font-size: 20px;
@@ -623,7 +631,13 @@
       border: 1px solid rgba(0, 0, 0, 0.06);
     }
 
-    .chart-title {
+    
+    .chart-subtitle {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+.chart-title {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -930,11 +944,19 @@
             <span>Acres: <strong id="hero-acres">–</strong></span>
           </div>
         </div>
-        <div class="hero-metrics">
-          <div class="hero-donut-wrap">
-            <canvas id="clarityDonut"></canvas>
-            <div class="hero-donut-main" id="clarity-main">97%</div>
-            <div class="hero-donut-sub">Message clarity (example target)</div>
+        
+<div class="hero-metrics">
+          <div class="hero-donut-grid">
+            <div class="hero-donut-wrap">
+              <canvas id="clarityDonut"></canvas>
+              <div class="hero-donut-main" id="clarity-main">–</div>
+              <div class="hero-donut-sub">Avg. message clarity (filtered view)</div>
+            </div>
+            <div class="hero-donut-wrap">
+              <canvas id="definiteDonut"></canvas>
+              <div class="hero-donut-main" id="definite-main">–</div>
+              <div class="hero-donut-sub">Definite use intent (filtered view)</div>
+            </div>
           </div>
           <div class="hero-metric-list">
             <div class="hero-metric-item">
@@ -948,7 +970,7 @@
             </div>
             <div class="hero-metric-item">
               <div class="hero-metric-icon">
-                <i class="fas fa-user-group"></i>
+                <i class="fas fa-users"></i>
               </div>
               <div class="hero-metric-text">
                 <span class="hero-metric-label">Farmers reached</span>
@@ -964,8 +986,7 @@
                 <span class="hero-metric-value" id="metric-acres-hero">–</span>
               </div>
             </div>
-          </div>
-        </div>
+          </div></div>
       </div>
     </header>
 
@@ -1079,6 +1100,19 @@
           <canvas id="cityFarmersChart"></canvas>
         </div>
       </section>
+        <section class="card" style="margin-top: 12px;">
+          <div class="card-header">
+            <div>
+              <div class="pill-icon"><i class="fas fa-person-booth"></i></div>
+              <h2>Farmer adoption snapshot</h2>
+            </div>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">Total farmers reached vs est. definite-use farmers</div>
+            <canvas id="adoptionChart"></canvas>
+            <div class="chart-subtitle" id="adoption-text">Estimated definite-use farmers: &ndash;</div>
+          </div>
+        </section>
     </section>
 
     <!-- Session table -->
@@ -1098,9 +1132,9 @@
               <th>Village / location</th>
               <th>Farmers</th>
               <th>Acres</th>
-              <th>Coordinates</th>
-              <th>Feedback / observations</th>
-              <th>Media index</th>
+              <th>Clarity %</th>
+              <th>Definite Use</th>
+              <th>Influencers</th>
             </tr>
           </thead>
           <tbody id="session-rows"></tbody>

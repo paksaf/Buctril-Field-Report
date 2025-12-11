@@ -38,7 +38,18 @@ var citySummary = [];
 var map = null;
 var mapMarkers = [];
 var clarityChart = null;
+var definiteChart = null;
 var cityFarmersChart = null;
+var adoptionChart = null;
+var currentHeroMetrics = {
+  avgClarity: 0,
+  avgDefiniteUse: 0,
+  totalInfluencers: 0,
+  totalFarmers: 0,
+  totalDefiniteFarmers: 0
+};
+
+// ---------- CSV LOAD ----------
 
 // ---------- CSV LOAD ----------
 function loadCSV() {
@@ -80,19 +91,57 @@ function loadCSV() {
               return;
             }
 
-            // 2) Next row is the real header row (SN, From City, City, Date, ...)
+            // 2) Next row is the real header row
             var headerRow = rows.shift();
             var headers = headerRow.map(function (h) {
               if (h === null || h === undefined) return "";
               return String(h).replace(/^\uFEFF/, "").trim();
             });
 
-            // 3) Turn remaining rows into objects keyed by the headers
-            allRows = rows.map(function (r, idx) {
+            // 3) Process rows and combine multi-line entries
+            var consolidatedRows = [];
+            var currentRow = null;
+
+            for (var i = 0; i < rows.length; i++) {
+              var rawRow = rows[i];
+
+              // Check if this is a new session (has SN value)
+              var hasSN = rawRow[0] && String(rawRow[0]).trim() !== "";
+
+              if (hasSN || currentRow === null) {
+                // If we have a previous row, add it to consolidatedRows
+                if (currentRow !== null) {
+                  consolidatedRows.push(currentRow);
+                }
+                // Start new row
+                currentRow = new Array(headers.length).fill("");
+              }
+
+              // Merge data into current row
+              for (var j = 0; j < Math.min(headers.length, rawRow.length); j++) {
+                if (rawRow[j] && String(rawRow[j]).trim() !== "") {
+                  // If currentRow already has data in this column and it's different, append
+                  if (currentRow[j] && currentRow[j] !== "" && 
+                      String(currentRow[j]).trim() !== String(rawRow[j]).trim()) {
+                    currentRow[j] += " | " + String(rawRow[j]).trim();
+                  } else {
+                    currentRow[j] = String(rawRow[j]).trim();
+                  }
+                }
+              }
+            }
+
+            // Add the last row
+            if (currentRow !== null) {
+              consolidatedRows.push(currentRow);
+            }
+
+            // 4) Turn consolidated rows into objects
+            allRows = consolidatedRows.map(function (r, idx) {
               var obj = {};
               headers.forEach(function (h, colIdx) {
-                if (!h) return; // ignore blank header cells
-                obj[h] = r[colIdx];
+                if (!h || h === "") return; // ignore blank header cells
+                obj[h] = r[colIdx] || "";
               });
               return normalizeRow(obj, idx);
             });
@@ -126,6 +175,9 @@ function loadCSV() {
     });
 }
 
+
+// Normalize each row, trim keys/values, and compute helper fields
+
 // Normalize each row, trim keys/values, and compute helper fields
 function normalizeRow(row, index) {
   var obj = {};
@@ -150,15 +202,27 @@ function normalizeRow(row, index) {
     obj["acres"]
   );
 
+  // New metrics from campaign snapshot
+  var definiteUseRate = safeNumber(obj["Definite Use Rate"] || 0);
+  var clarityScore = safeNumber(obj["Average Understanding Score"] || 0);
+  var influencers = safeNumber(obj["No. of Key Influencers (Names Highlighted)"] || 0);
+
+  // Calculate message clarity percentage (from 0-3 scale to 0-100%)
+  var messageClarity = clarityScore > 0 ? Math.round((clarityScore / 3) * 100) : 0;
+
   // Serial number
   var sn = obj["SN"] || obj["Sn"] || obj["sn"] || (index + 1);
 
   obj.__sn = sn;
   obj.__farmers = farmers;
   obj.__acres = acres;
+  obj.__definiteUseRate = definiteUseRate;
+  obj.__messageClarity = messageClarity;
+  obj.__influencers = influencers;
 
   return obj;
 }
+
 
 // ---------- DATES ----------
 function parseDate(value) {
@@ -284,26 +348,51 @@ function applyFilters() {
 }
 
 // ---------- SUMMARY BUILDERS ----------
+
+// ---------- SUMMARY BUILDERS ----------
 function buildCitySummary(rows) {
   var mapByCity = new Map();
   rows.forEach(function (row) {
-    // Use destination City primarily; fall back to From City
-    var city =
-      (row["City"] || row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
+    // First try to get the session location from various columns
+    var city = 
+      (row["City"] || row["To City"] || row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
+
+    // If city is still "Unknown" or empty, try to extract from Village/Location
+    if (city === "Unknown" || city === "") {
+      var loc = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
+      if (loc) {
+        // Extract city name from location if it contains city info
+        var parts = loc.split(/[, ]+/);
+        for (var i = 0; i < Math.min(parts.length, 2); i++) {
+          if (parts[i].length > 2) { // Avoid very short parts
+            city = parts[i];
+            break;
+          }
+        }
+      }
+    }
+
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
-    if (!mapByCity.has(city)) {
-      mapByCity.set(city, { city: city, sessions: 0, farmers: 0, acres: 0 });
+
+    if (city && city !== "-" && city !== "Unknown") {
+      if (!mapByCity.has(city)) {
+        mapByCity.set(city, { city: city, sessions: 0, farmers: 0, acres: 0 });
+      }
+      var item = mapByCity.get(city);
+      item.sessions += 1;
+      item.farmers += farmers;
+      item.acres += acres;
     }
-    var item = mapByCity.get(city);
-    item.sessions += 1;
-    item.farmers += farmers;
-    item.acres += acres;
   });
-  citySummary = Array.from(mapByCity.values()).sort(function (a, b) {
-    return b.farmers - a.farmers;
-  });
+
+  citySummary = Array.from(mapByCity.values())
+    .filter(function(item) { return item.farmers > 0; }) // Only include cities with farmers
+    .sort(function (a, b) {
+      return b.farmers - a.farmers;
+    });
 }
+
 
 // ---------- HERO + SNAPSHOT ----------
 function formatInt(value) {
@@ -317,10 +406,40 @@ function formatFloat(value, decimals) {
   return value.toFixed(d);
 }
 
+
 function updateHeroAndSnapshot(rows) {
   var totalSessions = rows.length;
   var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
   var totalAcres = rows.reduce(function (s, r) { return s + (r.__acres || 0); }, 0);
+
+  // Calculate average metrics
+  var avgClarity = 0;
+  var avgDefiniteUse = 0;
+  var totalInfluencers = 0;
+  var estDefiniteFarmers = 0;
+
+  if (rows.length > 0) {
+    avgClarity = Math.round(
+      rows.reduce(function (s, r) { return s + (r.__messageClarity || 0); }, 0) / rows.length
+    );
+    avgDefiniteUse = Math.round(
+      rows.reduce(function (s, r) { return s + (r.__definiteUseRate || 0); }, 0) / rows.length
+    );
+    totalInfluencers = rows.reduce(function (s, r) { return s + (r.__influencers || 0); }, 0);
+    estDefiniteFarmers = rows.reduce(function (s, r) {
+      var f = r.__farmers || 0;
+      var du = r.__definiteUseRate || 0;
+      return s + (f * du / 100);
+    }, 0);
+  }
+
+  currentHeroMetrics = {
+    avgClarity: avgClarity,
+    avgDefiniteUse: avgDefiniteUse,
+    totalInfluencers: totalInfluencers,
+    totalFarmers: totalFarmers,
+    totalDefiniteFarmers: estDefiniteFarmers
+  };
 
   setText("hero-sessions", formatInt(totalSessions));
   setText("hero-farmers", formatInt(totalFarmers));
@@ -334,15 +453,31 @@ function updateHeroAndSnapshot(rows) {
   setText("snap-farmers", formatInt(totalFarmers));
   setText("snap-acres", formatInt(totalAcres));
 
-  var cities = new Set();
-  var villages = new Set();
-  rows.forEach(function (row) {
-    var city = (row["City"] || row["From City"] || row["From"] || "").trim();
-    var v = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
-    if (city) cities.add(city);
-    if (v) villages.add(v);
-  });
-  setText("snap-locations", cities.size + " cities / " + villages.size + " villages");
+  // Update with campaign snapshot metrics
+  setText(
+    "snap-locations",
+    "Clarity: " + avgClarity + "% | Definite use: " + avgDefiniteUse +
+      "% | Influencers: " + totalInfluencers
+  );
+
+  // Also update donut labels
+  setText("clarity-main", (rows.length ? (avgClarity + "%") : "–"));
+  setText("definite-main", (rows.length ? (avgDefiniteUse + "%") : "–"));
+
+  // Adoption text under bar chart
+  var adoptionText = "Estimated definite-use farmers: –";
+  if (rows.length && totalFarmers > 0) {
+    var percent = Math.round((estDefiniteFarmers / totalFarmers) * 100);
+    adoptionText =
+      "Estimated definite-use farmers: " +
+      formatInt(estDefiniteFarmers) +
+      " out of " +
+      formatInt(totalFarmers) +
+      " (" +
+      percent +
+      "%)";
+  }
+  setText("adoption-text", adoptionText);
 }
 
 // ---------- KEY METRICS ----------
@@ -392,6 +527,7 @@ function getMediaIndexForDate(date) {
   return idx >= 0 ? idx + 1 : "";
 }
 
+
 function updateSessionTable(rows) {
   var tbody = document.getElementById("session-rows");
   if (!tbody) return;
@@ -406,8 +542,12 @@ function updateSessionTable(rows) {
       row["Village / Mauza"] || row["Session Location"] || row["Location"] || "";
     var farmers = row.__farmers || "";
     var acres = row.__acres || "";
-    var coordsObj = extractLatLng(row);
-    var coordsText = coordsObj.original || "";
+
+    // New: Get useful metrics instead of coordinates
+    var clarity = row.__messageClarity || 0;
+    var influencers = row.__influencers || 0;
+    var definiteUse = row.__definiteUseRate || 0;
+
     var feedback =
       row["Feedback/Observations"] ||
       row["Feedback"] ||
@@ -424,12 +564,13 @@ function updateSessionTable(rows) {
       "<td>" + loc + "</td>" +
       "<td>" + farmers + "</td>" +
       "<td>" + acres + "</td>" +
-      "<td>" + coordsText + "</td>" +
-      "<td>" + feedback + "</td>" +
-      "<td>" + mediaIndex + "</td>";
+      "<td>" + clarity + "%</td>" +  // Message clarity instead of coordinates
+      "<td>" + definiteUse + "%</td>" +  // Definite use intent
+      "<td>" + influencers + "</td>";  // Influencers identified
     tbody.appendChild(tr);
   });
 }
+
 
 function updateCityTable() {
   var tbody = document.getElementById("city-rows");
@@ -450,7 +591,9 @@ function updateCityTable() {
 // ---------- CHARTS ----------
 function initChartsIfNeeded() {
   var clarityCtx = document.getElementById("clarityDonut");
+  var definiteCtx = document.getElementById("definiteDonut");
   var cityCtx = document.getElementById("cityFarmersChart");
+  var adoptionCtx = document.getElementById("adoptionChart");
 
   if (clarityCtx && !clarityChart) {
     clarityChart = new Chart(clarityCtx, {
@@ -458,7 +601,7 @@ function initChartsIfNeeded() {
       data: {
         labels: ["Clarity", "Gap"],
         datasets: [{
-          data: [97, 3],
+          data: [0, 100],
           backgroundColor: ["#66bb6a", "#e0e0e0"],
           borderWidth: 0
         }]
@@ -469,6 +612,48 @@ function initChartsIfNeeded() {
         plugins: {
           legend: { display: false },
           tooltip: { enabled: false }
+        }
+      }
+    });
+  }
+
+  if (definiteCtx && !definiteChart) {
+    definiteChart = new Chart(definiteCtx, {
+      type: "doughnut",
+      data: {
+        labels: ["Definite use", "Gap"],
+        datasets: [{
+          data: [0, 100],
+          backgroundColor: ["#42a5f5", "#e0e0e0"],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: "70%",
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false }
+        }
+      }
+    });
+  }
+
+  if (adoptionCtx && !adoptionChart) {
+    adoptionChart = new Chart(adoptionCtx, {
+      type: "bar",
+      data: {
+        labels: ["Total farmers reached", "Est. definite-use farmers"],
+        datasets: [{
+          data: [0, 0]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true }
         }
       }
     });
@@ -499,6 +684,34 @@ function initChartsIfNeeded() {
 
 function updateCharts() {
   initChartsIfNeeded();
+
+  // Update clarity donut from current hero metrics (filtered view)
+  if (clarityChart && currentHeroMetrics) {
+    var clarityVal = currentHeroMetrics.avgClarity || 0;
+    if (clarityVal < 0) clarityVal = 0;
+    if (clarityVal > 100) clarityVal = 100;
+    clarityChart.data.datasets[0].data = [clarityVal, 100 - clarityVal];
+    clarityChart.update();
+  }
+
+  // Update definite-use donut from current hero metrics
+  if (definiteChart && currentHeroMetrics) {
+    var defVal = currentHeroMetrics.avgDefiniteUse || 0;
+    if (defVal < 0) defVal = 0;
+    if (defVal > 100) defVal = 100;
+    definiteChart.data.datasets[0].data = [defVal, 100 - defVal];
+    definiteChart.update();
+  }
+
+  // Update adoption bar (total vs definite-use farmers)
+  if (adoptionChart && currentHeroMetrics) {
+    var totalF = currentHeroMetrics.totalFarmers || 0;
+    var totalDefF = currentHeroMetrics.totalDefiniteFarmers || 0;
+    adoptionChart.data.datasets[0].data = [totalF, totalDefF];
+    adoptionChart.update();
+  }
+
+  // Update city bar chart
   if (cityFarmersChart && citySummary.length) {
     var top = citySummary.slice(0, 6);
     var others = citySummary.slice(6);
