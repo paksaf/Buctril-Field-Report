@@ -1,37 +1,13 @@
-// =========================
-//  GLOBAL STATE + HELPERS
-// =========================
-
-var allRows = [];
-var filteredRows = [];
-var uniqueDates = [];
-var citySummary = [];
-var colMap = {};            // will be filled from CSV headers
-var map = null;
-var mapMarkers = [];
-var clarityChart = null;
-var cityFarmersChart = null;
-
+// ---------- BASIC HELPERS ----------
 function safeNumber(val) {
   if (val === null || val === undefined) return 0;
-  var n = parseFloat(String(val).replace(/,/g, "").trim());
+  var n = parseFloat(String(val).replace(/,/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
 function setText(id, value) {
   var el = document.getElementById(id);
   if (el) el.textContent = value;
-}
-
-function formatInt(value) {
-  if (value === null || value === undefined || isNaN(value)) return "–";
-  return Math.round(value).toLocaleString("en-PK");
-}
-
-function formatFloat(value, decimals) {
-  if (value === null || value === undefined || isNaN(value)) return "–";
-  var d = decimals === undefined ? 1 : decimals;
-  return value.toFixed(d);
 }
 
 function showErrorModal(message) {
@@ -47,46 +23,104 @@ function showErrorModal(message) {
   if (btn) btn.addEventListener("click", function () { modal.remove(); });
 }
 
-// =========================
-//  DATE HANDLING
-// =========================
+// ---------- GLOBAL STATE ----------
+var allRows = [];
+var filteredRows = [];
+var uniqueDates = [];
+var citySummary = [];
+var map = null;
+var mapMarkers = [];
+var clarityChart = null;
+var cityFarmersChart = null;
 
+// ---------- CSV LOAD ----------
+function loadCSV() {
+  var loadingEl = document.getElementById("loading-message");
+  fetch("sum_sheet.csv?cache=" + Date.now())
+    .then(function (resp) {
+      if (!resp.ok) throw new Error("Failed to load CSV: " + resp.status);
+      return resp.text();
+    })
+    .then(function (text) {
+      Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function (result) {
+          allRows = (result.data || []).map(normalizeRow);
+          preProcessDates(allRows);
+          populateFilterOptions(allRows);
+          applyFilters(); // initial render
+          if (loadingEl) {
+            var spinner = document.getElementById("spinner");
+            if (spinner && spinner.parentNode) spinner.parentNode.removeChild(spinner);
+            loadingEl.textContent =
+              "Data loaded from sum_sheet.csv – filters are now active.";
+          }
+        },
+        error: function (err) {
+          console.error("CSV parse error:", err);
+          if (loadingEl) loadingEl.textContent = "Error loading data.";
+          showErrorModal("Could not parse sum_sheet.csv. Please confirm file format.");
+        }
+      });
+    })
+    .catch(function (err) {
+      console.error("CSV fetch error:", err);
+      if (loadingEl) loadingEl.textContent = "Error loading data.";
+      showErrorModal("Could not load sum_sheet.csv. Please confirm it is in the same folder as index.html.");
+    });
+}
+
+// Trim keys/values, map expected fields and SN, farmers, acres
+function normalizeRow(row, index) {
+  var obj = {};
+  Object.keys(row).forEach(function (k) {
+    var key = (k || "").trim();
+    var val = row[k];
+    if (typeof val === "string") val = val.trim();
+    obj[key] = val;
+  });
+
+  var farmers =
+    safeNumber(obj["Total Farmers"] || obj["Farmers"] || obj["farmers"]);
+  var acres =
+    safeNumber(obj["Total Acres"] || obj["Acres"] || obj["acres"]);
+  var sn = obj["SN"] || obj["Sn"] || obj["sn"] || (index + 1);
+
+  obj.__sn = sn;
+  obj.__farmers = farmers;
+  obj.__acres = acres;
+
+  return obj;
+}
+
+// ---------- DATES ----------
 function parseDate(value) {
   if (!value) return null;
   var v = String(value).trim();
-
-  // Try native parsing first
   var parsed = Date.parse(v);
   if (!isNaN(parsed)) return new Date(parsed);
 
-  // Fallback like 23-Nov-25, 23/Nov/2025, 23-11-25, etc.
+  // pattern: 23-Nov-25
   var m = v.match(/^(\d{1,2})[-\/](\w+)[-\/](\d{2,4})$/i);
   if (!m) return null;
-
   var day = parseInt(m[1], 10);
   var monStr = m[2].toLowerCase();
   var yearStr = m[3];
   var months = {
     jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
-    "1": 0, "01": 0, "2": 1, "02": 1, "3": 2, "03": 2,
-    "4": 3, "04": 3, "5": 4, "05": 4, "6": 5, "06": 5,
-    "7": 6, "07": 6, "8": 7, "08": 7, "9": 8, "09": 8,
-    "10": 9, "11": 10, "12": 11
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
   };
-
   if (!months.hasOwnProperty(monStr)) return null;
-
   var year = parseInt(yearStr, 10);
   if (year < 100) year += year < 50 ? 2000 : 1900;
-
   return new Date(year, months[monStr], day);
 }
 
 function preProcessDates(rows) {
   uniqueDates = [];
   rows.forEach(function (row) {
-    var dateStr = row[colMap.date] || row["Date"] || row["date"] || "";
+    var dateStr = row["Date"] || row["date"] || "";
     var d = parseDate(dateStr);
     row.__date_raw = dateStr;
     row.__date = d;
@@ -103,167 +137,19 @@ function preProcessDates(rows) {
   }
 }
 
-// =========================
-//  COLUMN DETECTION
-// =========================
-
-function findField(fields, patterns) {
-  var lowered = fields.map(function (f) { return f.toLowerCase(); });
-  for (var i = 0; i < patterns.length; i++) {
-    var p = patterns[i].toLowerCase();
-    for (var j = 0; j < lowered.length; j++) {
-      var field = lowered[j];
-      if (field === p || field.indexOf(p) !== -1) {
-        return fields[j]; // return original name
-      }
-    }
-  }
-  return null;
-}
-
-function detectColumns(fields) {
-  // fields: array of header strings
-  colMap = {};
-
-  colMap.sn = findField(fields, ["sn", "s.no", "sr", "serial", "id"]);
-  colMap.date = findField(fields, ["date", "session date"]);
-  colMap.fromCity = findField(fields, ["from city", "start city", "from"]);
-  colMap.toCity = findField(fields, ["to city", "destination", "to"]);
-  colMap.village = findField(
-    fields,
-    ["village", "session location", "location", "village / location", "spot"]
-  );
-  colMap.farmers = findField(
-    fields,
-    ["total farmers", "farmers reached", "no of farmers", "no. of farmers", "farmers"]
-  );
-  colMap.acres = findField(
-    fields,
-    ["total acres", "acres", "wheat acres", "area (acre)", "acres (approx)"]
-  );
-  colMap.lat = findField(fields, ["latitude", "lat"]);
-  colMap.lng = findField(fields, ["longitude", "lon", "lng"]);
-  colMap.feedback = findField(
-    fields,
-    ["feedback/observations", "feedback", "remarks", "observations"]
-  );
-
-  // Defensive fallbacks – if something is still null, pick a sane default if present
-  colMap.date = colMap.date || "Date";
-  colMap.farmers = colMap.farmers || "Farmers";
-  colMap.acres = colMap.acres || "Acres";
-}
-
-// Normalize each row: trim keys/values and add computed fields
-function normalizeRow(rawRow, index) {
-  var row = {};
-  Object.keys(rawRow).forEach(function (k) {
-    var key = (k || "").trim();
-    var val = rawRow[k];
-    if (typeof val === "string") val = val.trim();
-    row[key] = val;
-  });
-
-  var sn = colMap.sn ? row[colMap.sn] : null;
-  if (!sn) sn = index + 1;
-
-  var farmers = safeNumber(colMap.farmers ? row[colMap.farmers] : row["Farmers"]);
-  var acres = safeNumber(colMap.acres ? row[colMap.acres] : row["Acres"]);
-
-  row.__sn = sn;
-  row.__farmers = farmers;
-  row.__acres = acres;
-
-  return row;
-}
-
-// =========================
-//  CSV LOAD
-// =========================
-
-function loadCSV() {
-  var loadingEl = document.getElementById("loading-message");
-
-  fetch("sum_sheet.csv?cache=" + Date.now())
-    .then(function (resp) {
-      if (!resp.ok) throw new Error("Failed to load CSV: " + resp.status);
-      return resp.text();
-    })
-    .then(function (text) {
-      Papa.parse(text, {
-        header: true,
-        skipEmptyLines: true,
-        dynamicTyping: false,
-        complete: function (result) {
-          try {
-            var rows = result.data || [];
-            if (!rows.length) throw new Error("CSV has no data rows.");
-
-            // Detect columns using headers from meta or first row
-            var fields = result.meta && result.meta.fields && result.meta.fields.length
-              ? result.meta.fields.slice()
-              : Object.keys(rows[0]);
-
-            detectColumns(fields);
-
-            allRows = rows.map(function (r, idx) {
-              return normalizeRow(r, idx);
-            });
-
-            preProcessDates(allRows);
-            populateFilterOptions(allRows);
-            applyFilters();
-
-            if (loadingEl) {
-              var spinner = document.getElementById("spinner");
-              if (spinner && spinner.parentNode) spinner.parentNode.removeChild(spinner);
-              loadingEl.textContent =
-                "Data loaded from sum_sheet.csv – filters are now active.";
-            }
-          } catch (e) {
-            console.error("Post-parse error:", e);
-            if (loadingEl) loadingEl.textContent = "Error processing data.";
-            showErrorModal("CSV loaded but could not be processed: " + e.message);
-          }
-        },
-        error: function (err) {
-          console.error("CSV parse error:", err);
-          if (loadingEl) loadingEl.textContent = "Error parsing data.";
-          showErrorModal("Could not parse sum_sheet.csv. Please confirm the file format.");
-        }
-      });
-    })
-    .catch(function (err) {
-      console.error("CSV fetch error:", err);
-      if (loadingEl) loadingEl.textContent = "Error loading data.";
-      showErrorModal("Could not load sum_sheet.csv. Make sure it is in the same folder as index.html.");
-    });
-}
-
-// =========================
-//  FILTERS
-// =========================
-
+// ---------- FILTERS ----------
 function populateFilterOptions(rows) {
   var cityEl = document.getElementById("from-city-filter");
   if (!cityEl) return;
-
   var citiesSet = new Set();
   rows.forEach(function (row) {
-    var c = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      c = String(row[colMap.fromCity]).trim();
-    } else {
-      c = String(row["From City"] || row["From"] || "").trim();
-    }
+    var c = (row["From City"] || row["From"] || "").trim();
     if (c) citiesSet.add(c);
   });
-
   var cities = Array.from(citiesSet).sort(function (a, b) {
     return a.localeCompare(b);
   });
 
-  // Keep the first "All" option, remove others
   while (cityEl.options.length > 1) cityEl.remove(1);
   cities.forEach(function (c) {
     var opt = document.createElement("option");
@@ -285,7 +171,6 @@ function resetFilters() {
 
 function applyFilters() {
   if (!allRows.length) return;
-
   var startEl = document.getElementById("start-date");
   var endEl = document.getElementById("end-date");
   var cityEl = document.getElementById("from-city-filter");
@@ -298,14 +183,8 @@ function applyFilters() {
     var d = row.__date;
     if (startDate && (!d || d < startDate)) return false;
     if (endDate && (!d || d > endDate)) return false;
-
     if (cityFilter) {
-      var fromCity = "";
-      if (colMap.fromCity && row[colMap.fromCity]) {
-        fromCity = String(row[colMap.fromCity]).toLowerCase();
-      } else {
-        fromCity = String(row["From City"] || row["From"] || "").toLowerCase();
-      }
+      var fromCity = (row["From City"] || row["From"] || "").toLowerCase();
       if (!fromCity.includes(cityFilter)) return false;
     }
     return true;
@@ -321,24 +200,13 @@ function applyFilters() {
   initMediaGallery(filteredRows);
 }
 
-// =========================
-//  SUMMARY BUILDERS
-// =========================
-
+// ---------- SUMMARY BUILDERS ----------
 function buildCitySummary(rows) {
   var mapByCity = new Map();
-
   rows.forEach(function (row) {
-    var city = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      city = String(row[colMap.fromCity]).trim();
-    } else {
-      city = String(row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
-    }
-
+    var city = (row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
-
     if (!mapByCity.has(city)) {
       mapByCity.set(city, { city: city, sessions: 0, farmers: 0, acres: 0 });
     }
@@ -347,10 +215,21 @@ function buildCitySummary(rows) {
     item.farmers += farmers;
     item.acres += acres;
   });
-
   citySummary = Array.from(mapByCity.values()).sort(function (a, b) {
     return b.farmers - a.farmers;
   });
+}
+
+// ---------- HERO + SNAPSHOT ----------
+function formatInt(value) {
+  if (value === null || value === undefined || isNaN(value)) return "–";
+  return Math.round(value).toLocaleString("en-PK");
+}
+
+function formatFloat(value, decimals) {
+  if (value === null || value === undefined || isNaN(value)) return "–";
+  var d = decimals === undefined ? 1 : decimals;
+  return value.toFixed(d);
 }
 
 function updateHeroAndSnapshot(rows) {
@@ -374,27 +253,15 @@ function updateHeroAndSnapshot(rows) {
   var cities = new Set();
   var villages = new Set();
   rows.forEach(function (row) {
-    var c = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      c = String(row[colMap.fromCity]).trim();
-    } else {
-      c = String(row["From City"] || row["From"] || "").trim();
-    }
-
-    var v = "";
-    if (colMap.village && row[colMap.village]) {
-      v = String(row[colMap.village]).trim();
-    } else {
-      v = String(row["Village"] || row["Session Location"] || row["Location"] || "").trim();
-    }
-
+    var c = (row["From City"] || row["From"] || "").trim();
+    var v = (row["Village"] || row["Session Location"] || row["Location"] || "").trim();
     if (c) cities.add(c);
     if (v) villages.add(v);
   });
-
   setText("snap-locations", cities.size + " cities / " + villages.size + " villages");
 }
 
+// ---------- KEY METRICS ----------
 function updateKeyMetrics(rows) {
   var totalSessions = rows.length;
   var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
@@ -417,25 +284,12 @@ function updateKeyMetrics(rows) {
   var sessionsWithCoords = 0;
 
   rows.forEach(function (row) {
-    var c = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      c = String(row[colMap.fromCity]).trim();
-    } else {
-      c = String(row["From City"] || row["From"] || "").trim();
-    }
-
-    var v = "";
-    if (colMap.village && row[colMap.village]) {
-      v = String(row[colMap.village]).trim();
-    } else {
-      v = String(row["Village"] || row["Session Location"] || row["Location"] || "").trim();
-    }
-
+    var c = (row["From City"] || row["From"] || "").trim();
+    var v = (row["Village"] || row["Session Location"] || row["Location"] || "").trim();
     if (c) cities.add(c);
     if (v) villages.add(v);
-
-    var lat = safeNumber(colMap.lat ? row[colMap.lat] : row["Latitude"]);
-    var lng = safeNumber(colMap.lng ? row[colMap.lng] : row["Longitude"]);
+    var lat = safeNumber(row["Latitude"] || row["lat"]);
+    var lng = safeNumber(row["Longitude"] || row["lng"]);
     if (lat !== 0 && lng !== 0) sessionsWithCoords += 1;
   });
 
@@ -448,10 +302,7 @@ function updateKeyMetrics(rows) {
   );
 }
 
-// =========================
-//  TABLES
-// =========================
-
+// ---------- TABLES ----------
 function getMediaIndexForDate(date) {
   if (!date) return "";
   var idx = uniqueDates.findIndex(function (d) { return d.getTime() === date.getTime(); });
@@ -465,44 +316,18 @@ function updateSessionTable(rows) {
 
   rows.forEach(function (row) {
     var tr = document.createElement("tr");
-
     var d = row.__date ? row.__date.toISOString().slice(0, 10) : (row.__date_raw || "");
-
-    var fromCity = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      fromCity = String(row[colMap.fromCity]);
-    } else {
-      fromCity = String(row["From City"] || row["From"] || "");
-    }
-
-    var toCity = "";
-    if (colMap.toCity && row[colMap.toCity]) {
-      toCity = String(row[colMap.toCity]);
-    } else {
-      toCity = String(row["To City"] || row["To"] || "");
-    }
-
-    var loc = "";
-    if (colMap.village && row[colMap.village]) {
-      loc = String(row[colMap.village]);
-    } else {
-      loc = String(row["Village"] || row["Session Location"] || row["Location"] || "");
-    }
-
+    var fromCity = row["From City"] || row["From"] || "";
+    var toCity = row["To City"] || row["To"] || "";
+    var loc = row["Village"] || row["Session Location"] || row["Location"] || "";
     var farmers = row.__farmers || "";
     var acres = row.__acres || "";
-
-    var lat = safeNumber(colMap.lat ? row[colMap.lat] : row["Latitude"]);
-    var lng = safeNumber(colMap.lng ? row[colMap.lng] : row["Longitude"]);
-    var coords = (lat && lng) ? (lat + ", " + lng) : "";
-
-    var feedback = "";
-    if (colMap.feedback && row[colMap.feedback]) {
-      feedback = String(row[colMap.feedback]);
-    } else {
-      feedback = String(row["Feedback/Observations"] || row["Feedback"] || row["Observations"] || "");
-    }
-
+    var coords =
+      (row["Latitude"] && row["Longitude"])
+        ? String(row["Latitude"]) + ", " + String(row["Longitude"])
+        : "";
+    var feedback =
+      row["Feedback/Observations"] || row["Feedback"] || row["Observations"] || "";
     var mediaIndex = row.__date ? getMediaIndexForDate(row.__date) : "";
 
     tr.innerHTML =
@@ -524,7 +349,6 @@ function updateCityTable() {
   var tbody = document.getElementById("city-rows");
   if (!tbody) return;
   tbody.innerHTML = "";
-
   citySummary.forEach(function (row, i) {
     var tr = document.createElement("tr");
     tr.innerHTML =
@@ -537,10 +361,7 @@ function updateCityTable() {
   });
 }
 
-// =========================
-//  CHARTS
-// =========================
-
+// ---------- CHARTS ----------
 function initChartsIfNeeded() {
   var clarityCtx = document.getElementById("clarityDonut");
   var cityCtx = document.getElementById("cityFarmersChart");
@@ -609,10 +430,7 @@ function updateCharts() {
   }
 }
 
-// =========================
-//  MAP
-// =========================
-
+// ---------- MAP ----------
 function initMap(rows) {
   var mapEl = document.getElementById("route-map");
   if (!mapEl) return;
@@ -630,26 +448,14 @@ function initMap(rows) {
   var coords = [];
 
   rows.forEach(function (row) {
-    var lat = safeNumber(colMap.lat ? row[colMap.lat] : row["Latitude"]);
-    var lng = safeNumber(colMap.lng ? row[colMap.lng] : row["Longitude"]);
+    var lat = safeNumber(row["Latitude"] || row["lat"]);
+    var lng = safeNumber(row["Longitude"] || row["lng"]);
     if (!lat || !lng) return;
 
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
-
-    var loc = "";
-    if (colMap.village && row[colMap.village]) {
-      loc = String(row[colMap.village]);
-    } else {
-      loc = String(row["Village"] || row["Session Location"] || row["Location"] || "Session");
-    }
-
-    var fromCity = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      fromCity = String(row[colMap.fromCity]);
-    } else {
-      fromCity = String(row["From City"] || row["From"] || "");
-    }
+    var loc = row["Village"] || row["Session Location"] || row["Location"] || "Session";
+    var fromCity = row["From City"] || row["From"] || "";
 
     var radius = Math.max(4, Math.min(18, acres / 200));
     var popup =
@@ -676,16 +482,13 @@ function initMap(rows) {
   }
 }
 
-// =========================
-//  MEDIA GALLERY
-// =========================
-
+// ---------- MEDIA GALLERY ----------
 function initMediaGallery(rows) {
   var gallery = document.getElementById("media-gallery");
   if (!gallery) return;
   gallery.innerHTML = "";
 
-  // Map each unique date to index 1..N
+  // Map each unique date (global) to index 1..N
   var dateToIndex = new Map();
   uniqueDates.forEach(function (d, idx) {
     dateToIndex.set(d.getTime(), idx + 1);
@@ -705,26 +508,14 @@ function initMediaGallery(rows) {
   times.forEach(function (t) {
     var row = byTime.get(t);
     var d = new Date(t);
-    var idx = dateToIndex.get(t) || 0;
-    if (!idx) return;
+    var globalIndex = dateToIndex.get(t) || 0;
+    if (!globalIndex) return;
 
-    var imgSrc = idx + ".jpeg";
-    var vidSrc = idx + ".mp4";
+    var imgSrc = globalIndex + ".jpeg";
+    var vidSrc = globalIndex + ".mp4";
 
-    var loc = "";
-    if (colMap.village && row[colMap.village]) {
-      loc = String(row[colMap.village]);
-    } else {
-      loc = String(row["Village"] || row["Session Location"] || row["Location"] || "");
-    }
-
-    var city = "";
-    if (colMap.fromCity && row[colMap.fromCity]) {
-      city = String(row[colMap.fromCity]);
-    } else {
-      city = String(row["From City"] || row["From"] || "");
-    }
-
+    var loc = row["Village"] || row["Session Location"] || row["Location"] || "";
+    var city = row["From City"] || row["From"] || "";
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
 
@@ -732,12 +523,12 @@ function initMediaGallery(rows) {
     card.className = "media-card";
     card.innerHTML =
       "<div class='media-thumb-wrap hover-video'>" +
-      "<img src='" + imgSrc + "' alt='Session photo " + idx + "' onerror=\"this.style.display='none';\" />" +
+      "<img src='" + imgSrc + "' alt='Session photo " + globalIndex + "' onerror=\"this.style.display='none';\" />" +
       "<video muted loop playsinline onerror=\"this.style.display='none';\">" +
       "<source src='" + vidSrc + "' type='video/mp4' />" +
       "</video></div>" +
       "<div class='media-caption'>" +
-      "<strong>" + (loc || "Session " + idx) + "</strong>" +
+      "<strong>" + (loc || "Session " + globalIndex) + "</strong>" +
       "<span>" + city + " • " + farmers + " farmers • " + acres + " acres</span>" +
       "<span>" + d.toISOString().slice(0, 10) + "</span>" +
       "</div>";
@@ -768,12 +559,8 @@ function openLightbox(imgSrc, vidSrc) {
   };
 }
 
-// =========================
-//  INIT
-// =========================
-
+// ---------- INIT ----------
 document.addEventListener("DOMContentLoaded", function () {
-  // CSV + dashboards
   loadCSV();
   initChartsIfNeeded();
 });
