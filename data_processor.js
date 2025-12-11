@@ -11,22 +11,31 @@ const CAMPAIGN = {
 };
 
 // ---------- STATE ----------
+let allRows = [];
+let filteredRows = [];
+let uniqueDates = [];
+
+let clarityDonutInstance = null;
+let driversPieInstance = null;
+let cityFarmersChartInstance = null;
+let villageAcresChartInstance = null;
+let buctrilMap = null;
+let loadingSpinner = null;
+
+// Default filter window (will be overridden by CSV if needed)
 let FILTER_START_DATE = "2025-11-23";
 let FILTER_END_DATE = "2025-12-31";
 
-let ALLOWED_FROM_CITIES = [];
-let ALLOWED_TO_CITIES = [];
-let ALLOWED_LOCATIONS = [];
+// ---------- UTIL: DEBOUNCE ----------
+function debounce(func, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), delay);
+  };
+}
 
-let allRows = [];
-let currentFilteredRows = [];
-let uniqueDates = [];
-
-let cityFarmersChartInstance = null;
-let villageAcresChartInstance = null;
-let driversPieInstance = null;
-let clarityDonutInstance = null;
-
+// ---------- BOOTSTRAP ----------
 document.addEventListener("DOMContentLoaded", () => {
   initFilters();
   fillHeroStaticNumbers();
@@ -34,58 +43,74 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCSV();
 });
 
-// ---------- INITIALISATION HELPERS ----------
-
+// ---------- FILTER UI INITIALISATION ----------
 function initFilters() {
   const startEl = document.getElementById("start-date");
   const endEl = document.getElementById("end-date");
-
-  if (startEl) startEl.value = FILTER_START_DATE;
-  if (endEl) endEl.value = FILTER_END_DATE;
+  const cityEl = document.getElementById("from-city-filter");
 
   if (startEl) {
-    startEl.addEventListener("change", e => {
-      FILTER_START_DATE = e.target.value;
-    });
+    startEl.value = FILTER_START_DATE;
+    startEl.addEventListener(
+      "change",
+      debounce(e => {
+        FILTER_START_DATE = e.target.value;
+        applyFilters();
+      }, 300)
+    );
   }
+
   if (endEl) {
-    endEl.addEventListener("change", e => {
-      FILTER_END_DATE = e.target.value;
-    });
+    endEl.value = FILTER_END_DATE;
+    endEl.addEventListener(
+      "change",
+      debounce(e => {
+        FILTER_END_DATE = e.target.value;
+        applyFilters();
+      }, 300)
+    );
   }
-  const fromCity = document.getElementById("from-city-filter");
-  if (fromCity) {
-    fromCity.addEventListener("change", e => {
-      ALLOWED_FROM_CITIES = e.target.value ? [e.target.value] : [];
-    });
+
+  if (cityEl) {
+    cityEl.addEventListener(
+      "change",
+      debounce(() => {
+        applyFilters();
+      }, 300)
+    );
   }
 }
 
+// ---------- HERO STATIC (from CAMPAIGN object) ----------
 function fillHeroStaticNumbers() {
   setText("hero-sessions", `${CAMPAIGN.sessionsExecuted} of ${CAMPAIGN.sessionsPlanned}`);
-  setText("hero-farmers", formatNumber(CAMPAIGN.farmers));
-  setText("hero-acres", formatNumber(CAMPAIGN.acres));
+  setText("hero-farmers", formatInt(CAMPAIGN.farmers));
+  setText("hero-acres", formatInt(CAMPAIGN.acres));
   setText("hero-influencers", `${CAMPAIGN.influencers} Farmer Captains`);
 
   setText("snap-sessions", `${CAMPAIGN.sessionsExecuted} / ${CAMPAIGN.sessionsPlanned}`);
-  setText("snap-farmers", formatNumber(CAMPAIGN.farmers));
-  setText("snap-acres", formatNumber(CAMPAIGN.acres));
+  setText("snap-farmers", formatInt(CAMPAIGN.farmers));
+  setText("snap-acres", formatInt(CAMPAIGN.acres));
   setText("snap-intent", `${CAMPAIGN.definiteIntentPct}%`);
 
-  setBarWidth("snap-sessions-bar", CAMPAIGN.sessionsExecuted / CAMPAIGN.sessionsPlanned);
-  // normalise remaining to 0–1 based on convenient max values
-  setBarWidth("snap-farmers-bar", Math.min(CAMPAIGN.farmers / 1500, 1));
-  setBarWidth("snap-acres-bar", Math.min(CAMPAIGN.acres / 25000, 1));
-  setBarWidth("snap-intent-bar", CAMPAIGN.definiteIntentPct / 100);
+  const pSessions = (CAMPAIGN.sessionsExecuted / CAMPAIGN.sessionsPlanned) * 100;
+  setBarWidth("snap-sessions-bar", pSessions);
+  setBarWidth("snap-farmers-bar", 100); // treat as full scale
+  setBarWidth("snap-acres-bar", 100);
+  setBarWidth("snap-intent-bar", CAMPAIGN.definiteIntentPct);
 
-  setText("clarity-main", `${CAMPAIGN.clarityPct}%`);
+  setText("clarity-main", `${CAMPAIGN.clarityPct}%");
 }
 
-// ---------- CSV LOADING ----------
-
+// ---------- CSV LOAD & NORMALISATION ----------
 function loadCSV() {
   const loadingEl = document.getElementById("loading-message");
-  if (loadingEl) loadingEl.textContent = "Loading data from sum_sheet.csv…";
+  if (loadingEl) {
+    loadingEl.textContent = "Loading data from sum_sheet.csv…";
+    loadingSpinner = document.createElement("span");
+    loadingSpinner.className = "spinner";
+    loadingEl.appendChild(loadingSpinner);
+  }
 
   fetch("sum_sheet.csv?cache=" + Date.now())
     .then(resp => {
@@ -94,13 +119,19 @@ function loadCSV() {
     })
     .then(csvText => {
       Papa.parse(csvText, {
-        header: true,
+        header: true, // first physical row is technical header (Summary / Unnamed / …)
         skipEmptyLines: true,
         complete: result => {
           allRows = normalizeRows(result);
           preProcessDates(allRows);
-          populateFilterOptions();
-          applyFilters();
+          populateFilterOptions(allRows);
+          applyFilters(); // initial render
+
+          if (loadingSpinner && loadingSpinner.parentNode) {
+            loadingSpinner.parentNode.removeChild(loadingSpinner);
+            loadingSpinner = null;
+          }
+
           if (loadingEl) {
             loadingEl.textContent =
               "Data loaded. Use the filters to slice the fact-sheet dashboard.";
@@ -108,22 +139,40 @@ function loadCSV() {
         },
         error: err => {
           console.error("PapaParse error:", err);
-          if (loadingEl) loadingEl.textContent = "Error parsing sum_sheet.csv.";
+
+          if (loadingSpinner && loadingSpinner.parentNode) {
+            loadingSpinner.parentNode.removeChild(loadingSpinner);
+            loadingSpinner = null;
+          }
+          if (loadingEl) {
+            loadingEl.textContent = "Error parsing sum_sheet.csv.";
+          }
+          showErrorModal("Error parsing CSV: " + (err && err.message ? err.message : "Unknown error"));
         }
       });
     })
     .catch(err => {
       console.error("Error loading CSV:", err);
-      const loadingEl2 = document.getElementById("loading-message");
-      if (loadingEl2) loadingEl2.textContent = "Failed to load sum_sheet.csv.";
+
+      if (loadingSpinner && loadingSpinner.parentNode) {
+        loadingSpinner.parentNode.removeChild(loadingSpinner);
+        loadingSpinner = null;
+      }
+      if (loadingEl) {
+        loadingEl.textContent = "Failed to load sum_sheet.csv.";
+      }
+      showErrorModal("Failed to load CSV: " + (err && err.message ? err.message : "Unknown error"));
     });
 }
 
 /**
  * CSV structure:
- *   Row 0: technical headers
- *   Row 1: display headers (SN, From City, City, Date, ...)
- *   Row 2+: data
+ *   Line 0: technical headers (Summary, Unnamed:1, …)
+ *   Line 1 (data[0]): display headers (SN, From City, City, Date, …)
+ *   Line 2+ (data[1..]): actual data rows
+ *
+ * We map the technical headers to the human-readable headers using the row
+ * where each column value is "SN", "From City", etc.
  */
 function normalizeRows(result) {
   const rows = result.data || [];
@@ -132,17 +181,19 @@ function normalizeRows(result) {
 
   const headerRow = rows[0];
   const headerLabels = {};
+
   fields.forEach(f => {
     const raw = headerRow[f];
     const label = raw == null ? "" : String(raw).trim();
     headerLabels[f] = label || f;
   });
 
-  const normalized = [];
+  const normalised = [];
   for (let i = 1; i < rows.length; i++) {
     const rawRow = rows[i];
-    let hasValue = false;
     const obj = {};
+    let hasValue = false;
+
     fields.forEach(f => {
       const label = headerLabels[f];
       if (!label) return;
@@ -150,26 +201,63 @@ function normalizeRows(result) {
       if (v != null && String(v).trim() !== "") hasValue = true;
       obj[label] = v;
     });
-    if (hasValue) normalized.push(obj);
+
+    if (hasValue) normalised.push(obj);
   }
-  return normalized;
+
+  return normalised;
 }
 
-// ---------- FILTERING ----------
+// ---------- DATES & FILTER OPTIONS ----------
 
-function populateFilterOptions() {
+function preProcessDates(rows) {
+  const dateSet = new Set();
+
+  rows.forEach(r => {
+    const d =
+      (r["Date"] || r["Activity Date"] || "")
+        .toString()
+        .trim();
+    if (d) dateSet.add(d);
+  });
+
+  uniqueDates = Array.from(dateSet).sort((a, b) => {
+    const da = parseDateFlexible(a);
+    const db = parseDateFlexible(b);
+    if (da && db) return da - db;
+    return a.localeCompare(b);
+  });
+
+  // Use min/max from data to prefill filters if possible
+  if (uniqueDates.length) {
+    const minDate = parseDateFlexible(uniqueDates[0]);
+    const maxDate = parseDateFlexible(uniqueDates[uniqueDates.length - 1]);
+    if (minDate) FILTER_START_DATE = toInputDate(minDate);
+    if (maxDate) FILTER_END_DATE = toInputDate(maxDate);
+
+    const startEl = document.getElementById("start-date");
+    const endEl = document.getElementById("end-date");
+    if (startEl) startEl.value = FILTER_START_DATE;
+    if (endEl) endEl.value = FILTER_END_DATE;
+  }
+}
+
+function populateFilterOptions(rows) {
   const select = document.getElementById("from-city-filter");
   if (!select) return;
 
-  while (select.options.length > 1) select.remove(1);
+  // keep first option ("All")
+  while (select.options.length > 1) {
+    select.remove(1);
+  }
 
   const cities = [
     ...new Set(
-      allRows
+      rows
         .map(r => (r["From City"] || "").toString().trim())
         .filter(Boolean)
     )
-  ].sort();
+  ].sort((a, b) => a.localeCompare(b));
 
   cities.forEach(city => {
     const opt = document.createElement("option");
@@ -179,122 +267,113 @@ function populateFilterOptions() {
   });
 }
 
+// ---------- FILTER APPLY / RESET ----------
+
 function applyFilters() {
-  currentFilteredRows = filterRows(allRows);
-  updateMetrics(currentFilteredRows);
-  updateSessionTable(currentFilteredRows);
-  updateCitySummary(currentFilteredRows);
-  updateVillageSummary(currentFilteredRows);
-  buildCityVillageCharts(currentFilteredRows);
-  initMap(currentFilteredRows);
+  if (!allRows.length) return;
+
+  const startInput = document.getElementById("start-date");
+  const endInput = document.getElementById("end-date");
+  const cityInput = document.getElementById("from-city-filter");
+
+  const start = startInput && startInput.value ? new Date(startInput.value) : null;
+  const end = endInput && endInput.value ? new Date(endInput.value) : null;
+  const selectedCity =
+    cityInput && cityInput.value ? cityInput.value.toString().trim() : "";
+
+  filteredRows = allRows.filter(r => {
+    const dateStr = (r["Date"] || r["Activity Date"] || "").toString().trim();
+    const rowDate = parseDateFlexible(dateStr);
+
+    if (start && rowDate && rowDate < start) return false;
+    if (end && rowDate && rowDate > end) return false;
+
+    const fromCity = (r["From City"] || "").toString().trim();
+    if (selectedCity && fromCity !== selectedCity) return false;
+
+    return true;
+  });
+
+  // Update dashboard sections
+  updateMetrics(filteredRows);
+  updateSessionTable(filteredRows);
+  updateCitySummary(filteredRows);
+  updateVillageSummary(filteredRows);
+  buildCityVillageCharts(filteredRows);
+  initMap(filteredRows);
   updateMediaGallery();
 }
 
 function resetFilters() {
-  FILTER_START_DATE = "2025-11-23";
-  FILTER_END_DATE = "2025-12-31";
-  ALLOWED_FROM_CITIES = [];
-  ALLOWED_TO_CITIES = [];
-  ALLOWED_LOCATIONS = [];
-
   const startEl = document.getElementById("start-date");
   const endEl = document.getElementById("end-date");
-  const fromEl = document.getElementById("from-city-filter");
+  const cityEl = document.getElementById("from-city-filter");
+
+  if (uniqueDates.length) {
+    const minDate = parseDateFlexible(uniqueDates[0]);
+    const maxDate = parseDateFlexible(uniqueDates[uniqueDates.length - 1]);
+    FILTER_START_DATE = minDate ? toInputDate(minDate) : FILTER_START_DATE;
+    FILTER_END_DATE = maxDate ? toInputDate(maxDate) : FILTER_END_DATE;
+  }
+
   if (startEl) startEl.value = FILTER_START_DATE;
   if (endEl) endEl.value = FILTER_END_DATE;
-  if (fromEl) fromEl.value = "";
+  if (cityEl) cityEl.value = "";
 
   applyFilters();
 }
 
-function filterRows(rows) {
-  const start = parseDateFlexible(FILTER_START_DATE);
-  const end = parseDateFlexible(FILTER_END_DATE);
+// expose to inline HTML handlers
+window.applyFilters = applyFilters;
+window.resetFilters = resetFilters;
 
-  return rows.filter(r => {
-    const dateStr = (r["Date"] || "").toString().trim();
-    const rowDate = parseDateFlexible(dateStr);
+// ---------- METRIC HELPERS FROM CSV ----------
 
-    if (start && end && rowDate) {
-      if (rowDate < start || rowDate > end) return false;
-    }
-
-    const fromCity = (r["From City"] || "").toString().trim();
-    const toCity = (r["To City"] || r["City"] || "").toString().trim();
-    const loc = (r["Session Location"] || r["Village / Mauza"] || "")
-      .toString()
-      .trim();
-
-    if (ALLOWED_FROM_CITIES.length && !ALLOWED_FROM_CITIES.includes(fromCity))
-      return false;
-    if (ALLOWED_TO_CITIES.length && !ALLOWED_TO_CITIES.includes(toCity))
-      return false;
-    if (ALLOWED_LOCATIONS.length && !ALLOWED_LOCATIONS.includes(loc))
-      return false;
-
-    return true;
-  });
-}
-
-// ---------- DATE HELPERS ----------
-
-function parseDateFlexible(str) {
-  if (!str) return null;
-  const trimmed = str.toString().trim();
-  if (!trimmed) return null;
-
-  // yyyy-mm-dd
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    const d = new Date(trimmed);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // dd-MMM
-  const m = trimmed.match(/^(\d{1,2})[-/ ]([A-Za-z]{3})$/);
-  if (m) {
-    const day = parseInt(m[1], 10);
-    const monStr = m[2].toLowerCase();
-    const months = {
-      jan: 0,
-      feb: 1,
-      mar: 2,
-      apr: 3,
-      may: 4,
-      jun: 5,
-      jul: 6,
-      aug: 7,
-      sep: 8,
-      oct: 9,
-      nov: 10,
-      dec: 11
-    };
-    if (months.hasOwnProperty(monStr)) {
-      const year = 2025;
-      const d2 = new Date(year, months[monStr], day);
-      return isNaN(d2.getTime()) ? null : d2;
+function getNumber(row, keys) {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key) && row[key] != null) {
+      const num = toNumber(row[key]);
+      if (!isNaN(num)) return num;
     }
   }
-
-  const d3 = new Date(trimmed);
-  return isNaN(d3.getTime()) ? null : d3;
+  return 0;
 }
 
-function preProcessDates(rows) {
-  const dates = new Set();
-  rows.forEach(r => {
-    const d = (r["Date"] || "").toString().trim();
-    if (d) dates.add(d);
-  });
-  uniqueDates = Array.from(dates).sort((a, b) => {
-    const da = parseDateFlexible(a);
-    const db = parseDateFlexible(b);
-    if (da && db) return da - db;
-    return a.localeCompare(b);
-  });
+function getFarmers(row) {
+  // Prefer Total Wheat Farmers, then Total Farmers
+  return getNumber(row, ["Total Wheat Farmers", "Total Farmers"]);
 }
 
-// ---------- METRICS ----------
+function getCropArea(row) {
+  return getNumber(row, [
+    "Total Wheat Acres",
+    "Estimated Buctril Acres from this Session"
+  ]);
+}
 
+function getCoords(row) {
+  const val = (row["Spot Coordinates"] || "").toString().trim();
+  return val;
+}
+
+function getFeedback(row) {
+  const remarks = (row["Remarks"] || "").toString().trim();
+  const reasonUse = (row["Top Reason to Use (session)"] || "")
+    .toString()
+    .trim();
+  const reasonNot = (row["Top Reason Not to Use (session)"] || "")
+    .toString()
+    .trim();
+
+  const parts = [];
+  if (remarks) parts.push(remarks);
+  if (reasonUse) parts.push("Use: " + reasonUse);
+  if (reasonNot) parts.push("Not use: " + reasonNot);
+
+  return parts.join(" • ");
+}
+
+// ---------- METRICS PANEL ----------
 function updateMetrics(rows) {
   const totalSessions = rows.length;
   const uniqueSN = new Set();
@@ -305,22 +384,24 @@ function updateMetrics(rows) {
   let sessionsWithCoords = 0;
 
   rows.forEach(r => {
-    if (r["SN"] != null && r["SN"] !== "") uniqueSN.add(r["SN"]);
+    const sn = (r["SN"] || "").toString().trim();
+    if (sn) uniqueSN.add(sn);
 
     const fromCity = (r["From City"] || "").toString().trim();
-    const toCity = (r["To City"] || r["City"] || "").toString().trim();
+    const toCity = (r["City"] || "").toString().trim();
     if (fromCity) cities.add(fromCity);
     if (toCity) cities.add(toCity);
 
-    const loc = (r["Session Location"] || r["Village / Mauza"] || "")
-      .toString()
-      .trim();
+    const loc =
+      (r["Session Location"] || r["Village / Mauza"] || "")
+        .toString()
+        .trim();
     if (loc) villages.add(loc);
 
     const farmers = getFarmers(r);
     const acres = getCropArea(r);
-    if (!isNaN(farmers)) totalFarmers += farmers;
-    if (!isNaN(acres)) totalAcres += acres;
+    totalFarmers += farmers;
+    totalAcres += acres;
 
     if (getCoords(r)) sessionsWithCoords += 1;
   });
@@ -332,35 +413,71 @@ function updateMetrics(rows) {
 
   setText("metric-total-sessions", totalSessions || "0");
   setText("metric-unique-sn", uniqueSN.size || "0");
-  setText("metric-total-farmers", formatNumber(totalFarmers));
+  setText("metric-total-farmers", formatInt(totalFarmers));
   setText("metric-farmers-per-session", farmersPerSession);
-  setText("metric-total-acres", formatNumber(totalAcres));
+  setText("metric-total-acres", formatInt(totalAcres));
   setText("metric-acres-per-session", acresPerSession);
   setText("metric-villages", villages.size || "0");
   setText("metric-cities", cities.size || "0");
   setText("metric-sessions-with-coords", sessionsWithCoords || "0");
+
+  // Tooltips for metrics
+  const sessionsEl = document.getElementById("metric-total-sessions");
+  if (sessionsEl)
+    sessionsEl.title = "Number of field sessions in the current filter range";
+
+  const farmersEl = document.getElementById("metric-total-farmers");
+  if (farmersEl)
+    farmersEl.title = "Total farmers reached across filtered sessions";
+
+  const farmersPerEl = document.getElementById("metric-farmers-per-session");
+  if (farmersPerEl)
+    farmersPerEl.title = "Average number of farmers per filtered session";
+
+  const acresEl = document.getElementById("metric-total-acres");
+  if (acresEl)
+    acresEl.title = "Total wheat acres represented by filtered sessions";
+
+  const acresPerEl = document.getElementById("metric-acres-per-session");
+  if (acresPerEl)
+    acresPerEl.title = "Average acres per filtered session";
+
+  const villagesEl = document.getElementById("metric-villages");
+  if (villagesEl)
+    villagesEl.title = "Unique villages / locations visited";
+
+  const citiesEl = document.getElementById("metric-cities");
+  if (citiesEl)
+    citiesEl.title = "Unique cities covered (from and to)";
+
+  const gpsEl = document.getElementById("metric-sessions-with-coords");
+  if (gpsEl)
+    gpsEl.title = "Sessions where GPS coordinates were captured";
 }
 
 // ---------- SESSION TABLE ----------
-
 function updateSessionTable(rows) {
   const tbody = document.getElementById("session-rows");
   if (!tbody) return;
   tbody.innerHTML = "";
 
   rows.forEach(r => {
-    const dateStr = (r["Date"] || "").toString().trim();
+    const dateStr = (r["Date"] || r["Activity Date"] || "")
+      .toString()
+      .trim();
     const dateIndex = uniqueDates.indexOf(dateStr) + 1;
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(r["SN"] || "")}</td>
-      <td>${escapeHtml(r["Date"] || "")}</td>
+      <td>${escapeHtml(dateStr)}</td>
       <td>${escapeHtml(r["From City"] || "")}</td>
-      <td>${escapeHtml(r["To City"] || r["City"] || "")}</td>
-      <td>${escapeHtml(r["Session Location"] || r["Village / Mauza"] || "")}</td>
-      <td>${escapeHtml(getFarmers(r))}</td>
-      <td>${escapeHtml(getCropArea(r))}</td>
+      <td>${escapeHtml(r["City"] || "")}</td>
+      <td>${escapeHtml(
+        r["Session Location"] || r["Village / Mauza"] || ""
+      )}</td>
+      <td>${escapeHtml(formatInt(getFarmers(r)))}</td>
+      <td>${escapeHtml(formatInt(getCropArea(r)))}</td>
       <td>${escapeHtml(getCoords(r))}</td>
       <td>${escapeHtml(getFeedback(r))}</td>
       <td>${dateIndex > 0 ? dateIndex : ""}</td>
@@ -370,22 +487,24 @@ function updateSessionTable(rows) {
 }
 
 // ---------- CITY & VILLAGE SUMMARIES ----------
-
 function updateCitySummary(rows) {
   const tbody = document.getElementById("city-rows");
   if (!tbody) return;
 
   const summary = {};
+
   rows.forEach(r => {
-    const city = (
-      (r["From City"] || r["City"] || "Unknown").toString().trim() || "Unknown"
-    );
-    if (!summary[city]) summary[city] = { sessions: 0, farmers: 0, acres: 0 };
+    const city =
+      (r["From City"] || r["City"] || "Unknown").toString().trim() ||
+      "Unknown";
+
+    if (!summary[city]) {
+      summary[city] = { sessions: 0, farmers: 0, acres: 0 };
+    }
+
     summary[city].sessions += 1;
-    const farmers = getFarmers(r);
-    const acres = getCropArea(r);
-    if (!isNaN(farmers)) summary[city].farmers += farmers;
-    if (!isNaN(acres)) summary[city].acres += acres;
+    summary[city].farmers += getFarmers(r);
+    summary[city].acres += getCropArea(r);
   });
 
   const entries = Object.entries(summary).sort(
@@ -393,14 +512,15 @@ function updateCitySummary(rows) {
   );
 
   tbody.innerHTML = "";
+
   entries.forEach(([city, data], idx) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${idx + 1}</td>
       <td>${escapeHtml(city)}</td>
-      <td>${data.sessions}</td>
-      <td>${formatNumber(data.farmers)}</td>
-      <td>${formatNumber(data.acres)}</td>
+      <td>${escapeHtml(data.sessions)}</td>
+      <td>${escapeHtml(formatInt(data.farmers))}</td>
+      <td>${escapeHtml(formatInt(data.acres))}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -411,188 +531,42 @@ function updateVillageSummary(rows) {
   if (!tbody) return;
 
   const summary = {};
+
   rows.forEach(r => {
-    const v = (
+    const village =
       (r["Session Location"] || r["Village / Mauza"] || "Unknown")
         .toString()
-        .trim() || "Unknown"
-    );
-    if (!summary[v]) summary[v] = { sessions: 0, farmers: 0, acres: 0 };
-    summary[v].sessions += 1;
-    const farmers = getFarmers(r);
-    const acres = getCropArea(r);
-    if (!isNaN(farmers)) summary[v].farmers += farmers;
-    if (!isNaN(acres)) summary[v].acres += acres;
+        .trim() || "Unknown";
+
+    if (!summary[village]) {
+      summary[village] = { sessions: 0, farmers: 0, acres: 0 };
+    }
+
+    summary[village].sessions += 1;
+    summary[village].farmers += getFarmers(r);
+    summary[village].acres += getCropArea(r);
   });
 
   const entries = Object.entries(summary).sort(
-    (a, b) => b[1].farmers - a[1].farmers
+    (a, b) => b[1].acres - a[1].acres
   );
-  const top = entries.slice(0, 10);
 
   tbody.innerHTML = "";
-  top.forEach(([village, data], idx) => {
+
+  entries.slice(0, 10).forEach(([village, data], idx) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${idx + 1}</td>
       <td>${escapeHtml(village)}</td>
-      <td>${data.sessions}</td>
-      <td>${formatNumber(data.farmers)}</td>
-      <td>${formatNumber(data.acres)}</td>
+      <td>${escapeHtml(data.sessions)}</td>
+      <td>${escapeHtml(formatInt(data.farmers))}</td>
+      <td>${escapeHtml(formatInt(data.acres))}</td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-// ---------- MEDIA GALLERY ----------
-
-function updateMediaGallery() {
-  const gallery = document.getElementById("media-gallery");
-  if (!gallery) return;
-  gallery.innerHTML = "";
-
-  if (!uniqueDates.length) {
-    gallery.innerHTML =
-      '<div style="grid-column:1/-1;text-align:center;color:#607d8b;">No dates found in CSV.</div>';
-    return;
-  }
-
-  uniqueDates.forEach((date, idx) => {
-    const index = idx + 1;
-    const card = document.createElement("div");
-    card.className = "media-card";
-
-    const thumbWrap = document.createElement("div");
-    thumbWrap.className = "media-thumb-wrap hover-video";
-
-    const img = document.createElement("img");
-    img.src = `${index}.jpeg`;
-    img.alt = `Session media ${index}`;
-    thumbWrap.appendChild(img);
-
-    const video = document.createElement("video");
-    video.src = `${index}.mp4`;
-    video.muted = true;
-    video.loop = true;
-    video.playsInline = true;
-    thumbWrap.appendChild(video);
-
-    // Hover / tap behaviour
-    thumbWrap.addEventListener("mouseenter", () => {
-      video.currentTime = 0;
-      video.play().catch(() => {});
-    });
-    thumbWrap.addEventListener("mouseleave", () => {
-      video.pause();
-      video.currentTime = 0;
-    });
-    // Mobile tap toggle
-    thumbWrap.addEventListener("click", () => {
-      if (video.paused) {
-        video.play().catch(() => {});
-        thumbWrap.classList.add("video-active");
-      } else {
-        video.pause();
-        video.currentTime = 0;
-        thumbWrap.classList.remove("video-active");
-      }
-    });
-
-    const caption = document.createElement("div");
-    caption.className = "media-caption";
-    caption.innerHTML = `
-      <strong>Day ${index}</strong>
-      <span>Date: ${escapeHtml(date)}</span>
-      <span>Files: ${index}.jpeg • ${index}.mp4</span>
-    `;
-
-    card.appendChild(thumbWrap);
-    card.appendChild(caption);
-    gallery.appendChild(card);
-  });
-}
-
-// ---------- MAP ----------
-
-function initMap(rows) {
-  const mapDiv = document.getElementById("route-map");
-  if (!mapDiv) return;
-
-  let map = window.buctrilMap;
-  if (map) {
-    map.remove();
-    map = null;
-  }
-
-  const points = [];
-  rows.forEach(r => {
-    const coord = getCoords(r);
-    if (!coord) return;
-    const parts = coord
-      .split(/[, ]/)
-      .map(x => parseFloat(x.trim()))
-      .filter(n => !isNaN(n));
-    if (parts.length < 2) return;
-    points.push({
-      lat: parts[0],
-      lon: parts[1],
-      village: (r["Session Location"] || r["Village / Mauza"] || "").toString().trim(),
-      farmers: getFarmers(r),
-      acres: getCropArea(r),
-      date: (r["Date"] || "").toString().trim()
-    });
-  });
-
-  if (!points.length) {
-    mapDiv.innerHTML =
-      '<div style="padding:12px;text-align:center;font-size:12px;color:#607d8b;">No sessions with valid coordinates in the current filter range.</div>';
-    return;
-  }
-
-  map = L.map("route-map", { zoomControl: true });
-  window.buctrilMap = map;
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18,
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
-
-  const latLngs = [];
-  points.forEach((p, idx) => {
-    const latLng = L.latLng(p.lat, p.lon);
-    latLngs.push(latLng);
-
-    const acres = isNaN(p.acres) ? 0 : p.acres;
-    const radiusMeters = 80 + Math.sqrt(acres || 0) * 35;
-
-    L.circle(latLng, {
-      radius: radiusMeters,
-      fillOpacity: 0.35,
-      fillColor: "#66bb6a",
-      stroke: true,
-      color: "#2e7d32",
-      weight: 1.5
-    }).addTo(map);
-
-    const popup = `
-      <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
-      Date: ${escapeHtml(p.date)}<br/>
-      Farmers: ${formatNumber(p.farmers)}<br/>
-      Crop area: ${formatNumber(acres)} acres
-    `;
-    L.marker(latLng).addTo(map).bindPopup(popup);
-  });
-
-  if (latLngs.length > 1) {
-    L.polyline(latLngs, { weight: 3, color: "#ffb300", opacity: 0.9 }).addTo(map);
-    map.fitBounds(latLngs, { padding: [24, 24] });
-  } else {
-    map.setView(latLngs[0], 11);
-  }
-}
-
 // ---------- CHARTS ----------
-
 function initChartsStatic() {
   // Hero clarity doughnut
   const clarityCanvas = document.getElementById("clarityDonut");
@@ -612,9 +586,18 @@ function initChartsStatic() {
       },
       options: {
         cutout: "70%",
+        animation: {
+          duration: 1500,
+          easing: "easeOutBounce"
+        },
         plugins: {
           legend: { display: false },
-          tooltip: { enabled: false }
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: ctxInner => `${ctxInner.label}: ${ctxInner.raw}%`
+            }
+          }
         }
       }
     });
@@ -637,8 +620,18 @@ function initChartsStatic() {
         ]
       },
       options: {
+        animation: {
+          duration: 1200,
+          easing: "easeOutCubic"
+        },
         plugins: {
-          legend: { position: "bottom", labels: { font: { size: 10 } } }
+          legend: { position: "bottom", labels: { font: { size: 10 } } },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: ctxInner => `${ctxInner.label}: ${ctxInner.raw}%`
+            }
+          }
         }
       }
     });
@@ -652,13 +645,14 @@ function buildCityVillageCharts(rows) {
   // City – farmers
   const cityTotals = {};
   rows.forEach(r => {
-    const city = (
-      (r["From City"] || r["City"] || "Unknown").toString().trim() || "Unknown"
-    );
+    const city =
+      (r["From City"] || r["City"] || "Unknown").toString().trim() ||
+      "Unknown";
     const farmers = getFarmers(r);
     if (!cityTotals[city]) cityTotals[city] = 0;
-    if (!isNaN(farmers)) cityTotals[city] += farmers;
+    cityTotals[city] += farmers;
   });
+
   const cityPivot = buildTopNWithOthers(cityTotals, 6);
   const cityCanvas = document.getElementById("cityFarmersChart");
   if (cityCanvas && cityPivot.labels.length) {
@@ -671,21 +665,32 @@ function buildCityVillageCharts(rows) {
             label: "Farmers",
             data: cityPivot.data,
             backgroundColor: [
+              "#1b5e20",
               "#2e7d32",
               "#66bb6a",
               "#81c784",
               "#a5d6a7",
               "#c5e1a5",
-              "#dce775",
-              "#fff59d"
+              "#dce775"
             ],
             borderWidth: 0
           }
         ]
       },
       options: {
+        animation: {
+          duration: 1200,
+          easing: "easeOutCubic"
+        },
         plugins: {
-          legend: { position: "bottom", labels: { font: { size: 10 } } }
+          legend: { position: "bottom", labels: { font: { size: 10 } } },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: ctxInner =>
+                `${ctxInner.label}: ${Number(ctxInner.raw).toLocaleString()}`
+            }
+          }
         }
       }
     });
@@ -694,15 +699,15 @@ function buildCityVillageCharts(rows) {
   // Village – acres
   const villageTotals = {};
   rows.forEach(r => {
-    const village = (
+    const village =
       (r["Session Location"] || r["Village / Mauza"] || "Unknown")
         .toString()
-        .trim() || "Unknown"
-    );
+        .trim() || "Unknown";
     const acres = getCropArea(r);
     if (!villageTotals[village]) villageTotals[village] = 0;
-    if (!isNaN(acres)) villageTotals[village] += acres;
+    villageTotals[village] += acres;
   });
+
   const villagePivot = buildTopNWithOthers(villageTotals, 6);
   const villageCanvas = document.getElementById("villageAcresChart");
   if (villageCanvas && villagePivot.labels.length) {
@@ -728,8 +733,19 @@ function buildCityVillageCharts(rows) {
         ]
       },
       options: {
+        animation: {
+          duration: 1200,
+          easing: "easeOutCubic"
+        },
         plugins: {
-          legend: { position: "bottom", labels: { font: { size: 10 } } }
+          legend: { position: "bottom", labels: { font: { size: 10 } } },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: ctxInner =>
+                `${ctxInner.label}: ${Number(ctxInner.raw).toLocaleString()}`
+            }
+          }
         }
       }
     });
@@ -739,134 +755,228 @@ function buildCityVillageCharts(rows) {
 function buildTopNWithOthers(map, topN) {
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return { labels: [], data: [] };
+
   if (entries.length <= topN) {
     return {
       labels: entries.map(e => e[0]),
       data: entries.map(e => e[1])
     };
   }
-  const top = entries.slice(0, topN - 1);
-  const rest = entries.slice(topN - 1);
-  const othersVal = rest.reduce((sum, [, v]) => sum + v, 0);
-  const labels = top.map(e => e[0]).concat(["Others"]);
-  const data = top.map(e => e[1]).concat([othersVal]);
-  return { labels, data };
+
+  const top = entries.slice(0, topN);
+  const others = entries.slice(topN);
+  const otherTotal = others.reduce((acc, [, v]) => acc + v, 0);
+
+  return {
+    labels: [...top.map(e => e[0]), "Others"],
+    data: [...top.map(e => e[1]), otherTotal]
+  };
 }
 
-// ---------- SHARING ----------
+// ---------- MEDIA GALLERY ----------
+function updateMediaGallery() {
+  const gallery = document.getElementById("media-gallery");
+  if (!gallery) return;
+  gallery.innerHTML = "";
 
-function shareOnX() {
-  const url = window.location.href;
-  const text =
-    "Buctril Super Farmer Education Drive – interactive fact-sheet dashboard (sessions, acres, insights).";
-  const intent = `https://twitter.com/intent/tweet?url=${encodeURIComponent(
-    url
-  )}&text=${encodeURIComponent(text)}`;
-
-  if (navigator.share) {
-    navigator
-      .share({ title: document.title, text, url })
-      .catch(() => window.open(intent, "_blank"));
-  } else {
-    window.open(intent, "_blank");
+  if (!uniqueDates.length) {
+    gallery.innerHTML =
+      '<div style="grid-column:1/-1;text-align:center;color:#607d8b;">No dates found in CSV.</div>';
+    return;
   }
+
+  uniqueDates.forEach((date, idx) => {
+    const index = idx + 1;
+    const card = document.createElement("div");
+    card.className = "media-card";
+
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "media-thumb-wrap hover-video";
+
+    const img = document.createElement("img");
+    img.src = `${index}.jpeg`;
+    img.alt = `Session day ${index}`;
+    thumbWrap.appendChild(img);
+
+    const video = document.createElement("video");
+    video.src = `${index}.mp4`;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    thumbWrap.appendChild(video);
+
+    // Hover preview on desktop
+    thumbWrap.addEventListener("mouseenter", () => {
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    });
+    thumbWrap.addEventListener("mouseleave", () => {
+      video.pause();
+      video.currentTime = 0;
+    });
+
+    // Click -> open lightbox
+    const open = () => openLightbox(index, date);
+    thumbWrap.addEventListener("click", open);
+    card.addEventListener("click", open);
+
+    const caption = document.createElement("div");
+    caption.className = "media-caption";
+    caption.innerHTML = `
+      <strong>Day ${index}</strong>
+      <span>Date: ${escapeHtml(date)}</span>
+      <span>Files: ${index}.jpeg • ${index}.mp4</span>
+    `;
+
+    card.appendChild(thumbWrap);
+    card.appendChild(caption);
+    gallery.appendChild(card);
+  });
 }
 
-function copyLink() {
-  const url = window.location.href;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard
-      .writeText(url)
-      .then(() => alert("Link copied to clipboard"))
-      .catch(() => fallbackCopy(url));
-  } else {
-    fallbackCopy(url);
+function openLightbox(index, date) {
+  const lb = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lb-img");
+  const lbVideo = document.getElementById("lb-video");
+  if (!lb || !lbImg || !lbVideo) return;
+
+  lbImg.src = `${index}.jpeg`;
+  lbImg.style.display = "block";
+
+  lbVideo.src = `${index}.mp4`;
+  lbVideo.style.display = "block";
+  lbVideo.currentTime = 0;
+
+  lb.classList.add("active");
+
+  const closeHandler = e => {
+    // Close if background is clicked
+    if (e.target === lb) {
+      lb.classList.remove("active");
+      lbVideo.pause();
+      lb.removeEventListener("click", closeHandler);
+    }
+  };
+
+  lb.addEventListener("click", closeHandler);
+}
+
+// ---------- MAP ----------
+function initMap(rows) {
+  const mapDiv = document.getElementById("route-map");
+  if (!mapDiv) return;
+
+  if (buctrilMap) {
+    buctrilMap.remove();
+    buctrilMap = null;
   }
+
+  const points = [];
+  rows.forEach(r => {
+    const coord = getCoords(r);
+    if (!coord) return;
+
+    const parts = coord
+      .split(/[, ]/)
+      .map(x => parseFloat(x.trim()))
+      .filter(n => !isNaN(n));
+    if (parts.length < 2) return;
+
+    const lat = parts[0];
+    const lon = parts[1];
+
+    points.push({
+      lat,
+      lon,
+      village: (r["Session Location"] || r["Village / Mauza"] || "")
+        .toString()
+        .trim(),
+      farmers: getFarmers(r),
+      acres: getCropArea(r),
+      date: (r["Date"] || r["Activity Date"] || "").toString().trim()
+    });
+  });
+
+  if (!points.length) {
+    mapDiv.innerHTML =
+      '<div style="padding:12px;text-align:center;font-size:12px;color:#607d8b;">No sessions with valid coordinates in the current filter range.</div>';
+    return;
+  }
+
+  buctrilMap = L.map("route-map", { zoomControl: true });
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(buctrilMap);
+
+  const latLngs = [];
+
+  points.forEach((p, idx) => {
+    const latLng = L.latLng(p.lat, p.lon);
+    latLngs.push(latLng);
+
+    const acres = isNaN(p.acres) ? 0 : p.acres;
+    const radiusMeters = 80 + Math.sqrt(acres || 0) * 35;
+
+    L.circle(latLng, {
+      radius: radiusMeters,
+      fillOpacity: 0.35,
+      fillColor: "#66bb6a",
+      color: "#2e7d32",
+      weight: 1.5
+    })
+      .addTo(buctrilMap)
+      .bindPopup(
+        `
+        <strong>${escapeHtml(p.village || "Session " + (idx + 1))}</strong><br/>
+        Date: ${escapeHtml(p.date || "-")}<br/>
+        Farmers: ${escapeHtml(formatInt(p.farmers))}<br/>
+        Acres: ${escapeHtml(formatInt(p.acres))}
+      `
+      );
+  });
+
+  if (latLngs.length > 1) {
+    L.polyline(latLngs, {
+      color: "#2e7d32",
+      weight: 2,
+      opacity: 0.9
+    }).addTo(buctrilMap);
+  }
+
+  const bounds = L.latLngBounds(latLngs);
+  buctrilMap.fitBounds(bounds, { padding: [20, 20] });
 }
 
-function fallbackCopy(text) {
-  const el = document.createElement("textarea");
-  el.value = text;
-  document.body.appendChild(el);
-  el.select();
-  document.execCommand("copy");
-  document.body.removeChild(el);
-  alert("Link copied to clipboard");
-}
-
-// ---------- GENERIC HELPERS ----------
-
+// ---------- UTILITIES ----------
 function setText(id, value) {
   const el = document.getElementById(id);
-  if (el != null) el.textContent = value;
+  if (!el) return;
+  el.textContent = value == null ? "" : value;
 }
 
-function setBarWidth(id, ratio) {
+function setBarWidth(id, pct) {
   const el = document.getElementById(id);
   if (!el) return;
-  const clamped = Math.max(0, Math.min(1, ratio || 0));
-  el.style.width = (clamped * 100).toFixed(0) + "%";
+  const v = Math.max(0, Math.min(100, pct || 0));
+  el.style.width = v + "%";
 }
 
-function parseNumber(value) {
-  if (value == null) return NaN;
-  const n = parseFloat(value.toString().replace(/,/g, "").trim());
-  return isNaN(n) ? NaN : n;
+function formatInt(n) {
+  const num = Math.round(n || 0);
+  return num.toLocaleString();
 }
 
-function findField(row, keywords) {
-  const keys = Object.keys(row || {});
-  for (const key of keys) {
-    const lower = key.toLowerCase();
-    for (const kw of keywords) {
-      if (lower.includes(kw)) return key;
-    }
-  }
-  return null;
-}
-
-function getFarmers(row) {
-  const key = findField(row, ["total farmers", "farmers"]);
-  if (!key) return NaN;
-  return parseNumber(row[key]);
-}
-
-function getCropArea(row) {
-  const key = findField(row, [
-    "total wheat acres",
-    "acre",
-    "area",
-    "crop area"
-  ]);
-  if (!key) return NaN;
-  return parseNumber(row[key]);
-}
-
-function getFeedback(row) {
-  const key = findField(row, [
-    "feedback",
-    "observation",
-    "remark",
-    "comment"
-  ]);
-  if (!key) return "";
-  return (row[key] || "").toString();
-}
-
-function getCoords(row) {
-  const coordKey = findField(row, ["spot coordinates", "coord", "gps"]);
-  if (coordKey && row[coordKey]) return row[coordKey].toString();
-  const latKey = findField(row, ["lat"]);
-  const lonKey = findField(row, ["lon", "lng", "long"]);
-  if (latKey && lonKey && row[latKey] && row[lonKey]) {
-    return `${row[latKey]}, ${row[lonKey]}`;
-  }
-  return "";
-}
-
-function formatNumber(n) {
-  if (isNaN(n)) return "–";
-  return Math.round(n).toLocaleString();
+function toNumber(value) {
+  if (value == null) return 0;
+  const str = String(value)
+    .replace(/,/g, "")
+    .replace(/[^\d.-]/g, "")
+    .trim();
+  if (!str) return 0;
+  const n = parseFloat(str);
+  return isNaN(n) ? 0 : n;
 }
 
 function escapeHtml(str) {
@@ -877,3 +987,88 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+function parseDateFlexible(str) {
+  if (!str) return null;
+  const trimmed = String(str).trim();
+
+  // Pattern like "23-Nov" or "23-Nov."
+  const m = trimmed.match(/^(\d{1,2})[-/](\w{3,})\.?$/i);
+  if (m) {
+    const day = parseInt(m[1], 10);
+    const monStr = m[2].slice(0, 3).toLowerCase();
+    const months = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11
+    };
+    if (Object.prototype.hasOwnProperty.call(months, monStr)) {
+      const year = 2025; // your campaign year
+      const d = new Date(year, months[monStr], day);
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  const d2 = new Date(trimmed);
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
+function toInputDate(d) {
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// ---------- ERROR MODAL ----------
+function showErrorModal(message) {
+  const modal = document.createElement("div");
+  modal.className = "error-modal";
+  modal.innerHTML = `
+    <p>Error: ${escapeHtml(message)}</p>
+    <button type="button">Close</button>
+  `;
+  const btn = modal.querySelector("button");
+  if (btn) {
+    btn.addEventListener("click", () => modal.remove());
+  }
+  modal.addEventListener("click", e => {
+    if (e.target === modal) modal.remove();
+  });
+  document.body.appendChild(modal);
+}
+
+// ---------- SHARE / COPY ----------
+function shareOnX() {
+  const url = encodeURIComponent(window.location.href);
+  const text = encodeURIComponent(
+    "Buctril Super Farmer Education Drive – Fact Sheet Dashboard"
+  );
+  const shareUrl = `https://x.com/intent/tweet?text=${text}&url=${url}`;
+  window.open(shareUrl, "_blank", "noopener");
+}
+
+function copyLink() {
+  const url = window.location.href;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).catch(err =>
+      console.error("Clipboard copy failed:", err)
+    );
+  } else {
+    window.prompt("Copy this URL:", url);
+  }
+}
+
+// expose share/copy for header buttons
+window.shareOnX = shareOnX;
+window.copyLink = copyLink;
