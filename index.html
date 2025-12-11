@@ -160,18 +160,37 @@
       text-align: right;
     }
 
-    @media (max-width: 600px) {
-      .top-bar-logos {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .top-logo-center {
-        justify-content: flex-start;
-      }
-      .top-logo-right {
-        justify-content: flex-start;
-      }
-    }
+ @media (max-width: 600px) {
+  .top-bar-logos {
+    flex-direction: column;
+    align-items: center;      /* center everything */
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .top-logo-left,
+  .top-logo-center,
+  .top-logo-right {
+    justify-content: center;  /* center logos in each row */
+    width: 100%;
+  }
+
+  .top-logo-right {
+    flex-direction: column;   /* INTERACT logo above caption */
+    align-items: center;
+  }
+
+  .top-logo-caption {
+    text-align: center;
+    width: 100%;
+  }
+
+  .logo-bayer,
+  .logo-product,
+  .logo-interact {
+    max-width: 130px;         /* keeps logos tidy on small screens */
+  }
+}
 
     /* HEADER / HERO */
 
