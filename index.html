@@ -5,8 +5,10 @@
   <title>Buctril Super Farmer Education Drive – Fact Sheet Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <meta name="description"
-        content="Interactive fact-sheet style dashboard for the Buctril Super Farmer Education Drive (Nov–Dec 2025): map, pivots, campaign snapshot, key insights and media gallery." />
+  <meta
+    name="description"
+    content="Interactive fact-sheet style dashboard for the Buctril Super Farmer Education Drive (Nov–Dec 2025): map, pivots, campaign snapshot, key insights and media gallery."
+  />
 
   <!-- Leaflet CSS -->
   <link
@@ -67,10 +69,11 @@
       position: fixed;
       inset: 0;
       z-index: -1;
-      background:
-        linear-gradient(to bottom right,
-          rgba(255, 255, 255, 0.85),
-          rgba(232, 245, 233, 0.9));
+      background: linear-gradient(
+        to bottom right,
+        rgba(255, 255, 255, 0.85),
+        rgba(232, 245, 233, 0.9)
+      );
     }
 
     .page {
@@ -139,6 +142,7 @@
       align-items: center;
       gap: 4px;
       color: var(--text-muted);
+      cursor: pointer;
     }
 
     .primary-chip {
@@ -817,6 +821,7 @@
   <!-- Background video + overlay -->
   <div class="bg-layer">
     <video id="bg-video" autoplay muted loop playsinline>
+      <!-- Put a wheat / fields loop here, file next to index.html -->
       <source src="tmp.mp4" type="video/mp4" />
     </video>
   </div>
@@ -863,7 +868,7 @@
         <div class="hero-metrics">
           <div class="hero-donut-wrap">
             <canvas id="clarityDonut"></canvas>
-            <div class="hero-donut-main" id="clarity-main">97%</div>
+            <div class="hero-donut-main" id="clarity-main">–</div>
             <div class="hero-donut-sub">Message clarity • 2.9 / 3.0</div>
           </div>
           <div class="hero-metric-list">
@@ -871,28 +876,28 @@
               <div class="hero-metric-icon">📊</div>
               <div class="hero-metric-text">
                 <span class="hero-metric-label">Sessions Executed</span>
-                <span class="hero-metric-value" id="hero-sessions">26 of 34</span>
+                <span class="hero-metric-value" id="hero-sessions">–</span>
               </div>
             </div>
             <div class="hero-metric-item">
               <div class="hero-metric-icon">🧑‍🌾</div>
               <div class="hero-metric-text">
                 <span class="hero-metric-label">Farmers Reached</span>
-                <span class="hero-metric-value" id="hero-farmers">1,123</span>
+                <span class="hero-metric-value" id="hero-farmers">–</span>
               </div>
             </div>
             <div class="hero-metric-item">
               <div class="hero-metric-icon">🌾</div>
               <div class="hero-metric-text">
                 <span class="hero-metric-label">Acres Represented</span>
-                <span class="hero-metric-value" id="hero-acres">19,025</span>
+                <span class="hero-metric-value" id="hero-acres">–</span>
               </div>
             </div>
             <div class="hero-metric-item">
               <div class="hero-metric-icon">🤝</div>
               <div class="hero-metric-text">
                 <span class="hero-metric-label">Influencers Identified</span>
-                <span class="hero-metric-value" id="hero-influencers">201 Farmer Captains</span>
+                <span class="hero-metric-value" id="hero-influencers">–</span>
               </div>
             </div>
           </div>
@@ -932,7 +937,7 @@
         <div class="snapshot-grid">
           <div class="snapshot-card">
             <div class="snapshot-label">Sessions Executed</div>
-            <div class="snapshot-value" id="snap-sessions">26 / 34</div>
+            <div class="snapshot-value" id="snap-sessions">–</div>
             <div class="snapshot-sub">Education sessions completed</div>
             <div class="progress-track">
               <div class="progress-fill" id="snap-sessions-bar"></div>
@@ -940,7 +945,7 @@
           </div>
           <div class="snapshot-card">
             <div class="snapshot-label">Farmers Engaged</div>
-            <div class="snapshot-value" id="snap-farmers">1,123</div>
+            <div class="snapshot-value" id="snap-farmers">–</div>
             <div class="snapshot-sub">Direct wheat growers reached</div>
             <div class="progress-track">
               <div class="progress-fill" id="snap-farmers-bar"></div>
@@ -948,7 +953,7 @@
           </div>
           <div class="snapshot-card">
             <div class="snapshot-label">Acres Represented</div>
-            <div class="snapshot-value" id="snap-acres">19,025</div>
+            <div class="snapshot-value" id="snap-acres">–</div>
             <div class="snapshot-sub">Wheat acres in decision pipeline</div>
             <div class="progress-track">
               <div class="progress-fill" id="snap-acres-bar"></div>
@@ -956,7 +961,7 @@
           </div>
           <div class="snapshot-card">
             <div class="snapshot-label">Definite Use Intent</div>
-            <div class="snapshot-value" id="snap-intent">88%</div>
+            <div class="snapshot-value" id="snap-intent">–</div>
             <div class="snapshot-sub">Average commitment to Buctril Super</div>
             <div class="progress-track">
               <div class="progress-fill" id="snap-intent-bar"></div>
@@ -983,25 +988,26 @@
       <section class="card">
         <div class="card-header">
           <div class="pill-icon">📈</div>
-          <h2>Key Success Drivers & Challenges</h2>
+          <h2>Key Success Drivers &amp; Challenges</h2>
         </div>
         <div class="drivers-layout">
           <div>
             <div class="chart-title">Key Success Drivers</div>
-            <div class="chart-container" style="margin-top:2px;">
+            <div class="chart-container" style="margin-top: 2px;">
               <canvas id="driversPie"></canvas>
             </div>
           </div>
           <div class="drivers-text">
             <strong>Core Insights</strong>
             <ul>
-              <li><strong>Brand Trust</strong> – “Trust in Bayer” is the #1 purchase driver in 90% of sessions.</li>
-              <li><strong>Education Impact</strong> – 97% clarity directly feeds ~88% definite use intent.</li>
-              <li><strong>Network Effect</strong> – 200+ influencers ready for testimonials and advocacy.</li>
+              <li><strong>Brand Trust</strong> – “Trust in Bayer” is the #1 purchase driver in most sessions.</li>
+              <li><strong>Education Impact</strong> – high clarity directly feeds strong definite-use intent.</li>
+              <li><strong>Network Effect</strong> – influencers ready for testimonials and advocacy.</li>
             </ul>
             <div class="insight-highlight">
-              <strong>Challenges Identified</strong><br/>
-              Price sensitivity in selected pockets, partial data gaps, and generic competition – addressed via micro-packs, demo plots and improved tracking.
+              <strong>Challenges Identified</strong><br />
+              Price sensitivity in selected pockets, partial data gaps, and generic competition – addressed via micro-packs,
+              demo plots and improved tracking.
             </div>
           </div>
         </div>
@@ -1012,90 +1018,90 @@
     <section class="card">
       <div class="card-header">
         <div class="pill-icon">⭐</div>
-        <h2>Key Insights, Business Impact & Next Steps</h2>
+        <h2>Key Insights, Business Impact &amp; Next Steps</h2>
       </div>
 
       <div class="pill-row">
         <span class="pill">Brand trust leader</span>
-        <span class="pill">Education excellence (97% clarity)</span>
-        <span class="pill">Strong conversion (88% intent)</span>
-        <span class="pill">Network built (200+ influencers)</span>
+        <span class="pill">Education excellence</span>
+        <span class="pill">Strong conversion intent</span>
+        <span class="pill">Network of influencers</span>
       </div>
 
       <div class="insight-grid">
         <div class="insight-block">
           <h3>Top success factors</h3>
           <ul>
-            <li><strong>Brand trust leader:</strong> “Trust in Bayer” is the #1 purchase reason across sessions.</li>
-            <li><strong>Education excellence:</strong> simple, memorable key messages deliver 97% clarity.</li>
-            <li><strong>Strong conversion:</strong> 88% definite use intent from engaged farmers.</li>
-            <li><strong>Network built:</strong> 200+ Farmer Captains ready for advocacy and referrals.</li>
+            <li><strong>Brand trust leader:</strong> “Trust in Bayer” as primary purchase reason.</li>
+            <li><strong>Education excellence:</strong> simple key messages driving high clarity.</li>
+            <li><strong>Strong conversion:</strong> high definite-use intent from engaged farmers.</li>
+            <li><strong>Network built:</strong> Farmer Captains ready for advocacy and referrals.</li>
           </ul>
 
-          <h3 style="margin-top:8px;">Farmer requests & opportunities</h3>
+          <h3 style="margin-top: 8px;">Farmer requests &amp; opportunities</h3>
           <ul>
             <li>High demand for demo plots in key villages as physical proof of performance.</li>
-            <li>45+ farmers willing to share experiences on social media / WhatsApp.</li>
-            <li>Competitor mentions (Evyol, Suncrop) monitored for benchmarking.</li>
+            <li>Farmers willing to share experiences on social media / WhatsApp.</li>
+            <li>Competitor mentions monitored for benchmarking.</li>
           </ul>
 
-          <h3 style="margin-top:8px;">Business impact assessment</h3>
+          <h3 style="margin-top: 8px;">Business impact assessment</h3>
           <ul>
-            <li><strong>Market penetration:</strong> 26 targeted sessions addressing 19,025+ wheat acres.</li>
+            <li><strong>Market penetration:</strong> targeted sessions addressing large wheat acres.</li>
             <li><strong>Brand equity reinforcement:</strong> trust-first model differentiates from price-only competitors.</li>
-            <li><strong>Conversion pipeline:</strong> 88% intent supports strong seasonal forecast accuracy.</li>
-            <li><strong>Competitive advantage:</strong> farmer education plus safety benefits create a moat vs generics.</li>
+            <li><strong>Conversion pipeline:</strong> intent supports strong seasonal forecast accuracy.</li>
+            <li><strong>Competitive advantage:</strong> education + safety benefits vs generics.</li>
           </ul>
         </div>
 
         <div class="insight-block">
-          <h3>Challenges & price sensitivity</h3>
+          <h3>Challenges &amp; price sensitivity</h3>
           <table class="insight-table">
             <thead>
-            <tr>
-              <th>Challenge</th>
-              <th>Impact</th>
-              <th>Action Required</th>
-            </tr>
+              <tr>
+                <th>Challenge</th>
+                <th>Impact</th>
+                <th>Action Required</th>
+              </tr>
             </thead>
             <tbody>
-            <tr>
-              <td>Price sensitivity</td>
-              <td>Medium</td>
-              <td>Launch micro-packs and tailored dealer schemes.</td>
-            </tr>
-            <tr>
-              <td>Data gaps</td>
-              <td>Low</td>
-              <td>Improve tracking for Days 14–17 &amp; Sargodha / Phalia sessions.</td>
-            </tr>
-            <tr>
-              <td>Competition</td>
-              <td>Low</td>
-              <td>Continue education-first differentiation vs generics.</td>
-            </tr>
+              <tr>
+                <td>Price sensitivity</td>
+                <td>Medium</td>
+                <td>Micro-packs and tailored dealer schemes.</td>
+              </tr>
+              <tr>
+                <td>Data gaps</td>
+                <td>Low</td>
+                <td>Improve tracking for missing days &amp; locations.</td>
+              </tr>
+              <tr>
+                <td>Competition</td>
+                <td>Low</td>
+                <td>Continue education-first differentiation vs generics.</td>
+              </tr>
             </tbody>
           </table>
 
-          <h3 style="margin-top:8px;">Growth template – engagement framework</h3>
+          <h3 style="margin-top: 8px;">Growth template – engagement framework</h3>
           <ul>
             <li><strong>Timing:</strong> align sessions with pre-sowing decision window.</li>
             <li><strong>Clarity:</strong> keep 2–3 simple, memorable key messages.</li>
             <li><strong>Credibility:</strong> field team expertise plus dealer partners.</li>
-            <li><strong>Community:</strong> local influencers driving peer-to-peer recommendation.</li>
+            <li><strong>Community:</strong> local influencers driving recommendation.</li>
             <li><strong>Consistency:</strong> standardised session structure across regions.</li>
-            <li><strong>Feedback loop:</strong> capture farmer concerns and act in near real-time.</li>
+            <li><strong>Feedback loop:</strong> capture farmer concerns and act quickly.</li>
           </ul>
 
-          <h3 style="margin-top:8px;">Brand equity dashboard</h3>
+          <h3 style="margin-top: 8px;">Brand equity dashboard</h3>
           <div class="equity-grid">
             <div class="equity-card">
               <strong>Salience – Market reach</strong>
-              1,123 farmers • high salience in core wheat belt.
+              High salience in the core wheat belt.
             </div>
             <div class="equity-card">
               <strong>Performance – Clarity</strong>
-              97% understanding of dose, water volume and safety.
+              Strong understanding of dose, water volume and safety.
             </div>
             <div class="equity-card">
               <strong>Imagery – Trust anchor</strong>
@@ -1103,7 +1109,7 @@
             </div>
             <div class="equity-card">
               <strong>Judgements – Conversion</strong>
-              88% definite use intent confirms perceived value.
+              High definite use intent confirms perceived value.
             </div>
             <div class="equity-card">
               <strong>Feelings – Confidence</strong>
@@ -1111,14 +1117,13 @@
             </div>
             <div class="equity-card">
               <strong>Resonance – Advocacy</strong>
-              200+ influencers sustaining peer recommendations.
+              Influencers sustaining peer recommendations.
             </div>
           </div>
 
-          <div class="insight-highlight" style="margin-top:8px;">
-            <strong>Final verdict:</strong> overall campaign rating <strong>8.5 / 10</strong>.
-            Education builds trust, and trust drives action; price schemes and demo plots are the next levers to capture
-            the remaining hesitant farmers.
+          <div class="insight-highlight" style="margin-top: 8px;">
+            <strong>Final verdict:</strong> education builds trust, and trust drives action; price schemes and demo plots are
+            the next levers to capture the remaining hesitant farmers.
           </div>
         </div>
       </div>
@@ -1165,7 +1170,7 @@
             </div>
           </div>
           <div class="metric-card">
-            <div class="metric-card-label">Coverage & GPS</div>
+            <div class="metric-card-label">Coverage &amp; GPS</div>
             <div class="metric-card-value" id="metric-villages">–</div>
             <div class="metric-card-sub">
               Cities:
@@ -1187,18 +1192,18 @@
       <div class="table-wrapper">
         <table>
           <thead>
-          <tr>
-            <th>SN</th>
-            <th>Date</th>
-            <th>From City</th>
-            <th>To City</th>
-            <th>Session Location</th>
-            <th>Farmers</th>
-            <th>Acres</th>
-            <th>Coordinates</th>
-            <th>Feedback / Observations</th>
-            <th>Media Index</th>
-          </tr>
+            <tr>
+              <th>SN</th>
+              <th>Date</th>
+              <th>From City</th>
+              <th>To City</th>
+              <th>Session Location</th>
+              <th>Farmers</th>
+              <th>Acres</th>
+              <th>Coordinates</th>
+              <th>Feedback / Observations</th>
+              <th>Media Index</th>
+            </tr>
           </thead>
           <tbody id="session-rows"></tbody>
         </table>
@@ -1213,17 +1218,17 @@
       </div>
       <div class="pivot-layout">
         <div>
-          <div class="chart-title">By City – Sessions, Farmers & Acres</div>
-          <div class="table-wrapper" style="max-height:190px;">
+          <div class="chart-title">By City – Sessions, Farmers &amp; Acres</div>
+          <div class="table-wrapper" style="max-height: 190px;">
             <table>
               <thead>
-              <tr>
-                <th>#</th>
-                <th>City</th>
-                <th>Sessions</th>
-                <th>Farmers</th>
-                <th>Acres</th>
-              </tr>
+                <tr>
+                  <th>#</th>
+                  <th>City</th>
+                  <th>Sessions</th>
+                  <th>Farmers</th>
+                  <th>Acres</th>
+                </tr>
               </thead>
               <tbody id="city-rows"></tbody>
             </table>
@@ -1235,16 +1240,16 @@
         </div>
         <div>
           <div class="chart-title">By Village – Top 10 Locations</div>
-          <div class="table-wrapper" style="max-height:190px;">
+          <div class="table-wrapper" style="max-height: 190px;">
             <table>
               <thead>
-              <tr>
-                <th>#</th>
-                <th>Village / Location</th>
-                <th>Sessions</th>
-                <th>Farmers</th>
-                <th>Acres</th>
-              </tr>
+                <tr>
+                  <th>#</th>
+                  <th>Village / Location</th>
+                  <th>Sessions</th>
+                  <th>Farmers</th>
+                  <th>Acres</th>
+                </tr>
               </thead>
               <tbody id="village-rows"></tbody>
             </table>
@@ -1261,12 +1266,12 @@
     <section class="card">
       <div class="card-header">
         <div class="pill-icon">📸</div>
-        <h2>Media Gallery – Dates, Photos & Short Clips (from GitHub)</h2>
+        <h2>Media Gallery – Dates, Photos &amp; Short Clips (from GitHub)</h2>
       </div>
       <div class="media-grid" id="media-gallery"></div>
-      <div class="footer-note" style="margin-top:10px;">
+      <div class="footer-note" style="margin-top: 10px;">
         Media slots map chronologically to unique dates in <strong>sum_sheet.csv</strong>:
-        <code>1.jpeg / 1.mp4</code>, <code>2.jpeg / 2.mp4</code>, … Up to <code>13.jpeg / 13.mp4</code>.
+        <code>1.jpeg / 1.mp4</code>, <code>2.jpeg / 2.mp4</code>, … Up to your last date.
         Hover on desktop (or tap on mobile) to preview videos.
       </div>
     </section>
@@ -1288,6 +1293,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <!-- Dashboard logic -->
-  <script src="dashboard.js"></script>
+  <script src="data_processor.js"></script>
 </body>
 </html>
