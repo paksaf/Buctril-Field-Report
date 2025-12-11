@@ -632,7 +632,18 @@
     }
 
     
-    .chart-subtitle {
+    
+    .card-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .card-row > .card {
+      flex: 1 1 320px;
+      margin-top: 0;
+    }
+.chart-subtitle {
       margin-top: 4px;
       font-size: 11px;
       color: var(--text-muted);
@@ -1100,7 +1111,9 @@
           <canvas id="cityFarmersChart"></canvas>
         </div>
       </section>
-        <section class="card" style="margin-top: 12px;">
+        
+        <div class="card-row">
+<section class="card" style="margin-top: 12px;">
           <div class="card-header">
             <div>
               <div class="pill-icon"><i class="fas fa-person-booth"></i></div>
@@ -1113,6 +1126,8 @@
             <div class="chart-subtitle" id="adoption-text">Estimated definite-use farmers: &ndash;</div>
           </div>
         </section>
+
+        </div>
     </section>
 
     <!-- Session table -->
@@ -1162,6 +1177,7 @@
           <tbody id="city-rows"></tbody>
         </table>
       </div>
+      <div class="chart-subtitle">Totals per city (sessions, farmers, acres) for current filters</div>
     </section>
 
     <!-- Media gallery -->
