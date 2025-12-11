@@ -1,1213 +1,1293 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>Buctril Farmer Engagement Summary 2025</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Dynamic dashboard summarising Buctril Super farmer engagements – sessions, acres, farmers, insights, and media gallery for Bayer Marketing Team." />
-    <link rel="canonical" href="https://paksaf.github.io/Buctril-Field-Report/" />
+  <meta charset="UTF-8" />
+  <title>Buctril Super Farmer Education Drive – Fact Sheet Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Open Graph -->
-    <meta property="og:title" content="Buctril Super Farmer Education Drive – Summary 2025" />
-    <meta property="og:description" content="From education to acres: building trust that converts." />
-    <meta property="og:image" content="wheat-bg.jpg" />
-    <meta property="og:type" content="website" />
+  <meta name="description"
+        content="Interactive fact-sheet style dashboard for the Buctril Super Farmer Education Drive (Nov–Dec 2025): map, pivots, campaign snapshot, key insights and media gallery." />
 
-    <!-- Leaflet CSS -->
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""
-    />
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 
-    <style>
-        :root {
-            --bg-dark: rgba(3, 10, 25, 0.96);
-            --card: rgba(15, 23, 42, 0.96);
-            --accent: #ffb74d;
-            --accent-soft: rgba(255, 183, 77, 0.25);
-            --accent-strong: #ff9800;
-            --text-main: #f9fafb;
-            --text-muted: #9ca3af;
-            --border-subtle: rgba(148, 163, 184, 0.4);
-            --radius-lg: 16px;
-            --radius-xl: 22px;
-            --shadow-soft: 0 22px 55px rgba(0, 0, 0, 0.55);
-        }
+  <!-- Base styles -->
+  <style>
+    :root {
+      --bg-page: #f4f7f1;
+      --bg-card: #ffffff;
+      --bg-soft: #edf4e7;
+      --accent-main: #2e7d32;
+      --accent-soft: #c8e6c9;
+      --accent-amber: #ffb300;
+      --text-main: #163020;
+      --text-muted: #607d8b;
+      --border-subtle: rgba(0, 0, 0, 0.08);
+      --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.08);
+      --radius-lg: 16px;
+      --radius-xl: 22px;
+    }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-                "Segoe UI", sans-serif;
-            color: var(--text-main);
-            background: #020617;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, sans-serif;
+      color: var(--text-main);
+      background: var(--bg-page);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-        /* Background */
-        #bg-video {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: blur(1px) brightness(0.5);
-            z-index: -2;
-        }
-        .bg-fallback {
-            position: fixed;
-            inset: 0;
-            z-index: -3;
-            background: url("wheat-bg.jpg") center/cover no-repeat;
-            opacity: 0.65;
-        }
-        .overlay {
-            position: relative;
-            min-height: 100vh;
-            background:
-                radial-gradient(circle at top left, rgba(255, 193, 7, 0.24), transparent 55%),
-                radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.25), transparent 55%),
-                linear-gradient(to bottom, rgba(2, 6, 23, 0.96), rgba(2, 8, 23, 0.98));
-            padding: 16px clamp(10px, 4vw, 28px) 32px;
-        }
+    /* Background video */
+    .bg-layer {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+    }
 
-        header {
-            margin-bottom: 12px;
-        }
-        .title-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-        .logo-badge {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #ffe082, #f57c00);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            color: #3e2723;
-            box-shadow: 0 0 0 2px rgba(255, 224, 130, 0.4);
-            margin-right: 6px;
-        }
-        h1 {
-            font-size: clamp(24px, 3.2vw, 34px);
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            text-shadow: 0 6px 26px rgba(0, 0, 0, 0.9);
-        }
-        .subtitle {
-            margin-top: 4px;
-            font-size: 13px;
-            color: var(--text-muted);
-            max-width: 980px;
-        }
-        .subtitle strong {
-            color: #e5e7eb;
-        }
-        .subtitle code {
-            font-family: "Menlo", "SF Mono", ui-monospace, monospace;
-            font-size: 12px;
-            background: rgba(15, 23, 42, 0.9);
-            padding: 2px 6px;
-            border-radius: 6px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-        }
+    #bg-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: blur(1px) brightness(0.8);
+    }
 
-        .tagline {
-            margin-top: 6px;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-        .tagline strong {
-            color: var(--accent);
-        }
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        linear-gradient(to bottom right,
+          rgba(255, 255, 255, 0.85),
+          rgba(232, 245, 233, 0.9));
+    }
 
-        .sharing-section {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-            flex-wrap: wrap;
-        }
-        .share-btn {
-            background: var(--accent-soft);
-            color: var(--accent);
-            border: none;
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .share-btn:hover {
-            background: var(--accent);
-            color: var(--text-main);
-            transform: translateY(-1px);
-        }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 16px 32px;
+    }
 
-        #loading-message {
-            margin-top: 6px;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
+    /* HEADER / HERO */
 
-        /* Impact strip */
-        .impact-strip {
-            margin-top: 12px;
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 8px;
-        }
-        @media (max-width: 900px) {
-            .impact-strip {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-        .impact-pill {
-            background: radial-gradient(circle at top left, rgba(255, 183, 77, 0.15), transparent 55%),
-                rgba(15, 23, 42, 0.96);
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            padding: 8px 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
-        }
-        .impact-icon {
-            font-size: 16px;
-        }
-        .impact-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            color: var(--text-muted);
-        }
-        .impact-value {
-            font-size: 15px;
-            font-weight: 600;
-        }
+    header {
+      margin-bottom: 16px;
+    }
 
-        /* Filters */
-        .filters-section {
-            background: var(--card);
-            border-radius: var(--radius-lg);
-            padding: 10px 12px;
-            margin: 14px 0 18px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-            border: 1px solid var(--border-subtle);
-            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
-        }
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .filter-group label {
-            font-size: 10px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-        .filter-group input,
-        .filter-group select {
-            background: rgba(15, 23, 42, 0.9);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-main);
-            padding: 5px 8px;
-            border-radius: 6px;
-            font-size: 11px;
-        }
-        .filter-btn {
-            background: var(--accent);
-            color: var(--text-main);
-            border: none;
-            padding: 7px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 11px;
-            transition: opacity 0.15s, transform 0.05s;
-        }
-        .filter-btn:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
+    .hero-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
 
-        /* Layout and cards */
-        .layout-main {
-            display: grid;
-            grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
-            gap: 14px;
-            align-items: flex-start;
-            margin-bottom: 14px;
-        }
-        @media (max-width: 900px) {
-            .layout-main {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .card {
-            background: var(--card);
-            border-radius: var(--radius-xl);
-            border: 1px solid var(--border-subtle);
-            box-shadow: var(--shadow-soft);
-            padding: 12px 14px 14px;
-            backdrop-filter: blur(24px);
-            position: relative;
-            overflow: hidden;
-        }
-        .card-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .pill-icon {
-            width: 22px;
-            height: 22px;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            background: var(--accent-soft);
-            color: var(--accent);
-            flex-shrink: 0;
-        }
-        .card-title-text {
-            font-size: 12px;
-            color: #e5e9f5;
-        }
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-        /* Map */
-        #route-map {
-            width: 100%;
-            min-height: 260px;
-            border-radius: 14px;
-            overflow: hidden;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            background: radial-gradient(
-                circle at top,
-                rgba(148, 163, 184, 0.28),
-                rgba(15, 23, 42, 0.9)
-            );
-        }
+    .logo-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #fffde7, #c0e9a8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 0 0 2px rgba(200, 230, 201, 0.7);
+    }
 
-        /* Metrics */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr);
-            gap: 8px;
-        }
-        .metric-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 8px;
-        }
-        @media (max-width: 600px) {
-            .metric-row {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .metric {
-            background: radial-gradient(circle at top left, rgba(255, 183, 77, 0.12), transparent 55%),
-                rgba(13, 25, 48, 0.97);
-            border-radius: var(--radius-lg);
-            padding: 8px 10px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-        .metric-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-        }
-        .metric-value {
-            font-size: 20px;
-            font-weight: 600;
-            line-height: 1.1;
-        }
-        .metric-sub {
-            font-size: 10px;
-            color: var(--text-muted);
-        }
-        .metric-sub span {
-            color: var(--accent);
-            font-weight: 600;
-        }
+    .brand-text h1 {
+      font-size: clamp(22px, 3vw, 30px);
+      font-weight: 700;
+      color: #154734;
+    }
 
-        /* Tables */
-        .table-card {
-            margin-top: 8px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 4px;
-            font-size: 11px;
-        }
-        thead {
-            background: linear-gradient(
-                to right,
-                rgba(37, 99, 235, 0.9),
-                rgba(2, 132, 199, 0.9)
-            );
-        }
-        thead th {
-            text-align: left;
-            padding: 6px 8px;
-            color: #e5f3ff;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        tbody tr:nth-child(even) {
-            background: rgba(15, 23, 42, 0.92);
-        }
-        tbody tr:nth-child(odd) {
-            background: rgba(15, 23, 42, 0.7);
-        }
-        tbody td {
-            padding: 5px 8px;
-            border-bottom: 1px solid rgba(51, 65, 85, 0.95);
-            color: #e2e8f0;
-            vertical-align: top;
-        }
-        tbody tr:last-child td {
-            border-bottom: none;
-        }
-        .table-wrapper {
-            max-height: 230px;
-            overflow: auto;
-            border-radius: 12px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-        }
+    .brand-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
 
-        .footer-note {
-            margin-top: 8px;
-            font-size: 10px;
-            color: var(--text-muted);
-            text-align: center;
-        }
-        .footer-note code {
-            font-family: "Menlo", "SF Mono", ui-monospace, monospace;
-            font-size: 10px;
-            background: rgba(15, 23, 42, 0.9);
-            padding: 1px 4px;
-            border-radius: 4px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-        }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
 
-        /* Pivot layout */
-        .pivot-layout {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 12px;
-            margin-top: 6px;
-        }
-        @media (max-width: 900px) {
-            .pivot-layout {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .chart-container {
-            background: rgba(13, 25, 48, 0.97);
-            border-radius: var(--radius-lg);
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            padding: 8px 10px;
-            min-height: 210px;
-            display: flex;
-            flex-direction: column;
-        }
-        .chart-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-        .chart-container canvas {
-            flex: 1;
-        }
+    .chip {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(21, 71, 52, 0.12);
+      background: rgba(255, 255, 255, 0.8);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+    }
 
-        .media-link {
-            display: block;
-            font-size: 10px;
-            margin-top: 2px;
-            color: var(--accent);
-            text-decoration: none;
-        }
-        .media-link:hover {
-            text-decoration: underline;
-        }
+    .primary-chip {
+      background: #e8f5e9;
+      color: #1b5e20;
+      border-color: rgba(46, 125, 50, 0.4);
+      font-weight: 600;
+    }
 
-        /* Summary / insights section */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.1fr);
-            gap: 14px;
-        }
-        @media (max-width: 1000px) {
-            .summary-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
 
-        .summary-card-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-        .summary-lead {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
+    @media (max-width: 900px) {
+      .hero-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
 
-        .kpi-table-exec {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 4px;
-            font-size: 11px;
-        }
-        .kpi-table-exec thead {
-            background: rgba(15, 23, 42, 0.9);
-        }
-        .kpi-table-exec th {
-            text-align: left;
-            padding: 5px 6px;
-            color: var(--text-muted);
-            font-weight: 600;
-            border-bottom: 1px solid rgba(55, 65, 81, 0.9);
-        }
-        .kpi-table-exec td {
-            padding: 4px 6px;
-            border-bottom: 1px solid rgba(31, 41, 55, 0.95);
-            vertical-align: middle;
-        }
-        .kpi-table-exec tbody tr:last-child td {
-            border-bottom: none;
-        }
+      .hero-top-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
 
-        .bar-wrapper {
-            position: relative;
-            width: 100%;
-            height: 8px;
-            border-radius: 999px;
-            background: rgba(17, 24, 39, 0.9);
-            overflow: hidden;
-        }
-        .bar-fill {
-            position: absolute;
-            inset: 0;
-            width: 0;
-            border-radius: inherit;
-            background: linear-gradient(90deg, #22c55e, #a3e635, #facc15, #fb923c);
-            transition: width 0.8s ease-out;
-        }
-        .metric-emoji {
-            font-size: 10px;
-            white-space: nowrap;
-        }
+      .hero-actions {
+        justify-content: flex-start;
+      }
+    }
 
-        .summary-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 4px;
-            font-size: 10px;
-        }
-        .summary-chip {
-            background: rgba(17, 24, 39, 0.95);
-            border-radius: 999px;
-            padding: 3px 8px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-        }
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border-subtle);
+      padding: 14px 16px 16px;
+      position: relative;
+    }
 
-        .insights-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-            gap: 14px;
-        }
-        @media (max-width: 1000px) {
-            .insights-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-        .insights-heading {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin: 8px 0 4px;
-            color: #e5e7eb;
-        }
-        .insights-list {
-            font-size: 11px;
-            color: var(--text-main);
-            padding-left: 16px;
-        }
-        .insights-list li + li {
-            margin-top: 2px;
-        }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
 
-        /* Snapshot & flows */
-        .snapshot-mini-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-            margin: 4px 0;
-        }
-        .snapshot-note {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
+    .card-header h2 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+    }
 
-        .flow-diagram {
-            margin-top: 8px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            align-items: stretch;
-        }
-        .flow-step {
-            background: rgba(13, 25, 48, 0.97);
-            border-radius: 10px;
-            padding: 6px 8px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            font-size: 10px;
-            flex: 1 1 120px;
-            min-width: 120px;
-        }
-        .flow-step strong {
-            display: block;
-            font-size: 11px;
-            margin-bottom: 2px;
-        }
-        .flow-arrow {
-            align-self: center;
-            font-size: 16px;
-            color: var(--accent);
-        }
+    .pill-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--accent-main);
+      flex-shrink: 0;
+    }
 
-        .equity-flow {
-            margin-top: 6px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-        .equity-node {
-            background: rgba(15, 23, 42, 0.98);
-            border-radius: 999px;
-            padding: 4px 10px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            font-size: 9px;
-            white-space: nowrap;
-        }
-        .equity-arrow {
-            align-self: center;
-            font-size: 14px;
-            color: var(--accent);
-        }
+    .hero-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #1b5e20;
+    }
 
-        /* Media gallery */
-        .media-gallery {
-            margin-top: 18px;
-        }
-        .media-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-            gap: 10px;
-        }
-        .media-item {
-            background: rgba(13, 25, 48, 0.97);
-            border-radius: var(--radius-lg);
-            padding: 8px;
-            text-align: center;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .media-thumb-wrapper {
-            position: relative;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            background: #020617;
-        }
-        .media-thumb-wrapper img,
-        .media-thumb-wrapper video {
-            display: block;
-            width: 100%;
-            height: 110px;
-            object-fit: cover;
-        }
-        .media-number {
-            position: absolute;
-            top: 4px;
-            left: 6px;
-            background: rgba(15, 23, 42, 0.8);
-            border-radius: 999px;
-            padding: 1px 6px;
-            font-size: 10px;
-        }
-        .media-label {
-            font-size: 10px;
-            color: var(--text-muted);
-        }
-        .media-links {
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            flex-wrap: wrap;
-            font-size: 10px;
-        }
+    .hero-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
 
-        img, video {
-            max-width: 100%;
-            height: auto;
-        }
-        [role="img"] {
-            border: 1px solid var(--border-subtle);
-        }
+    .hero-tagline {
+      font-size: 13px;
+      font-weight: 600;
+      color: #2e7d32;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
 
-        .brand-credit {
-            margin-top: 10px;
-            font-size: 10px;
-            color: var(--text-muted);
-            text-align: right;
-        }
-        .brand-credit strong {
-            color: #e5e7eb;
-        }
-    </style>
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .hero-meta span {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--bg-soft);
+    }
+
+    /* HERO RIGHT – DOUGHNUT + TOP METRICS */
+
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: 6px;
+      align-items: center;
+    }
+
+    @media (max-width: 500px) {
+      .hero-metrics {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .hero-donut-wrap {
+      text-align: center;
+    }
+
+    .hero-donut-wrap canvas {
+      max-width: 130px;
+      margin: 0 auto;
+    }
+
+    .hero-donut-main {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1b5e20;
+      margin-top: 4px;
+    }
+
+    .hero-donut-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .hero-metric-list {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .hero-metric-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: var(--bg-soft);
+    }
+
+    .hero-metric-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 0 1px rgba(46, 125, 50, 0.2);
+    }
+
+    .hero-metric-text span {
+      display: block;
+      line-height: 1.2;
+    }
+
+    .hero-metric-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .hero-metric-value {
+      font-weight: 600;
+      color: #1b5e20;
+    }
+
+    /* FILTER BAR */
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 10px 12px;
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border-subtle);
+      align-items: center;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+    }
+
+    .filter-group label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .filter-group input,
+    .filter-group select {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid #cfd8dc;
+      background: #ffffff;
+      min-width: 130px;
+    }
+
+    .filter-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border-radius: 999px;
+      border: none;
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-primary {
+      background: var(--accent-main);
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      background: #eceff1;
+      color: #455a64;
+    }
+
+    /* LAYOUT ROWS */
+
+    .two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .two-col {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    /* SNAPSHOT SECTION */
+
+    .snapshot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .snapshot-card {
+      border-radius: 14px;
+      padding: 8px 10px;
+      background: var(--bg-soft);
+      border: 1px solid rgba(46, 125, 50, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 12px;
+    }
+
+    .snapshot-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .snapshot-value {
+      font-weight: 600;
+      color: #1b5e20;
+    }
+
+    .snapshot-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .progress-track {
+      margin-top: 4px;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #e0e0e0;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(to right, #66bb6a, #43a047);
+      width: 0;
+    }
+
+    .mini-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+
+    .mini-kpi {
+      background: #fafafa;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px dashed rgba(0, 0, 0, 0.08);
+    }
+
+    .mini-kpi strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #1b5e20;
+    }
+
+    /* PIE AREA (KEY DRIVERS) */
+
+    .drivers-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 700px) {
+      .drivers-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .drivers-text ul {
+      margin-left: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .drivers-text li {
+      margin-bottom: 2px;
+    }
+
+    .drivers-text strong {
+      color: #1b5e20;
+    }
+
+    /* KEY INSIGHTS / BUSINESS IMPACT SECTION */
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #e3f2fd;
+      color: #0d47a1;
+      font-weight: 500;
+    }
+
+    .insight-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr);
+      gap: 16px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .insight-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .insight-block h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+      color: #455a64;
+    }
+
+    .insight-block ul {
+      margin-left: 18px;
+      margin-top: 4px;
+    }
+
+    .insight-block li {
+      margin-bottom: 3px;
+      color: var(--text-muted);
+    }
+
+    .insight-block li strong {
+      color: #1b5e20;
+    }
+
+    .insight-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 4px;
+      font-size: 11px;
+    }
+
+    .insight-table th,
+    .insight-table td {
+      border: 1px solid #e0e0e0;
+      padding: 4px 6px;
+      text-align: left;
+    }
+
+    .insight-table th {
+      background: #f1f8e9;
+      color: #33691e;
+    }
+
+    .insight-highlight {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .insight-highlight strong {
+      color: #1b5e20;
+    }
+
+    .equity-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 11px;
+    }
+
+    .equity-card {
+      border-radius: 10px;
+      padding: 6px 8px;
+      background: #e3f2fd;
+      border: 1px solid rgba(25, 118, 210, 0.2);
+    }
+
+    .equity-card strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #0d47a1;
+    }
+
+    /* MAP + METRICS SECTION */
+
+    #route-map {
+      width: 100%;
+      min-height: 260px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .key-metrics-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .metric-card {
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: var(--bg-soft);
+      border: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .metric-card-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .metric-card-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1b5e20;
+    }
+
+    .metric-card-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* TABLE SECTION */
+
+    .table-wrapper {
+      max-height: 260px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      background: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    thead {
+      background: #c5e1a5;
+    }
+
+    thead th {
+      padding: 6px 8px;
+      text-align: left;
+      color: #1b5e20;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #eeeeee;
+      color: #37474f;
+      vertical-align: top;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    /* PIVOT SECTION */
+
+    .pivot-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .pivot-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .chart-container {
+      margin-top: 8px;
+      border-radius: 14px;
+      padding: 8px 10px;
+      background: #fafafa;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .chart-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .chart-container canvas {
+      max-height: 220px;
+    }
+
+    /* MEDIA GALLERY */
+
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 10px;
+    }
+
+    .media-card {
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+      font-size: 11px;
+    }
+
+    .media-thumb-wrap {
+      position: relative;
+      width: 100%;
+      height: 110px;
+      overflow: hidden;
+    }
+
+    .media-thumb-wrap img,
+    .media-thumb-wrap video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .media-thumb-wrap video {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.2s ease-out;
+      pointer-events: none;
+    }
+
+    .media-thumb-wrap.hover-video video {
+      pointer-events: auto;
+    }
+
+    .media-thumb-wrap.hover-video:hover video,
+    .media-thumb-wrap.hover-video.video-active video {
+      opacity: 1;
+    }
+
+    .media-caption {
+      padding: 6px 8px 8px;
+    }
+
+    .media-caption strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #1b5e20;
+    }
+
+    .media-caption span {
+      display: block;
+      color: var(--text-muted);
+    }
+
+    /* FOOTER NOTE */
+
+    .footer-note {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .footer-note strong {
+      color: #1b5e20;
+    }
+
+    /* STATUS TEXT */
+
+    #loading-message {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+  </style>
 </head>
 <body>
-    <div class="bg-fallback"></div>
+  <!-- Background video + overlay -->
+  <div class="bg-layer">
     <video id="bg-video" autoplay muted loop playsinline>
-        <source src="bg-video.mp4" type="video/mp4" />
+      <source src="tmp.mp4" type="video/mp4" />
     </video>
+  </div>
+  <div class="bg-overlay"></div>
 
-    <div class="overlay">
-        <header>
-            <div class="title-row">
-                <div class="logo-badge">🌾</div>
-                <div>
-                    <h1>Buctril Super Farmer Education Drive – 2025 Summary</h1>
-                    <p class="subtitle">
-                        From <strong>education to acres</strong>: this dashboard reads
-                        <code>sum_sheet.csv</code> from the repository and summarises farmer engagement
-                        across <strong>cities</strong>, <strong>villages</strong>, <strong>dates</strong>,
-                        <strong>farmers reached</strong>, and <strong>wheat acres</strong>, with
-                        insights prepared for the <strong>Bayer Marketing Team</strong>.
-                    </p>
-                    <p class="tagline">
-                        November – December 2025 · Theme:
-                        <strong>“From education to acres: building trust that converts.”</strong>
-                    </p>
-                </div>
+  <div class="page">
+    <!-- HEADER / HERO -->
+    <header>
+      <div class="hero-top-row">
+        <div class="brand-mark">
+          <div class="logo-circle">🌾</div>
+          <div class="brand-text">
+            <h1>Buctril Super Farmer Education Drive</h1>
+            <p>November – December 2025 • From Education to Acres: Building Trust That Converts</p>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <div class="chip primary-chip">Empowering Farmers, Enhancing Agriculture</div>
+          <div class="chip">Brand activation executed &amp; reported by <strong>INTERACT</strong></div>
+          <button class="chip" type="button" onclick="shareOnX()">Share on X</button>
+          <button class="chip" type="button" onclick="copyLink()">Copy Link</button>
+        </div>
+      </div>
+
+      <div id="loading-message">Loading data from <code>sum_sheet.csv</code>…</div>
+
+      <div class="hero-grid card">
+        <div>
+          <div class="hero-title">Marketing Team Fact-Sheet Dashboard</div>
+          <div class="hero-subtitle">
+            Interactive summary of sessions, acres, farmer engagement, and marketing impact across 13 districts.
+          </div>
+          <div class="hero-tagline">
+            <span>🌱</span> <span>Empowering Farmers, Enhancing Agriculture.</span>
+          </div>
+
+          <div class="hero-meta">
+            <span>Period: <strong>Nov 23 – Dec 8, 2025</strong></span>
+            <span>Data Source: <strong>Field session reports &amp; sum_sheet.csv</strong></span>
+            <span>Prepared for: <strong>Bayer Marketing Team</strong></span>
+          </div>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="hero-donut-wrap">
+            <canvas id="clarityDonut"></canvas>
+            <div class="hero-donut-main" id="clarity-main">97%</div>
+            <div class="hero-donut-sub">Message clarity • 2.9 / 3.0</div>
+          </div>
+          <div class="hero-metric-list">
+            <div class="hero-metric-item">
+              <div class="hero-metric-icon">📊</div>
+              <div class="hero-metric-text">
+                <span class="hero-metric-label">Sessions Executed</span>
+                <span class="hero-metric-value" id="hero-sessions">26 of 34</span>
+              </div>
             </div>
-
-            <div class="sharing-section">
-                <button class="share-btn" type="button" onclick="shareOnX()">📱 Share on X</button>
-                <button class="share-btn" type="button" onclick="copyLink()">🔗 Copy Link</button>
+            <div class="hero-metric-item">
+              <div class="hero-metric-icon">🧑‍🌾</div>
+              <div class="hero-metric-text">
+                <span class="hero-metric-label">Farmers Reached</span>
+                <span class="hero-metric-value" id="hero-farmers">1,123</span>
+              </div>
             </div>
-            <div id="loading-message">Loading data from <code>sum_sheet.csv</code>…</div>
-
-            <!-- Impact strip -->
-            <div class="impact-strip" aria-label="Campaign impact at a glance">
-                <div class="impact-pill">
-                    <div class="impact-icon">🧑‍🌾</div>
-                    <div>
-                        <div class="impact-label">Farmers reached</div>
-                        <div class="impact-value" id="impact-farmers">–</div>
-                    </div>
-                </div>
-                <div class="impact-pill">
-                    <div class="impact-icon">🌾</div>
-                    <div>
-                        <div class="impact-label">Wheat acres</div>
-                        <div class="impact-value" id="impact-acres">–</div>
-                    </div>
-                </div>
-                <div class="impact-pill">
-                    <div class="impact-icon">⭐</div>
-                    <div>
-                        <div class="impact-label">Message clarity</div>
-                        <div class="impact-value" id="impact-clarity">–</div>
-                    </div>
-                </div>
-                <div class="impact-pill">
-                    <div class="impact-icon">📈</div>
-                    <div>
-                        <div class="impact-label">Definite use intent</div>
-                        <div class="impact-value" id="impact-intent">–</div>
-                    </div>
-                </div>
+            <div class="hero-metric-item">
+              <div class="hero-metric-icon">🌾</div>
+              <div class="hero-metric-text">
+                <span class="hero-metric-label">Acres Represented</span>
+                <span class="hero-metric-value" id="hero-acres">19,025</span>
+              </div>
             </div>
-        </header>
-
-        <!-- Filters -->
-        <section class="filters-section">
-            <div class="filter-group">
-                <label for="start-date">Start Date</label>
-                <input type="date" id="start-date" value="2025-11-23" />
+            <div class="hero-metric-item">
+              <div class="hero-metric-icon">🤝</div>
+              <div class="hero-metric-text">
+                <span class="hero-metric-label">Influencers Identified</span>
+                <span class="hero-metric-value" id="hero-influencers">201 Farmer Captains</span>
+              </div>
             </div>
-            <div class="filter-group">
-                <label for="end-date">End Date</label>
-                <input type="date" id="end-date" value="2025-12-31" />
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- FILTER BAR -->
+    <section class="filters">
+      <div class="filter-group">
+        <label for="start-date">Start Date</label>
+        <input type="date" id="start-date" />
+      </div>
+      <div class="filter-group">
+        <label for="end-date">End Date</label>
+        <input type="date" id="end-date" />
+      </div>
+      <div class="filter-group">
+        <label for="from-city-filter">From City</label>
+        <select id="from-city-filter">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary" type="button" onclick="applyFilters()">Apply Filters</button>
+        <button class="btn btn-secondary" type="button" onclick="resetFilters()">Reset</button>
+      </div>
+    </section>
+
+    <!-- SNAPSHOT & KEY DRIVERS -->
+    <section class="two-col">
+      <section class="card">
+        <div class="card-header">
+          <div class="pill-icon">📊</div>
+          <h2>Campaign Snapshot</h2>
+        </div>
+        <div class="snapshot-grid">
+          <div class="snapshot-card">
+            <div class="snapshot-label">Sessions Executed</div>
+            <div class="snapshot-value" id="snap-sessions">26 / 34</div>
+            <div class="snapshot-sub">Education sessions completed</div>
+            <div class="progress-track">
+              <div class="progress-fill" id="snap-sessions-bar"></div>
             </div>
-            <div class="filter-group">
-                <label for="from-city-filter">From City</label>
-                <select id="from-city-filter">
-                    <option value="">All</option>
-                </select>
+          </div>
+          <div class="snapshot-card">
+            <div class="snapshot-label">Farmers Engaged</div>
+            <div class="snapshot-value" id="snap-farmers">1,123</div>
+            <div class="snapshot-sub">Direct wheat growers reached</div>
+            <div class="progress-track">
+              <div class="progress-fill" id="snap-farmers-bar"></div>
             </div>
-            <button class="filter-btn" type="button" onclick="applyFilters()">Apply Filters</button>
-            <button class="filter-btn" type="button" onclick="resetFilters()" style="background: var(--text-muted);">
-                Reset
-            </button>
-        </section>
-
-        <!-- Map + Key Metrics -->
-        <main class="layout-main">
-            <section class="card">
-                <div class="card-header">
-                    <div class="pill-icon">M</div>
-                    <span class="card-title-text">Engagement route map (circle size = crop area)</span>
-                </div>
-                <div id="route-map"></div>
-            </section>
-
-            <section class="card">
-                <div class="card-header">
-                    <div class="pill-icon">Σ</div>
-                    <span class="card-title-text">Key engagement metrics (current filters)</span>
-                </div>
-                <div class="metrics-grid">
-                    <div class="metric-row">
-                        <div class="metric">
-                            <div class="metric-label">Total sessions</div>
-                            <div class="metric-value" id="metric-total-sessions">–</div>
-                            <div class="metric-sub">
-                                Unique session IDs:
-                                <span id="metric-unique-sn">–</span>
-                            </div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Farmers reached</div>
-                            <div class="metric-value" id="metric-total-farmers">–</div>
-                            <div class="metric-sub">
-                                Avg per session:
-                                <span id="metric-farmers-per-session">–</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="metric-row">
-                        <div class="metric">
-                            <div class="metric-label">Crop area (acres)</div>
-                            <div class="metric-value" id="metric-total-acres">–</div>
-                            <div class="metric-sub">
-                                Avg per session:
-                                <span id="metric-acres-per-session">–</span>
-                            </div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Coverage</div>
-                            <div class="metric-value" id="metric-villages">–</div>
-                            <div class="metric-sub">
-                                Cities:
-                                <span id="metric-cities">–</span>,
-                                sessions with GPS:
-                                <span id="metric-sessions-with-coords">–</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <!-- Session-wise detail -->
-        <section class="card table-card">
-            <div class="card-header">
-                <div class="pill-icon">T</div>
-                <span class="card-title-text">
-                    Session-wise detail (filtered range &amp; media linkage)
-                </span>
+          </div>
+          <div class="snapshot-card">
+            <div class="snapshot-label">Acres Represented</div>
+            <div class="snapshot-value" id="snap-acres">19,025</div>
+            <div class="snapshot-sub">Wheat acres in decision pipeline</div>
+            <div class="progress-track">
+              <div class="progress-fill" id="snap-acres-bar"></div>
             </div>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>SN</th>
-                            <th>Date</th>
-                            <th>From City</th>
-                            <th>To City</th>
-                            <th>Session Location</th>
-                            <th>Farmers</th>
-                            <th>Acres</th>
-                            <th>Coordinates</th>
-                            <th>Feedback / Observations</th>
-                            <th>Media</th>
-                        </tr>
-                    </thead>
-                    <tbody id="session-rows"></tbody>
-                </table>
+          </div>
+          <div class="snapshot-card">
+            <div class="snapshot-label">Definite Use Intent</div>
+            <div class="snapshot-value" id="snap-intent">88%</div>
+            <div class="snapshot-sub">Average commitment to Buctril Super</div>
+            <div class="progress-track">
+              <div class="progress-fill" id="snap-intent-bar"></div>
             </div>
-            <p class="footer-note">
-                Media files are linked as <code>1.jpeg</code>/<code>1.mp4</code>, <code>2.jpeg</code>/<code>2.mp4</code>, …
-                based on the chronological order of unique dates in <code>sum_sheet.csv</code>.
-            </p>
-        </section>
+          </div>
+        </div>
 
-        <!-- Pivot summaries -->
-        <section class="card table-card">
-            <div class="card-header">
-                <div class="pill-icon">P</div>
-                <span class="card-title-text">
-                    Pivot view – by city &amp; village (top categories for clear graphs)
-                </span>
+        <div class="mini-kpi-row">
+          <div class="mini-kpi">
+            <strong>Education Effectiveness</strong>
+            2.9 / 3.0 message clarity • 97% understanding of “Golden Period” and safety.
+          </div>
+          <div class="mini-kpi">
+            <strong>Network Effect</strong>
+            200+ “Farmer Captains” identified across regions for peer advocacy.
+          </div>
+          <div class="mini-kpi">
+            <strong>Data Note</strong>
+            Days 14–17 &amp; Sargodha / Phalia metrics partially missing – tracking to be tightened.
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="pill-icon">📈</div>
+          <h2>Key Success Drivers & Challenges</h2>
+        </div>
+        <div class="drivers-layout">
+          <div>
+            <div class="chart-title">Key Success Drivers</div>
+            <div class="chart-container" style="margin-top:2px;">
+              <canvas id="driversPie"></canvas>
             </div>
-
-            <div class="pivot-layout">
-                <!-- City pivot -->
-                <div>
-                    <div class="chart-title" style="margin-bottom:4px;">By city – pivot table</div>
-                    <div class="table-wrapper" style="max-height:190px;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>City</th>
-                                    <th>Sessions</th>
-                                    <th>Farmers</th>
-                                    <th>Acres</th>
-                                </tr>
-                            </thead>
-                            <tbody id="city-rows"></tbody>
-                        </table>
-                    </div>
-                    <div class="chart-container" style="margin-top:8px;">
-                        <div class="chart-title">Share of farmers by city (top 6 + others)</div>
-                        <canvas id="cityFarmersChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Village pivot -->
-                <div>
-                    <div class="chart-title" style="margin-bottom:4px;">By village – pivot table (top 10)</div>
-                    <div class="table-wrapper" style="max-height:190px;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Village / location</th>
-                                    <th>Sessions</th>
-                                    <th>Farmers</th>
-                                    <th>Acres</th>
-                                </tr>
-                            </thead>
-                            <tbody id="village-rows"></tbody>
-                        </table>
-                    </div>
-                    <div class="chart-container" style="margin-top:8px;">
-                        <div class="chart-title">Share of acres by village (top 6 + others)</div>
-                        <canvas id="villageAcresChart"></canvas>
-                    </div>
-                </div>
+          </div>
+          <div class="drivers-text">
+            <strong>Core Insights</strong>
+            <ul>
+              <li><strong>Brand Trust</strong> – “Trust in Bayer” is the #1 purchase driver in 90% of sessions.</li>
+              <li><strong>Education Impact</strong> – 97% clarity directly feeds ~88% definite use intent.</li>
+              <li><strong>Network Effect</strong> – 200+ influencers ready for testimonials and advocacy.</li>
+            </ul>
+            <div class="insight-highlight">
+              <strong>Challenges Identified</strong><br/>
+              Price sensitivity in selected pockets, partial data gaps, and generic competition – addressed via micro-packs, demo plots and improved tracking.
             </div>
-        </section>
+          </div>
+        </div>
+      </section>
+    </section>
 
-        <!-- Executive summary & insights -->
-        <section class="card">
-            <div class="card-header">
-                <div class="pill-icon">📊</div>
-                <span class="card-title-text">
-                    Campaign snapshot, executive summary &amp; brand equity
-                </span>
+    <!-- KEY INSIGHTS / BUSINESS IMPACT -->
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon">⭐</div>
+        <h2>Key Insights, Business Impact & Next Steps</h2>
+      </div>
+
+      <div class="pill-row">
+        <span class="pill">Brand trust leader</span>
+        <span class="pill">Education excellence (97% clarity)</span>
+        <span class="pill">Strong conversion (88% intent)</span>
+        <span class="pill">Network built (200+ influencers)</span>
+      </div>
+
+      <div class="insight-grid">
+        <div class="insight-block">
+          <h3>Top success factors</h3>
+          <ul>
+            <li><strong>Brand trust leader:</strong> “Trust in Bayer” is the #1 purchase reason across sessions.</li>
+            <li><strong>Education excellence:</strong> simple, memorable key messages deliver 97% clarity.</li>
+            <li><strong>Strong conversion:</strong> 88% definite use intent from engaged farmers.</li>
+            <li><strong>Network built:</strong> 200+ Farmer Captains ready for advocacy and referrals.</li>
+          </ul>
+
+          <h3 style="margin-top:8px;">Farmer requests & opportunities</h3>
+          <ul>
+            <li>High demand for demo plots in key villages as physical proof of performance.</li>
+            <li>45+ farmers willing to share experiences on social media / WhatsApp.</li>
+            <li>Competitor mentions (Evyol, Suncrop) monitored for benchmarking.</li>
+          </ul>
+
+          <h3 style="margin-top:8px;">Business impact assessment</h3>
+          <ul>
+            <li><strong>Market penetration:</strong> 26 targeted sessions addressing 19,025+ wheat acres.</li>
+            <li><strong>Brand equity reinforcement:</strong> trust-first model differentiates from price-only competitors.</li>
+            <li><strong>Conversion pipeline:</strong> 88% intent supports strong seasonal forecast accuracy.</li>
+            <li><strong>Competitive advantage:</strong> farmer education plus safety benefits create a moat vs generics.</li>
+          </ul>
+        </div>
+
+        <div class="insight-block">
+          <h3>Challenges & price sensitivity</h3>
+          <table class="insight-table">
+            <thead>
+            <tr>
+              <th>Challenge</th>
+              <th>Impact</th>
+              <th>Action Required</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td>Price sensitivity</td>
+              <td>Medium</td>
+              <td>Launch micro-packs and tailored dealer schemes.</td>
+            </tr>
+            <tr>
+              <td>Data gaps</td>
+              <td>Low</td>
+              <td>Improve tracking for Days 14–17 &amp; Sargodha / Phalia sessions.</td>
+            </tr>
+            <tr>
+              <td>Competition</td>
+              <td>Low</td>
+              <td>Continue education-first differentiation vs generics.</td>
+            </tr>
+            </tbody>
+          </table>
+
+          <h3 style="margin-top:8px;">Growth template – engagement framework</h3>
+          <ul>
+            <li><strong>Timing:</strong> align sessions with pre-sowing decision window.</li>
+            <li><strong>Clarity:</strong> keep 2–3 simple, memorable key messages.</li>
+            <li><strong>Credibility:</strong> field team expertise plus dealer partners.</li>
+            <li><strong>Community:</strong> local influencers driving peer-to-peer recommendation.</li>
+            <li><strong>Consistency:</strong> standardised session structure across regions.</li>
+            <li><strong>Feedback loop:</strong> capture farmer concerns and act in near real-time.</li>
+          </ul>
+
+          <h3 style="margin-top:8px;">Brand equity dashboard</h3>
+          <div class="equity-grid">
+            <div class="equity-card">
+              <strong>Salience – Market reach</strong>
+              1,123 farmers • high salience in core wheat belt.
             </div>
-
-            <div class="summary-grid">
-                <!-- Left: executive summary & funnel -->
-                <div>
-                    <div class="summary-card-title">
-                        🚜 Farmer education drive – November–December 2025 | Executive snapshot
-                    </div>
-                    <p class="summary-lead">
-                        Transforming farmer education into acres: 26 sessions across 13 districts,
-                        building trust that converts into Buctril Super usage.
-                    </p>
-
-                    <table class="kpi-table-exec" aria-label="Campaign snapshot">
-                        <thead>
-                            <tr>
-                                <th>Metric</th>
-                                <th>Result</th>
-                                <th>Visual progress</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Sessions executed</td>
-                                <td>26 / 34 (76%)</td>
-                                <td>
-                                    <div class="bar-wrapper">
-                                        <div class="bar-fill" data-percent="76"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Farmers engaged</td>
-                                <td>1,123 🧑‍🌾</td>
-                                <td class="metric-emoji">🧑‍🌾 × 1,123</td>
-                            </tr>
-                            <tr>
-                                <td>Acres represented</td>
-                                <td>19,025 🌾</td>
-                                <td class="metric-emoji">🌾 × 19,025</td>
-                            </tr>
-                            <tr>
-                                <td>Message clarity</td>
-                                <td>2.9 / 3.0 (97%)</td>
-                                <td class="metric-emoji">⭐⭐⭐⭐⭐</td>
-                            </tr>
-                            <tr>
-                                <td>Definite use intent</td>
-                                <td>88% 💪</td>
-                                <td>
-                                    <div class="bar-wrapper">
-                                        <div class="bar-fill" data-percent="88"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Influencers identified</td>
-                                <td>201 🤝</td>
-                                <td class="metric-emoji">🤝 × 201</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="snapshot-note">
-                        Brand activation executed and reported by <strong>INTERACT</strong>;
-                        prepared for Bayer Marketing Team. Data period: 23 Nov – 8 Dec 2025
-                        (Days 1–13 complete; partial gaps on Days 14–17).
-                    </p>
-
-                    <div class="chart-container summary-small" style="margin-top:10px; min-height:190px;">
-                        <div class="chart-title">Education → commitment → acres (KPI funnel)</div>
-                        <canvas id="kpiFunnelChart"></canvas>
-                    </div>
-
-                    <div class="chart-container summary-small" style="margin-top:10px; min-height:160px;">
-                        <div class="chart-title">Campaign rating (overall 8.5 / 10)</div>
-                        <canvas id="ratingChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Right: insights, challenges, drivers, impact -->
-                <div>
-                    <div class="summary-card-title">
-                        ⭐ Key success factors, challenges &amp; business impact
-                    </div>
-
-                    <div class="insights-grid">
-                        <!-- Success factors & brand equity -->
-                        <div>
-                            <div class="insights-heading">Top success factors</div>
-                            <ul class="insights-list">
-                                <li><strong>Brand trust leader:</strong> “Trust in Bayer” the #1 purchase reason in ~90% of sessions.</li>
-                                <li><strong>Education excellence:</strong> 97% message clarity – farmers clearly understand dose, timing and safety.</li>
-                                <li><strong>Strong conversion:</strong> 88% definite use intent among engaged farmers.</li>
-                                <li><strong>Network built:</strong> 200+ Farmer Captains ready for advocacy and referrals.</li>
-                            </ul>
-
-                            <div class="insights-heading">Farmer requests &amp; opportunities</div>
-                            <ul class="insights-list">
-                                <li>High demand for demo plots as physical proof of performance.</li>
-                                <li>45+ farmers willing to share experiences on social media / WhatsApp.</li>
-                                <li>Competitor mentions (Evyol, Suncrop) monitored for benchmarking.</li>
-                            </ul>
-
-                            <div class="insights-heading">Brand equity dashboard</div>
-                            <ul class="insights-list">
-                                <li><strong>Salience – market reach:</strong> 1,123 farmers ✅</li>
-                                <li><strong>Performance – clarity:</strong> 97% understanding ✅</li>
-                                <li><strong>Imagery – purchase driver:</strong> “Trust in Bayer” ✅</li>
-                                <li><strong>Judgements – conversion:</strong> 88% definite use ✅</li>
-                                <li><strong>Feelings – confidence:</strong> high confidence reported ✅</li>
-                                <li><strong>Resonance – advocacy:</strong> 201 influencers identified ✅</li>
-                            </ul>
-
-                            <div class="equity-flow" aria-label="Brand equity ladder">
-                                <div class="equity-node">Salience · 1,123 farmers</div>
-                                <div class="equity-arrow">➜</div>
-                                <div class="equity-node">Performance · 97% clarity</div>
-                                <div class="equity-arrow">➜</div>
-                                <div class="equity-node">Imagery · “Trust in Bayer”</div>
-                                <div class="equity-arrow">➜</div>
-                                <div class="equity-node">Judgements · 88% conversion</div>
-                                <div class="equity-arrow">➜</div>
-                                <div class="equity-node">Feelings · high confidence</div>
-                                <div class="equity-arrow">➜</div>
-                                <div class="equity-node">Resonance · 201 influencers</div>
-                            </div>
-                        </div>
-
-                        <!-- Challenges, drivers, educational impact -->
-                        <div>
-                            <div class="snapshot-mini-title">Challenges &amp; price sensitivity</div>
-                            <ul class="insights-list">
-                                <li>Price seen as high by 15–20% of hesitant farmers; more pronounced in pockets such as Mianwali.</li>
-                                <li>Credit constraints and delayed payments noted – require dealer schemes / micro-packs.</li>
-                                <li>Partial data for some sessions – tracking must be tightened for a complete picture.</li>
-                            </ul>
-
-                            <div class="snapshot-mini-title" style="margin-top:8px;">Campaign snapshot – risk &amp; response</div>
-                            <table class="kpi-table-exec">
-                                <thead>
-                                    <tr>
-                                        <th>Challenge</th>
-                                        <th>Impact</th>
-                                        <th>Action required</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>Price sensitivity</td>
-                                        <td>Medium</td>
-                                        <td>Adjust pricing, launch micro-packs, support dealer credit schemes.</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Data gaps</td>
-                                        <td>Low</td>
-                                        <td>Improve tracking sheets for Sargodha/Phalia and Days 14–17.</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Competition</td>
-                                        <td>Low</td>
-                                        <td>Maintain education-first differentiation vs price-only competitors.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            <div class="chart-container summary-small" style="margin-top:10px; min-height:170px;">
-                                <div class="chart-title">Key success drivers</div>
-                                <canvas id="keyDriversChart"></canvas>
-                            </div>
-
-                            <div class="snapshot-mini-title" style="margin-top:10px;">Educational impact – from sessions to acres</div>
-                            <div class="flow-diagram" aria-label="Education-to-acres impact path">
-                                <div class="flow-step">
-                                    <strong>Education sessions</strong>
-                                    Structured Buctril Super farmer meetings.
-                                </div>
-                                <div class="flow-arrow">➜</div>
-                                <div class="flow-step">
-                                    <strong>97% clarity</strong>
-                                    Farmers understand timing and safety.
-                                </div>
-                                <div class="flow-arrow">➜</div>
-                                <div class="flow-step">
-                                    <strong>88% conversion</strong>
-                                    Definite intent to use Buctril Super.
-                                </div>
-                                <div class="flow-arrow">➜</div>
-                                <div class="flow-step">
-                                    <strong>19,025 acres secured</strong>
-                                    Direct footprint for current season.
-                                </div>
-                                <div class="flow-arrow">➜</div>
-                                <div class="flow-step">
-                                    <strong>16,742 acres benefited</strong>
-                                    Estimated acres with full weed-control benefit.
-                                </div>
-                            </div>
-
-                            <div class="insights-heading" style="margin-top:10px;">
-                                Growth template – the Buctril engagement framework
-                            </div>
-                            <ul class="insights-list">
-                                <li><strong>Timing:</strong> align sessions with pre-sowing decision window.</li>
-                                <li><strong>Clarity:</strong> keep 2–3 simple, memorable key messages.</li>
-                                <li><strong>Credibility:</strong> field team expertise plus dealer partners.</li>
-                                <li><strong>Community:</strong> local influencers driving peer-to-peer recommendation.</li>
-                                <li><strong>Consistency:</strong> standardised session structure across regions.</li>
-                                <li><strong>Feedback loop:</strong> capture and act on farmer concerns in near real time.</li>
-                            </ul>
-
-                            <div class="insights-heading">Final verdict</div>
-                            <ul class="insights-list">
-                                <li><strong>Overall rating:</strong> 8.5 / 10.</li>
-                                <li><strong>Key insight:</strong> education builds trust, and trust drives action – brand equity translates directly into market share.</li>
-                                <li><strong>Next priority:</strong> address price sensitivity and credit barriers to capture the remaining ~12% hesitant farmers.</li>
-                                <li><strong>Strategic success formula:</strong> [Clear education × Bayer trust] + [Community validation] = High conversion.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+            <div class="equity-card">
+              <strong>Performance – Clarity</strong>
+              97% understanding of dose, water volume and safety.
             </div>
-
-            <div class="brand-credit">
-                Job performed in field and reported by agency <strong>INTERACT</strong>;
-                prepared for <strong>Bayer Marketing Team</strong>.
+            <div class="equity-card">
+              <strong>Imagery – Trust anchor</strong>
+              “Trust in Bayer” as the primary purchase driver.
             </div>
-        </section>
-
-        <!-- Media gallery -->
-        <section class="media-gallery card">
-            <div class="card-header">
-                <div class="pill-icon">📸</div>
-                <span class="card-title-text">
-                    Media gallery (one slot per unique date – reads <code>1.jpeg</code>/<code>1.mp4</code> etc. from GitHub)
-                </span>
+            <div class="equity-card">
+              <strong>Judgements – Conversion</strong>
+              88% definite use intent confirms perceived value.
             </div>
-            <div class="media-grid" id="media-gallery"></div>
-            <p class="footer-note">
-                Hover on desktop (or tap on mobile) to preview videos; full media opens in a new tab if tapped.
-            </p>
-        </section>
+            <div class="equity-card">
+              <strong>Feelings – Confidence</strong>
+              High confidence reported across sessions.
+            </div>
+            <div class="equity-card">
+              <strong>Resonance – Advocacy</strong>
+              200+ influencers sustaining peer recommendations.
+            </div>
+          </div>
+
+          <div class="insight-highlight" style="margin-top:8px;">
+            <strong>Final verdict:</strong> overall campaign rating <strong>8.5 / 10</strong>.
+            Education builds trust, and trust drives action; price schemes and demo plots are the next levers to capture
+            the remaining hesitant farmers.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAP + KEY METRICS -->
+    <section class="two-col">
+      <section class="card">
+        <div class="card-header">
+          <div class="pill-icon">🗺️</div>
+          <h2>Engagement Route Map (circle = crop acres)</h2>
+        </div>
+        <div id="route-map"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="pill-icon">Σ</div>
+          <h2>Key Engagement Metrics (current filters)</h2>
+        </div>
+        <div class="key-metrics-grid">
+          <div class="metric-card">
+            <div class="metric-card-label">Total sessions</div>
+            <div class="metric-card-value" id="metric-total-sessions">–</div>
+            <div class="metric-card-sub">
+              Unique SN:
+              <strong id="metric-unique-sn">–</strong>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-label">Farmers reached</div>
+            <div class="metric-card-value" id="metric-total-farmers">–</div>
+            <div class="metric-card-sub">
+              Avg per session:
+              <strong id="metric-farmers-per-session">–</strong>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-label">Crop area (acres)</div>
+            <div class="metric-card-value" id="metric-total-acres">–</div>
+            <div class="metric-card-sub">
+              Avg per session:
+              <strong id="metric-acres-per-session">–</strong>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-label">Coverage & GPS</div>
+            <div class="metric-card-value" id="metric-villages">–</div>
+            <div class="metric-card-sub">
+              Cities:
+              <strong id="metric-cities">–</strong>,
+              sessions with GPS:
+              <strong id="metric-sessions-with-coords">–</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- SESSION TABLE -->
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon">📋</div>
+        <h2>Session-wise Detail (filtered range, with media index)</h2>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+          <tr>
+            <th>SN</th>
+            <th>Date</th>
+            <th>From City</th>
+            <th>To City</th>
+            <th>Session Location</th>
+            <th>Farmers</th>
+            <th>Acres</th>
+            <th>Coordinates</th>
+            <th>Feedback / Observations</th>
+            <th>Media Index</th>
+          </tr>
+          </thead>
+          <tbody id="session-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PIVOTS -->
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon">P</div>
+        <h2>Pivot View – By City &amp; Village</h2>
+      </div>
+      <div class="pivot-layout">
+        <div>
+          <div class="chart-title">By City – Sessions, Farmers & Acres</div>
+          <div class="table-wrapper" style="max-height:190px;">
+            <table>
+              <thead>
+              <tr>
+                <th>#</th>
+                <th>City</th>
+                <th>Sessions</th>
+                <th>Farmers</th>
+                <th>Acres</th>
+              </tr>
+              </thead>
+              <tbody id="city-rows"></tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">Share of farmers by city (Top 6 + Others)</div>
+            <canvas id="cityFarmersChart"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">By Village – Top 10 Locations</div>
+          <div class="table-wrapper" style="max-height:190px;">
+            <table>
+              <thead>
+              <tr>
+                <th>#</th>
+                <th>Village / Location</th>
+                <th>Sessions</th>
+                <th>Farmers</th>
+                <th>Acres</th>
+              </tr>
+              </thead>
+              <tbody id="village-rows"></tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">Share of acres by village (Top 6 + Others)</div>
+            <canvas id="villageAcresChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEDIA GALLERY -->
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon">📸</div>
+        <h2>Media Gallery – Dates, Photos & Short Clips (from GitHub)</h2>
+      </div>
+      <div class="media-grid" id="media-gallery"></div>
+      <div class="footer-note" style="margin-top:10px;">
+        Media slots map chronologically to unique dates in <strong>sum_sheet.csv</strong>:
+        <code>1.jpeg / 1.mp4</code>, <code>2.jpeg / 2.mp4</code>, … Up to <code>13.jpeg / 13.mp4</code>.
+        Hover on desktop (or tap on mobile) to preview videos.
+      </div>
+    </section>
+
+    <div class="footer-note">
+      Brand activation executed and reported by <strong>INTERACT</strong>. Dashboard prepared for
+      <strong>Bayer Marketing Team</strong>. Strategic success formula:
+      <em>[Clear education × Bayer trust] + community validation = high conversion.</em>
     </div>
+  </div>
 
-    <!-- JS libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
-    <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""
-        defer
-    ></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <!-- JS libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-    <!-- Dashboard logic -->
-    <script src="data_processor.js" defer></script>
+  <!-- Dashboard logic -->
+  <script src="dashboard.js"></script>
 </body>
 </html>
