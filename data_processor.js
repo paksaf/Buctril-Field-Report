@@ -1,749 +1,616 @@
 /****************************************************
- * Buctril Super Dashboard – Data Processor (RGN/City/Spot + Per-Session Media)
- * Expects files in SAME FOLDER as index.html:
- * - sum_sheet.csv
- * - tmp.mp4 (optional background)
- * Media naming per session row (Session ID):
- *   1a.jpg / 1a.jpeg / 1a.mp4 ... up to 1f.*
- *   2a.jpg ... 17f.mp4 etc.
+ * Buctril Super Dashboard – Donut-driven City Navigation (multi-color)
+ * - Reads sum_sheet.csv (same folder as index.html)
+ * - Excludes Multan start-point rows (Multan + 0 farmers + 0 acres)
+ * - Filters: RGN → City → Spot + Search
+ * - Donuts:
+ *    1) Avg Clarity (single-color)
+ *    2) Avg Definite (single-color)
+ *    3) Farmers by City (multi-color, click segment to filter)
+ * - Media:
+ *    Supports simple per-session naming: 1.jpg/1.jpeg + 1.mp4
+ *    Also supports multi-media per session: 1a…1f (jpg/jpeg/mp4)
  ****************************************************/
 
-// ------------------------- Helpers -------------------------
-function safeText(v) {
-  if (v === null || v === undefined) return "";
-  return String(v).trim();
-}
-
-function safeNumber(val) {
-  if (val === null || val === undefined || val === "") return 0;
-  // Handles "1,002", "45%", " 12.5 "
-  var str = String(val).replace(/,/g, "").trim();
+function safeText(v){ return (v===null||v===undefined) ? "" : String(v).trim(); }
+function safeNumber(val){
+  if(val===null||val===undefined||val==="") return 0;
+  var str = String(val).replace(/,/g,"").trim();
   var m = str.match(/-?\d+(?:\.\d+)?/);
-  if (!m) return 0;
+  if(!m) return 0;
   var n = parseFloat(m[0]);
   return isNaN(n) ? 0 : n;
 }
+function formatInt(n){ try{return Math.round(n).toLocaleString("en-US");}catch(e){return String(n);} }
+function setText(id, v){ var el=document.getElementById(id); if(el) el.textContent=v; }
 
-function formatInt(n) {
-  try { return Math.round(n).toLocaleString("en-US"); } catch { return String(n); }
-}
-
-function setText(id, value) {
-  var el = document.getElementById(id);
-  if (el) el.textContent = value;
-}
-
-function showErrorModal(message) {
-  var existing = document.querySelector(".error-modal");
-  if (existing) existing.remove();
-
-  var modal = document.createElement("div");
-  modal.className = "error-modal";
-  modal.innerHTML = "<p>" + message + "</p><button type='button'>Close</button>";
+function showErrorModal(msg){
+  var existing=document.querySelector(".error-modal"); if(existing) existing.remove();
+  var modal=document.createElement("div"); modal.className="error-modal";
+  modal.innerHTML="<p>"+msg+"</p><button type='button'>Close</button>";
   document.body.appendChild(modal);
-  var btn = modal.querySelector("button");
-  if (btn) btn.addEventListener("click", function () { modal.remove(); });
+  modal.querySelector("button").addEventListener("click", function(){ modal.remove(); });
 }
 
-function getField(row, candidates) {
-  // candidates: array of possible column names
-  for (var i = 0; i < candidates.length; i++) {
-    var k = candidates[i];
-    if (row.hasOwnProperty(k) && safeText(row[k]) !== "") return row[k];
+function getField(row, candidates){
+  for(var i=0;i<candidates.length;i++){
+    var k=candidates[i];
+    if(row.hasOwnProperty(k) && safeText(row[k])!=="") return row[k];
   }
-  // try case-insensitive match
-  var keys = Object.keys(row);
-  for (var j = 0; j < candidates.length; j++) {
-    var want = candidates[j].toLowerCase();
-    for (var t = 0; t < keys.length; t++) {
-      if (keys[t].toLowerCase() === want && safeText(row[keys[t]]) !== "") return row[keys[t]];
+  var keys=Object.keys(row);
+  for(var j=0;j<candidates.length;j++){
+    var want=candidates[j].toLowerCase();
+    for(var t=0;t<keys.length;t++){
+      if(keys[t].toLowerCase()===want && safeText(row[keys[t]])!=="") return row[keys[t]];
     }
   }
   return "";
 }
+function normName(s){ return safeText(s).replace(/\s+/g," ").trim(); }
 
-function normalizeCityName(s) {
-  return safeText(s).replace(/\s+/g, " ").trim();
+function isMultanStartPoint(r){
+  var c = normName(r.city).toLowerCase();
+  return (c==="multan" && (r.__farmers===0) && (r.__acres===0));
+}
+function clampPct(x){ return Math.max(0, Math.min(100, x)); }
+function starsFromPct(p){
+  var s = Math.max(0, Math.min(5, Math.round(p/20)));
+  return "★".repeat(s) + "☆".repeat(5-s);
+}
+function cityColor(city){
+  var c = normName(city).toLowerCase();
+  var h=0;
+  for(var i=0;i<c.length;i++){ h = (h*31 + c.charCodeAt(i)) % 360; }
+  return "hsl(" + h + ", 70%, 55%)";
 }
 
-function isMultanStartPoint(r) {
-  // Exclude "Multan" when it's not an engagement session.
-  // Conservative rule: if city is Multan AND farmers & acres are zero -> drop.
-  var city = normalizeCityName(r.city).toLowerCase();
-  return city === "multan" && (r.__farmers === 0) && (r.__acres === 0);
-}
+var allRows=[], filteredRows=[];
+var map=null, mapMarkers=[];
+var clarityDonut=null, definiteDonut=null, cityDonut=null;
+var MEDIA_LETTERS=["a","b","c","d","e","f"];
 
-function starsFromPct(pct) {
-  var s = Math.max(0, Math.min(5, Math.round(pct / 20)));
-  return "★".repeat(s) + "☆".repeat(5 - s);
-}
-
-// ------------------------- Global State -------------------------
-var allRows = [];
-var filteredRows = [];
-
-var map = null;
-var mapMarkers = [];
-
-var clarityDonut = null;
-var definiteDonut = null;
-var adoptionChart = null;
-
-// Media letters (a..f)
-var MEDIA_LETTERS = ["a","b","c","d","e","f"];
-
-// ------------------------- CSV Load + Parse -------------------------
-function loadCSV() {
-  var loadingEl = document.getElementById("loading-message");
+function loadCSV(){
+  var loading=document.getElementById("loading");
   fetch("sum_sheet.csv?cache=" + Date.now())
-    .then(function (res) {
-      if (!res.ok) throw new Error("sum_sheet.csv not found (" + res.status + ")");
+    .then(function(res){
+      if(!res.ok) throw new Error("sum_sheet.csv not found ("+res.status+")");
       return res.text();
     })
-    .then(function (csvText) {
-      // Remove a "Summary..." first line if present
-      var lines = csvText.split(/\r?\n/);
-      if (lines.length > 0 && /^summary\b/i.test(lines[0].trim())) {
+    .then(function(text){
+      var lines=text.split(/\r?\n/);
+      if(lines.length && /^summary\b/i.test(lines[0].trim())){
         lines.shift();
-        csvText = lines.join("\n");
+        text=lines.join("\n");
       }
+      if(typeof Papa==="undefined") throw new Error("PapaParse not loaded (Papa is undefined).");
 
-      if (typeof Papa === "undefined") {
-        throw new Error("PapaParse library not loaded (Papa is undefined).");
-      }
-
-      var parsed = Papa.parse(csvText, {
-        header: true,
-        dynamicTyping: false,
-        skipEmptyLines: true,
-      });
-
-      if (parsed.errors && parsed.errors.length) {
+      var parsed=Papa.parse(text, {header:true, dynamicTyping:false, skipEmptyLines:true});
+      if(parsed.errors && parsed.errors.length){
         console.error("CSV parse errors:", parsed.errors);
-        showErrorModal("CSV parsing errors detected. Please verify your CSV formatting (commas inside fields must be quoted).");
+        showErrorModal("CSV parsing errors detected. Ensure commas inside text fields are quoted.");
       }
 
-      allRows = (parsed.data || [])
-        .map(function (row, idx) { return normalizeRow(row, idx); })
-        .filter(function (r) { return r && r.__farmers > 0; }) // keep real sessions only
-        .filter(function (r) { return !isMultanStartPoint(r); }); // remove Multan start point
+      allRows=(parsed.data||[])
+        .map(function(row, idx){ return normalizeRow(row, idx); })
+        .filter(function(r){ return r && (r.__farmers>0); })
+        .filter(function(r){ return normName(r.city).toLowerCase() !== "multan"; });
 
-      // Initial render
       initCharts();
       initFilters();
       applyFilters();
 
-      if (loadingEl) loadingEl.remove();
+      if(loading) loading.remove();
     })
-    .catch(function (err) {
+    .catch(function(err){
       console.error(err);
       showErrorModal("Error loading data: " + err.message);
-      if (loadingEl) loadingEl.remove();
+      if(loading) loading.remove();
     });
 }
 
-function normalizeRow(row, idx) {
-  // Determine stable Session ID for media mapping
+function normalizeRow(row, idx){
   var sid = safeText(getField(row, ["SN","Sr No","Sr. No","Session ID","SessionID","ID","Id","S#","S.No","S No"]));
-  var sessionId = sid !== "" ? safeNumber(sid) : (idx + 1);
+  var id = sid!=="" ? safeNumber(sid) : (idx+1);
 
   var rgn = safeText(getField(row, ["RGN","Region","REGION","Rgn"]));
-  var city = normalizeCityName(getField(row, ["City","To City","To","District","District/City"]));
-  var fromCity = normalizeCityName(getField(row, ["From City","From","Starting City","Start City"]));
-  var spot = normalizeCityName(getField(row, ["Session Location","Village / Mauza","Village/Mauza","Spot","Location","Venue","Mauza","Village"]));
-  var dateStr = safeText(getField(row, ["Date","Activity Date","Day","Session Date"]));
+  var city = normName(getField(row, ["City","To City","To","District","District/City"]));
+  var from = normName(getField(row, ["From City","From","Starting City","Start City"]));
+  var spot = normName(getField(row, ["Session Location","Village / Mauza","Village/Mauza","Spot","Location","Venue","Mauza","Village"]));
+  var date = safeText(getField(row, ["Date","Activity Date","Day","Session Date"]));
 
-  // numbers
-  var farmers = safeNumber(getField(row, ["No of Farmer Participate","Farmers","Farmers Engaged","No of Farmers","No. of Farmers","No of farmer","Participants","Attendees"]));
+  var farmers = safeNumber(getField(row, ["No of Farmer Participate","Farmers","Farmers Engaged","No of Farmers","No. of Farmers","Participants","Attendees"]));
   var acres = safeNumber(getField(row, ["Acres","Acres Covered","Total Acres"]));
 
-  // campaign metrics
   var clarity = safeNumber(getField(row, ["Message Clarity %","Message Clarity","Clarity %","Clarity","Msg Clarity"]));
-  var definite = safeNumber(getField(row, ["Definite Use %","Definite Use","Definite Use %","Use Intent %","Use Intent","Definite"]));
+  var definite = safeNumber(getField(row, ["Definite Use %","Definite Use","Use Intent %","Use Intent","Definite"]));
   var influencers = safeNumber(getField(row, ["Influencers","No of Influencers","Influencers Identified"]));
   var awareness = safeNumber(getField(row, ["Awareness %","Awareness","Awareness Rate"]));
 
-  // geo
   var lat = safeNumber(getField(row, ["Latitude","Lat"]));
   var lon = safeNumber(getField(row, ["Longitude","Lng","Long","Lon"]));
 
   return {
     __raw: row,
-    id: sessionId,              // displayed session id + used for media file prefixes
-    rgn: rgn,
-    city: city,
-    from: fromCity,
-    spot: spot,
-    date: dateStr,
-
-    __farmers: farmers,
-    __acres: acres,
-
-    __messageClarity: clarity,
-    __definiteUseRate: definite,
-    __influencers: influencers,
-    __awarenessRate: awareness,
-
-    latitude: lat,
-    longitude: lon
+    id:id, rgn:rgn, city:city, from:from, spot:spot, date:date,
+    __farmers:farmers, __acres:acres,
+    __messageClarity:clarity, __definiteUseRate:definite, __influencers:influencers, __awarenessRate:awareness,
+    latitude:lat, longitude:lon
   };
 }
 
-// ------------------------- Filters -------------------------
-function initFilters() {
-  var rgnSel = document.getElementById("filter-rgn");
-  var citySel = document.getElementById("filter-city");
-  var spotSel = document.getElementById("filter-spot");
-  var searchEl = document.getElementById("filter-search");
+function initFilters(){
+  var rgnSel=document.getElementById("filter-rgn");
+  var citySel=document.getElementById("filter-city");
+  var spotSel=document.getElementById("filter-spot");
+  var search=document.getElementById("filter-search");
+  var clearBtn=document.getElementById("btn-clear");
 
-  if (!rgnSel || !citySel || !spotSel) return;
+  rebuildRegionOptions();
+  rebuildCityOptions();
+  rebuildSpotOptions();
 
-  // Attach listeners
-  rgnSel.addEventListener("change", function () {
-    // When region changes, rebuild city/spot options to match region
-    rebuildCityAndSpotOptions();
-    applyFilters();
-  });
-
-  citySel.addEventListener("change", function () {
-    // When city changes, rebuild spot options to match region+city
+  rgnSel.addEventListener("change", function(){
+    rebuildCityOptions();
     rebuildSpotOptions();
     applyFilters();
   });
-
+  citySel.addEventListener("change", function(){
+    rebuildSpotOptions();
+    applyFilters();
+  });
   spotSel.addEventListener("change", applyFilters);
+  search.addEventListener("input", applyFilters);
 
-  if (searchEl) {
-    searchEl.addEventListener("input", function () {
-      // keep city/spot options but apply filtering live
-      applyFilters();
-    });
-  }
-
-  rebuildRegionOptions();
-  rebuildCityAndSpotOptions();
+  clearBtn.addEventListener("click", function(){
+    rgnSel.value="";
+    citySel.value="";
+    spotSel.value="";
+    search.value="";
+    rebuildCityOptions();
+    rebuildSpotOptions();
+    applyFilters();
+  });
 }
 
-function rebuildRegionOptions() {
-  var rgnSel = document.getElementById("filter-rgn");
-  if (!rgnSel) return;
+function rebuildRegionOptions(){
+  var rgnSel=document.getElementById("filter-rgn");
+  var cur=rgnSel.value||"";
+  rgnSel.innerHTML="<option value=''>All Regions</option>";
 
-  var current = rgnSel.value || "";
-  rgnSel.innerHTML = "<option value=''>All Regions</option>";
-
-  var set = new Set();
-  allRows.forEach(function (r) {
-    var v = safeText(r.rgn);
-    if (v) set.add(v);
+  var set=new Set();
+  allRows.forEach(function(r){ if(r.rgn) set.add(r.rgn); });
+  Array.from(set).sort().forEach(function(v){
+    var o=document.createElement("option"); o.value=v; o.textContent=v; rgnSel.appendChild(o);
   });
-  Array.from(set).sort().forEach(function (v) {
-    var opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    rgnSel.appendChild(opt);
-  });
-
-  // restore selection if still present
-  if (current) rgnSel.value = current;
+  if(cur) rgnSel.value=cur;
 }
 
-function rebuildCityAndSpotOptions() {
-  rebuildCityOptions();
-  rebuildSpotOptions();
+function rebuildCityOptions(){
+  var rgnSel=document.getElementById("filter-rgn");
+  var citySel=document.getElementById("filter-city");
+  var region=rgnSel.value||"";
+  var cur=citySel.value||"";
+
+  citySel.innerHTML="<option value=''>All Cities</option>";
+  var set=new Set();
+  allRows.forEach(function(r){
+    if(region && r.rgn!==region) return;
+    if(!r.city) return;
+    if(r.city.toLowerCase()==="multan") return;
+    set.add(r.city);
+  });
+  Array.from(set).sort().forEach(function(c){
+    var o=document.createElement("option"); o.value=c; o.textContent=c; citySel.appendChild(o);
+  });
+  if(cur && set.has(cur)) citySel.value=cur; else citySel.value="";
 }
 
-function rebuildCityOptions() {
-  var rgnSel = document.getElementById("filter-rgn");
-  var citySel = document.getElementById("filter-city");
-  if (!citySel) return;
+function rebuildSpotOptions(){
+  var rgnSel=document.getElementById("filter-rgn");
+  var citySel=document.getElementById("filter-city");
+  var spotSel=document.getElementById("filter-spot");
 
-  var region = rgnSel ? (rgnSel.value || "") : "";
-  var currentCity = citySel.value || "";
+  var region=rgnSel.value||"";
+  var city=citySel.value||"";
+  var cur=spotSel.value||"";
 
-  citySel.innerHTML = "<option value=''>All Cities</option>";
-
-  var set = new Set();
-  allRows.forEach(function (r) {
-    if (region && safeText(r.rgn) !== region) return;
-    var c = safeText(r.city);
-    if (!c) return;
-    if (c.toLowerCase() === "multan") return; // extra safety
-    set.add(c);
+  spotSel.innerHTML="<option value=''>All Spots</option>";
+  var set=new Set();
+  allRows.forEach(function(r){
+    if(region && r.rgn!==region) return;
+    if(city && r.city!==city) return;
+    if(r.spot) set.add(r.spot);
   });
-
-  Array.from(set).sort().forEach(function (c) {
-    var opt = document.createElement("option");
-    opt.value = c;
-    opt.textContent = c;
-    citySel.appendChild(opt);
+  Array.from(set).sort().forEach(function(s){
+    var o=document.createElement("option"); o.value=s; o.textContent=s; spotSel.appendChild(o);
   });
-
-  if (currentCity && Array.from(set).includes(currentCity)) {
-    citySel.value = currentCity;
-  } else {
-    citySel.value = "";
-  }
+  if(cur && set.has(cur)) spotSel.value=cur; else spotSel.value="";
 }
 
-function rebuildSpotOptions() {
-  var rgnSel = document.getElementById("filter-rgn");
-  var citySel = document.getElementById("filter-city");
-  var spotSel = document.getElementById("filter-spot");
-  if (!spotSel) return;
+function applyFilters(){
+  var rgnVal=safeText(document.getElementById("filter-rgn").value);
+  var cityVal=safeText(document.getElementById("filter-city").value);
+  var spotVal=safeText(document.getElementById("filter-spot").value);
+  var q=safeText(document.getElementById("filter-search").value).toLowerCase();
 
-  var region = rgnSel ? (rgnSel.value || "") : "";
-  var city = citySel ? (citySel.value || "") : "";
-  var currentSpot = spotSel.value || "";
-
-  spotSel.innerHTML = "<option value=''>All Spots</option>";
-
-  var set = new Set();
-  allRows.forEach(function (r) {
-    if (region && safeText(r.rgn) !== region) return;
-    if (city && safeText(r.city) !== city) return;
-    var s = safeText(r.spot);
-    if (s) set.add(s);
-  });
-
-  Array.from(set).sort().forEach(function (s) {
-    var opt = document.createElement("option");
-    opt.value = s;
-    opt.textContent = s;
-    spotSel.appendChild(opt);
-  });
-
-  if (currentSpot && Array.from(set).includes(currentSpot)) {
-    spotSel.value = currentSpot;
-  } else {
-    spotSel.value = "";
-  }
-}
-
-function applyFilters() {
-  var rgnVal = safeText(document.getElementById("filter-rgn")?.value);
-  var cityVal = safeText(document.getElementById("filter-city")?.value);
-  var spotVal = safeText(document.getElementById("filter-spot")?.value);
-  var searchVal = safeText(document.getElementById("filter-search")?.value).toLowerCase();
-
-  filteredRows = allRows.filter(function (r) {
-    if (rgnVal && safeText(r.rgn) !== rgnVal) return false;
-    if (cityVal && safeText(r.city) !== cityVal) return false;
-    if (spotVal && safeText(r.spot) !== spotVal) return false;
-
-    if (searchVal) {
-      var hay = (safeText(r.rgn) + " " + safeText(r.city) + " " + safeText(r.spot) + " " + safeText(r.from)).toLowerCase();
-      if (!hay.includes(searchVal)) return false;
+  filteredRows=allRows.filter(function(r){
+    if(rgnVal && r.rgn!==rgnVal) return false;
+    if(cityVal && r.city!==cityVal) return false;
+    if(spotVal && r.spot!==spotVal) return false;
+    if(q){
+      var hay=(safeText(r.rgn)+" "+safeText(r.city)+" "+safeText(r.spot)+" "+safeText(r.from)).toLowerCase();
+      if(!hay.includes(q)) return false;
     }
     return true;
   });
 
-  // update UI
   updateMetrics(filteredRows);
   updateDonuts(filteredRows);
-  updateAdoptionChart(filteredRows);
+  updateCityDonut(filteredRows);
   updateSessionTable(filteredRows);
   updateMap(filteredRows);
-  updateMediaGallery(filteredRows);
+  updateMedia(filteredRows);
 }
 
-// ------------------------- Metrics + Donuts -------------------------
-function updateMetrics(rows) {
-  var totalSessions = rows.length;
-  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
-  var totalAcres = rows.reduce(function (s, r) { return s + (r.__acres || 0); }, 0);
-  var uniqueCities = new Set(rows.map(function (r) { return r.city; }).filter(Boolean)).size;
-  var uniqueDays = new Set(rows.map(function (r) { return r.date; }).filter(Boolean)).size;
+function updateMetrics(rows){
+  var sessions=rows.length;
+  var farmers=rows.reduce(function(s,r){return s+(r.__farmers||0);},0);
+  var acres=rows.reduce(function(s,r){return s+(r.__acres||0);},0);
+  var cities=new Set(rows.map(function(r){return r.city;}).filter(Boolean)).size;
+  var days=new Set(rows.map(function(r){return r.date;}).filter(Boolean)).size;
 
-  setText("metric-sessions", formatInt(totalSessions));
-  setText("metric-farmers", formatInt(totalFarmers));
-  setText("metric-acres", formatInt(totalAcres));
-  setText("metric-cities", formatInt(uniqueCities));
-  setText("metric-days", formatInt(uniqueDays));
+  setText("metric-sessions", formatInt(sessions));
+  setText("metric-farmers", formatInt(farmers));
+  setText("metric-acres", formatInt(acres));
+  setText("metric-cities", formatInt(cities));
+  setText("metric-days", formatInt(days));
+  setText("hero-farmers", formatInt(farmers));
+  setText("hero-sessions", formatInt(sessions));
 
-  setText("hero-farmers", formatInt(totalFarmers));
-  setText("hero-sessions", formatInt(totalSessions));
-
-  // campaign metrics
-  var avgClarity = 0, avgDef = 0, avgAware = 0, totalInfl = 0, defFarmers = 0;
-  if (rows.length > 0) {
-    avgClarity = rows.reduce(function (s, r) { return s + (r.__messageClarity || 0); }, 0) / rows.length;
-    avgDef = rows.reduce(function (s, r) { return s + (r.__definiteUseRate || 0); }, 0) / rows.length;
-    avgAware = rows.reduce(function (s, r) { return s + (r.__awarenessRate || 0); }, 0) / rows.length;
-    totalInfl = rows.reduce(function (s, r) { return s + (r.__influencers || 0); }, 0);
-    defFarmers = rows.reduce(function (s, r) {
-      return s + Math.round((r.__farmers || 0) * (r.__definiteUseRate || 0) / 100);
-    }, 0);
+  var avgCl=0, avgDef=0, avgAw=0, infl=0, defFarmers=0;
+  if(rows.length){
+    avgCl = rows.reduce(function(s,r){return s+(r.__messageClarity||0);},0)/rows.length;
+    avgDef = rows.reduce(function(s,r){return s+(r.__definiteUseRate||0);},0)/rows.length;
+    avgAw = rows.reduce(function(s,r){return s+(r.__awarenessRate||0);},0)/rows.length;
+    infl = rows.reduce(function(s,r){return s+(r.__influencers||0);},0);
+    defFarmers = rows.reduce(function(s,r){
+      return s + Math.round((r.__farmers||0)*(r.__definiteUseRate||0)/100);
+    },0);
   }
 
-  setText("metric-clarity", Math.round(avgClarity) + "%");
-  setText("metric-definite", Math.round(avgDef) + "%");
-  setText("metric-influencers", formatInt(totalInfl));
-  setText("metric-awareness", Math.round(avgAware) + "%");
+  avgCl=clampPct(avgCl); avgDef=clampPct(avgDef); avgAw=clampPct(avgAw);
 
-  var clarityBar = document.getElementById("clarity-progress");
-  var defBar = document.getElementById("definite-progress");
-  var inflBar = document.getElementById("influencers-progress");
-  var awareBar = document.getElementById("awareness-progress");
-  var stars = document.getElementById("clarity-stars");
+  setText("metric-clarity", Math.round(avgCl)+"%");
+  setText("metric-definite", Math.round(avgDef)+"%");
+  setText("metric-influencers", formatInt(infl));
+  setText("metric-awareness", Math.round(avgAw)+"%");
 
-  if (clarityBar) clarityBar.style.width = Math.max(0, Math.min(100, Math.round(avgClarity))) + "%";
-  if (defBar) defBar.style.width = Math.max(0, Math.min(100, Math.round(avgDef))) + "%";
-  if (awareBar) awareBar.style.width = Math.max(0, Math.min(100, Math.round(avgAware))) + "%";
+  var b1=document.getElementById("clarity-progress");
+  var b2=document.getElementById("definite-progress");
+  var b3=document.getElementById("influencers-progress");
+  var b4=document.getElementById("awareness-progress");
+  if(b1) b1.style.width=Math.round(avgCl)+"%";
+  if(b2) b2.style.width=Math.round(avgDef)+"%";
+  if(b4) b4.style.width=Math.round(avgAw)+"%";
 
-  // influencers scale: dynamic max by current dataset to avoid always tiny bars
-  var maxInfl = allRows.reduce(function (m, r) { return Math.max(m, r.__influencers || 0); }, 0) || 1;
-  if (inflBar) inflBar.style.width = Math.round(Math.min(100, (totalInfl / (maxInfl * Math.max(1, rows.length / 3))) * 100)) + "%";
+  var maxInfl=allRows.reduce(function(m,r){ return Math.max(m, r.__influencers||0); },0) || 1;
+  var scaled = Math.min(100, Math.round((infl / (maxInfl * Math.max(1, rows.length/3))) * 100));
+  if(b3) b3.style.width=scaled+"%";
 
-  if (stars) stars.textContent = starsFromPct(avgClarity);
+  var st=document.getElementById("clarity-stars");
+  if(st) st.textContent=starsFromPct(avgCl);
 
-  var adoptionText = document.getElementById("adoption-text");
-  if (adoptionText) {
-    var pct = totalFarmers > 0 ? Math.round((defFarmers / totalFarmers) * 100) : Math.round(avgDef);
-    adoptionText.textContent = "Estimated definite-use farmers: " + formatInt(defFarmers) + " (" + pct + "%)";
+  var at=document.getElementById("adoption-text");
+  if(at){
+    var pct = farmers>0 ? Math.round((defFarmers/farmers)*100) : Math.round(avgDef);
+    at.textContent="Estimated definite-use farmers: " + formatInt(defFarmers) + " ("+pct+"%)";
   }
 }
 
-function updateDonuts(rows) {
-  if (!clarityDonut || !definiteDonut) return;
+function initCharts(){
+  var c1=document.getElementById("clarityDonut");
+  var c2=document.getElementById("definiteDonut");
+  var c3=document.getElementById("cityDonut");
+  if(!c1||!c2||!c3) return;
 
-  var avgClarity = 0, avgDef = 0;
-  if (rows.length > 0) {
-    avgClarity = rows.reduce(function (s, r) { return s + (r.__messageClarity || 0); }, 0) / rows.length;
-    avgDef = rows.reduce(function (s, r) { return s + (r.__definiteUseRate || 0); }, 0) / rows.length;
+  clarityDonut=new Chart(c1, {
+    type:"doughnut",
+    data:{labels:["Clarity","Remaining"],datasets:[{data:[0,100],backgroundColor:["#66bb6a","#e0e0e0"],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"80%",plugins:{legend:{display:false}}}
+  });
+
+  definiteDonut=new Chart(c2, {
+    type:"doughnut",
+    data:{labels:["Definite","Remaining"],datasets:[{data:[0,100],backgroundColor:["#ff7043","#e0e0e0"],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"80%",plugins:{legend:{display:false}}}
+  });
+
+  cityDonut=new Chart(c3, {
+    type:"doughnut",
+    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderWidth:0}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:"74%",
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:function(ctx){
+              var label=ctx.label||"";
+              var val=ctx.parsed||0;
+              return label + ": " + formatInt(val) + " farmers";
+            }
+          }
+        }
+      },
+      onClick: function(evt, elements){
+        if(!elements || !elements.length) return;
+        var idx=elements[0].index;
+        var city = this.data.labels[idx];
+        if(city){
+          var citySel=document.getElementById("filter-city");
+          citySel.value=city;
+          rebuildSpotOptions();
+          applyFilters();
+        }
+      }
+    }
+  });
+}
+
+function updateDonuts(rows){
+  if(!clarityDonut || !definiteDonut) return;
+  var avgCl=0, avgDef=0;
+  if(rows.length){
+    avgCl=rows.reduce(function(s,r){return s+(r.__messageClarity||0);},0)/rows.length;
+    avgDef=rows.reduce(function(s,r){return s+(r.__definiteUseRate||0);},0)/rows.length;
   }
-  avgClarity = Math.max(0, Math.min(100, avgClarity));
-  avgDef = Math.max(0, Math.min(100, avgDef));
+  avgCl=clampPct(avgCl); avgDef=clampPct(avgDef);
 
-  clarityDonut.data.datasets[0].data = [avgClarity, 100 - avgClarity];
-  definiteDonut.data.datasets[0].data = [avgDef, 100 - avgDef];
-
+  clarityDonut.data.datasets[0].data=[avgCl, 100-avgCl];
+  definiteDonut.data.datasets[0].data=[avgDef, 100-avgDef];
   clarityDonut.update();
   definiteDonut.update();
 
-  setText("clarity-main", Math.round(avgClarity) + "%");
-  setText("definite-main", Math.round(avgDef) + "%");
+  setText("clarity-main", Math.round(avgCl)+"%");
+  setText("definite-main", Math.round(avgDef)+"%");
 }
 
-// ------------------------- Charts -------------------------
-function initCharts() {
-  // Donuts
-  var ctx1 = document.getElementById("clarityDonut");
-  var ctx2 = document.getElementById("definiteDonut");
-  if (!ctx1 || !ctx2) return;
-
-  clarityDonut = new Chart(ctx1, {
-    type: "doughnut",
-    data: {
-      labels: ["Clarity", "Remaining"],
-      datasets: [{
-        data: [0, 100],
-        backgroundColor: ["#66bb6a", "#e0e0e0"],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "80%",
-      plugins: { legend: { display: false }, tooltip: { enabled: true } }
-    }
+function buildCitySummary(rows){
+  var m={};
+  rows.forEach(function(r){
+    var c=r.city||"Unknown";
+    if(!m[c]) m[c]={city:c, farmers:0, sessions:0, acres:0};
+    m[c].farmers += (r.__farmers||0);
+    m[c].acres += (r.__acres||0);
+    m[c].sessions += 1;
   });
-
-  definiteDonut = new Chart(ctx2, {
-    type: "doughnut",
-    data: {
-      labels: ["Definite Use", "Remaining"],
-      datasets: [{
-        data: [0, 100],
-        backgroundColor: ["#ff7043", "#e0e0e0"],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "80%",
-      plugins: { legend: { display: false }, tooltip: { enabled: true } }
-    }
-  });
-
-  // Adoption bar
-  var ctx3 = document.getElementById("adoptionChart");
-  if (ctx3) {
-    adoptionChart = new Chart(ctx3, {
-      type: "bar",
-      data: {
-        labels: ["Total Farmers", "Estimated Definite-use"],
-        datasets: [{
-          label: "Farmers",
-          data: [0, 0],
-          backgroundColor: ["#90caf9", "#66bb6a"],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return formatInt(v); } } } }
-      }
-    });
-  }
+  var arr=Object.values(m).filter(function(x){ return x.city && x.city.toLowerCase()!=="multan"; });
+  arr.sort(function(a,b){ return b.farmers-a.farmers; });
+  return arr;
 }
 
-function updateAdoptionChart(rows) {
-  if (!adoptionChart) return;
+function updateCityDonut(rows){
+  if(!cityDonut) return;
 
-  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
-  var defFarmers = rows.reduce(function (s, r) {
-    return s + Math.round((r.__farmers || 0) * (r.__definiteUseRate || 0) / 100);
-  }, 0);
+  var sum=buildCitySummary(rows);
+  var labels=sum.map(function(s){return s.city;});
+  var data=sum.map(function(s){return Math.round(s.farmers);});
+  var colors=labels.map(cityColor);
 
-  adoptionChart.data.datasets[0].data = [totalFarmers, defFarmers];
-  adoptionChart.update();
+  cityDonut.data.labels=labels;
+  cityDonut.data.datasets[0].data=data;
+  cityDonut.data.datasets[0].backgroundColor=colors;
+  cityDonut.update();
+
+  var total=data.reduce(function(a,b){return a+b;},0);
+  setText("city-main", total ? formatInt(total) : "–");
 }
 
-// ------------------------- Session Table -------------------------
-function updateSessionTable(rows) {
-  var tbody = document.getElementById("session-table-body");
-  if (!tbody) return;
-
-  tbody.innerHTML = "";
-  rows.forEach(function (r) {
-    var tr = document.createElement("tr");
+function updateSessionTable(rows){
+  var tbody=document.getElementById("session-table-body");
+  if(!tbody) return;
+  tbody.innerHTML="";
+  rows.forEach(function(r){
+    var tr=document.createElement("tr");
     function td(v){ var x=document.createElement("td"); x.textContent=v; return x; }
-
     tr.appendChild(td(String(r.id)));
-    tr.appendChild(td(r.date || ""));
-    tr.appendChild(td(r.rgn || ""));
-    tr.appendChild(td(r.city || ""));
-    tr.appendChild(td(r.spot || ""));
-    tr.appendChild(td(formatInt(r.__farmers || 0)));
-    tr.appendChild(td(formatInt(r.__acres || 0)));
-    tr.appendChild(td((Math.round(r.__messageClarity || 0)) + "%"));
-    tr.appendChild(td((Math.round(r.__definiteUseRate || 0)) + "%"));
-    tr.appendChild(td(formatInt(r.__influencers || 0)));
-
+    tr.appendChild(td(r.date||""));
+    tr.appendChild(td(r.rgn||""));
+    tr.appendChild(td(r.city||""));
+    tr.appendChild(td(r.spot||""));
+    tr.appendChild(td(formatInt(r.__farmers||0)));
+    tr.appendChild(td(formatInt(r.__acres||0)));
     tbody.appendChild(tr);
   });
 }
 
-// ------------------------- Map -------------------------
-function ensureMap() {
-  var container = document.getElementById("route-map");
-  if (!container) return;
-
-  if (!map) {
-    map = L.map("route-map").setView([30.3753, 69.3451], 5);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+function ensureMap(){
+  var el=document.getElementById("route-map");
+  if(!el) return;
+  if(!map){
+    map=L.map("route-map").setView([30.3753, 69.3451], 5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"&copy; OpenStreetMap contributors"}).addTo(map);
   }
 }
-
-function updateMap(rows) {
+function updateMap(rows){
   ensureMap();
-  if (!map) return;
+  if(!map) return;
 
-  // clear old
-  mapMarkers.forEach(function (m) { try { map.removeLayer(m); } catch(e){} });
-  mapMarkers = [];
+  mapMarkers.forEach(function(m){ try{ map.removeLayer(m);}catch(e){} });
+  mapMarkers=[];
 
-  var bounds = [];
-  rows.forEach(function (r) {
-    if (!r.latitude || !r.longitude) return;
-    if (r.latitude === 0 || r.longitude === 0) return;
-
-    var coords = [r.latitude, r.longitude];
+  var bounds=[];
+  rows.forEach(function(r){
+    if(!r.latitude || !r.longitude) return;
+    if(r.latitude===0 || r.longitude===0) return;
+    var coords=[r.latitude, r.longitude];
     bounds.push(coords);
 
-    var html = "<strong>" + (r.spot || r.city || "Session") + "</strong><br/>" +
-      "RGN: " + (r.rgn || "—") + "<br/>" +
-      "City: " + (r.city || "—") + "<br/>" +
-      "Date: " + (r.date || "—") + "<br/>" +
-      "Farmers: " + formatInt(r.__farmers || 0) + "<br/>" +
-      "Acres: " + formatInt(r.__acres || 0);
+    var html="<strong>"+(r.spot||r.city||"Session")+"</strong><br/>"+
+      "RGN: "+(r.rgn||"—")+"<br/>"+
+      "City: "+(r.city||"—")+"<br/>"+
+      "Date: "+(r.date||"—")+"<br/>"+
+      "Farmers: "+formatInt(r.__farmers||0)+"<br/>"+
+      "Acres: "+formatInt(r.__acres||0);
 
-    var marker = L.marker(coords).addTo(map).bindPopup(html);
-    mapMarkers.push(marker);
+    var mk=L.marker(coords).addTo(map).bindPopup(html);
+    mapMarkers.push(mk);
   });
 
-  if (bounds.length) {
-    map.fitBounds(L.latLngBounds(bounds), { padding: [22, 22] });
+  if(bounds.length){
+    map.fitBounds(L.latLngBounds(bounds), {padding:[22,22]});
   }
-  // if no bounds, keep current view
 }
 
-// ------------------------- Media (per session row) -------------------------
-function updateMediaGallery(rows) {
-  var container = document.getElementById("media-gallery");
-  if (!container) return;
+function mediaCandidatesForSession(sessionId){
+  var id=String(sessionId);
+  var candidates=[ {key:id, img:[id+".jpg", id+".jpeg"], vid:id+".mp4"} ];
+  MEDIA_LETTERS.forEach(function(letter){
+    var k=id+letter;
+    candidates.push({key:k, img:[k+".jpg", k+".jpeg"], vid:k+".mp4"});
+  });
+  return candidates;
+}
 
-  container.innerHTML = "";
+function updateMedia(rows){
+  var wrap=document.getElementById("media-gallery");
+  if(!wrap) return;
+  wrap.innerHTML="";
 
-  if (!rows.length) {
-    var empty = document.createElement("div");
-    empty.className = "muted";
-    empty.style.fontWeight = "800";
-    empty.textContent = "No sessions match your current filters.";
-    container.appendChild(empty);
+  if(!rows.length){
+    var empty=document.createElement("div");
+    empty.className="muted";
+    empty.style.fontWeight="1000";
+    empty.textContent="No sessions match your filters.";
+    wrap.appendChild(empty);
     return;
   }
 
-  rows.forEach(function (r) {
-    var group = document.createElement("div");
-    group.className = "session-group";
+  rows.forEach(function(r){
+    var block=document.createElement("div");
+    block.className="sessionBlock";
 
-    var head = document.createElement("div");
-    head.className = "session-head";
+    var head=document.createElement("div");
+    head.className="sessionHead";
     head.innerHTML =
-      "<div><strong>Session " + r.id + "</strong> — " + (r.city || "") + (r.spot ? (" • " + r.spot) : "") + "</div>" +
-      "<div class='session-meta'>" + (r.date || "") + "</div>";
-    group.appendChild(head);
+      "<div><strong>Session "+r.id+"</strong> — "+(r.city||"")+(r.spot?(" • "+r.spot):"")+"</div>"+
+      "<div class='sessionMeta'>"+(r.date||"")+
+      " • Farmers "+formatInt(r.__farmers||0)+
+      " • Acres "+formatInt(r.__acres||0)+
+      "</div>";
+    block.appendChild(head);
 
-    var grid = document.createElement("div");
-    grid.className = "media-gallery";
+    var reel=document.createElement("div");
+    reel.className="reel";
 
-    // Create placeholders for a..f; hide if missing
-    MEDIA_LETTERS.forEach(function (letter) {
-      var prefix = String(r.id) + letter;
+    var cand=mediaCandidatesForSession(r.id);
 
-      var imgSrcJpg = prefix + ".jpg";
-      var imgSrcJpeg = prefix + ".jpeg";
-      var vidSrc = prefix + ".mp4";
+    cand.forEach(function(c){
+      var tile=document.createElement("div");
+      tile.className="tile";
+      tile.dataset.noimg="0";
+      tile.dataset.novid="0";
 
-      // Card uses img as thumb, video on hover. We try jpg first, then jpeg if jpg fails.
-      var card = document.createElement("div");
-      card.className = "media-card";
+      var thumb=document.createElement("div");
+      thumb.className="thumb";
 
-      var thumb = document.createElement("div");
-      thumb.className = "thumb";
-
-      var img = document.createElement("img");
-      img.alt = "Session " + r.id + " (" + letter + ")";
-      img.src = imgSrcJpg;
-      img.onerror = function () {
-        // fallback to jpeg
-        if (img.src.endsWith(".jpg")) {
-          img.src = imgSrcJpeg;
-          return;
-        }
-        // if jpeg also fails, hide entire card (unless video exists later)
-        card.dataset.noimg = "1";
-        maybeHideCard();
+      var img=document.createElement("img");
+      img.alt="Session "+r.id+" "+c.key;
+      img.src=c.img[0];
+      img.onerror=function(){
+        if(img.src.endsWith(".jpg") && c.img[1]){ img.src=c.img[1]; return; }
+        tile.dataset.noimg="1"; maybeRemove();
       };
 
-      var video = document.createElement("video");
-      video.muted = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.preload = "none";
-      video.style.display = "none";
-      video.src = vidSrc;
-      video.addEventListener("error", function () {
-        card.dataset.novid = "1";
-        maybeHideCard();
-      });
+      var vid=document.createElement("video");
+      vid.muted=true; vid.loop=true; vid.playsInline=true; vid.preload="none";
+      vid.src=c.vid;
+      vid.addEventListener("error", function(){ tile.dataset.novid="1"; maybeRemove(); });
 
-      var badge = document.createElement("div");
-      badge.className = "play-badge";
-      badge.innerHTML = "<i class='fas fa-play'></i>";
+      tile.addEventListener("mouseenter", function(){ try{ vid.play(); }catch(e){} });
+      tile.addEventListener("mouseleave", function(){ try{ vid.pause(); }catch(e){} });
+
+      var badge=document.createElement("div");
+      badge.className="badge";
+      badge.innerHTML="<i class='fas fa-play'></i>";
 
       thumb.appendChild(img);
-      thumb.appendChild(video);
+      thumb.appendChild(vid);
       thumb.appendChild(badge);
 
-      var cap = document.createElement("div");
-      cap.className = "caption";
-      cap.innerHTML =
-        "<div class='t'>Media " + String(r.id) + letter + "</div>" +
-        "<div class='s'>" + (r.city || "") + (r.spot ? (" • " + r.spot) : "") + "</div>";
+      var cap=document.createElement("div");
+      cap.className="cap";
+      cap.innerHTML="<div class='t'>"+c.key+"</div><div class='s'>"+(r.city||"")+"</div>";
 
-      card.appendChild(thumb);
-      card.appendChild(cap);
+      tile.appendChild(thumb);
+      tile.appendChild(cap);
+      tile.addEventListener("click", function(){ openLightbox(img, vid); });
 
-      // Hover play/pause (best-effort)
-      card.addEventListener("mouseenter", function () {
-        if (video && video.src) { try { video.play(); } catch(e){} }
-      });
-      card.addEventListener("mouseleave", function () {
-        if (video) { try { video.pause(); } catch(e){} }
-      });
+      function maybeRemove(){ if(tile.dataset.noimg==="1" && tile.dataset.novid==="1"){ tile.remove(); } }
 
-      card.addEventListener("click", function () {
-        openLightbox(img, video);
-      });
-
-      function maybeHideCard() {
-        // Hide if BOTH image and video missing
-        if (card.dataset.noimg === "1" && card.dataset.novid === "1") {
-          card.remove();
-        }
-      }
-
-      grid.appendChild(card);
+      reel.appendChild(tile);
     });
 
-    group.appendChild(grid);
-    container.appendChild(group);
+    setTimeout(function(){
+      if(!reel.children.length){
+        var note=document.createElement("div");
+        note.className="muted";
+        note.style.fontWeight="1000";
+        note.textContent="No media files found for this session (upload files like "+r.id+".jpg or "+r.id+"a.jpg).";
+        block.appendChild(note);
+      }
+    }, 600);
+
+    block.appendChild(reel);
+    wrap.appendChild(block);
   });
 }
 
-// ------------------------- Lightbox -------------------------
-function openLightbox(imgEl, videoEl) {
-  var lb = document.getElementById("lightbox");
-  var lbImg = document.getElementById("lb-img");
-  var lbVid = document.getElementById("lb-video");
-  if (!lb || !lbImg || !lbVid) return;
+function openLightbox(imgEl, vidEl){
+  var lb=document.getElementById("lightbox");
+  var lbImg=document.getElementById("lb-img");
+  var lbVid=document.getElementById("lb-video");
+  if(!lb||!lbImg||!lbVid) return;
 
   lb.classList.add("active");
+  lbImg.style.display="none";
+  lbVid.style.display="none";
 
-  // Default: show video if it exists and is likely valid; fall back to image
-  var vidSrc = videoEl ? safeText(videoEl.src) : "";
-  var imgSrc = imgEl ? safeText(imgEl.src) : "";
+  var imgSrc=safeText(imgEl && imgEl.src);
+  var vidSrc=safeText(vidEl && vidEl.src);
 
   lbVid.pause();
   lbVid.removeAttribute("src");
   lbVid.load();
 
-  lbImg.style.display = "none";
-  lbVid.style.display = "none";
-
-  if (vidSrc) {
-    lbVid.src = vidSrc;
-    lbVid.style.display = "block";
+  if(vidSrc){
+    lbVid.src=vidSrc;
+    lbVid.style.display="block";
     lbVid.load();
-    var p = lbVid.play();
-    if (p && typeof p.catch === "function") p.catch(function () {});
-    // If video fails, fall back to image
-    lbVid.onerror = function () {
-      lbVid.style.display = "none";
-      if (imgSrc) {
-        lbImg.src = imgSrc;
-        lbImg.style.display = "block";
-      }
+    var p=lbVid.play();
+    if(p && typeof p.catch==="function") p.catch(function(){});
+    lbVid.onerror=function(){
+      lbVid.style.display="none";
+      if(imgSrc){ lbImg.src=imgSrc; lbImg.style.display="block"; }
     };
-  } else if (imgSrc) {
-    lbImg.src = imgSrc;
-    lbImg.style.display = "block";
+  } else if(imgSrc){
+    lbImg.src=imgSrc;
+    lbImg.style.display="block";
   }
 }
-
-function closeLightbox() {
-  var lb = document.getElementById("lightbox");
-  var lbVid = document.getElementById("lb-video");
-  if (lb) lb.classList.remove("active");
-  if (lbVid) { try { lbVid.pause(); } catch(e){} }
+function closeLightbox(){
+  var lb=document.getElementById("lightbox");
+  var lbVid=document.getElementById("lb-video");
+  if(lb) lb.classList.remove("active");
+  if(lbVid) try{ lbVid.pause(); }catch(e){}
 }
 
-// ------------------------- Boot -------------------------
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function(){
   loadCSV();
-
-  var lb = document.getElementById("lightbox");
-  if (lb) {
-    lb.addEventListener("click", function (e) {
-      if (e.target === lb || e.target.closest("#lb-close")) closeLightbox();
+  var lb=document.getElementById("lightbox");
+  if(lb){
+    lb.addEventListener("click", function(e){
+      if(e.target===lb || e.target.closest("#lb-close")) closeLightbox();
     });
   }
 });
