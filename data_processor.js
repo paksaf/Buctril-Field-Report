@@ -86,24 +86,91 @@ function starsFromPct(p){
 }
 
 // Parse "lat,lng" (or "lat lng") inside a single column like "Coorrdinates" or "Spot Coordinates"
+function dmsToDecimal(token){
+  var s = safeText(token);
+  if(!s) return NaN;
+
+  // Normalize curly quotes if present
+  s = s.replace(/[’‘]/g,"'").replace(/[“”]/g,'"').trim();
+
+  // Direction is typically the last character (N/S/E/W)
+  var dm = s.match(/([NSEW])\s*$/i);
+  var dir = dm ? dm[1].toUpperCase() : "";
+
+  // Remove direction letters and convert all separators to spaces
+  s = s.replace(/[NSEW]/ig,"").trim();
+  s = s.replace(/[^0-9.\-]+/g," ").trim();
+
+  var parts = s.split(/\s+/).filter(Boolean);
+  if(!parts.length) return NaN;
+
+  var deg = parseFloat(parts[0]);
+  var min = parts.length > 1 ? parseFloat(parts[1]) : 0;
+  var sec = parts.length > 2 ? parseFloat(parts[2]) : 0;
+
+  if(isNaN(deg)) return NaN;
+  if(isNaN(min)) min = 0;
+  if(isNaN(sec)) sec = 0;
+
+  var dec = Math.abs(deg) + (Math.abs(min)/60) + (Math.abs(sec)/3600);
+
+  // Preserve explicit negative degrees
+  if(deg < 0) dec = -dec;
+
+  // Apply hemisphere if provided
+  if(dir === "S" || dir === "W") dec = -Math.abs(dec);
+  if(dir === "N" || dir === "E") dec = Math.abs(dec);
+
+  return dec;
+}
+
 function parseLatLon(maybe){
-  var s=safeText(maybe);
+  var s = safeText(maybe);
   if(!s) return {lat:0, lon:0};
-  // Replace common separators
-  s=s.replace(/[;]/g,",").replace(/\s+/g," ").trim();
-  // Try comma-separated first
-  var parts=s.split(",");
-  if(parts.length>=2){
-    var a=safeNumber(parts[0]);
-    var b=safeNumber(parts[1]);
-    if(Math.abs(a)<=90 && Math.abs(b)<=180) return {lat:a, lon:b};
+
+  // Standardize separators / whitespace
+  s = s.replace(/[;]/g,",").replace(/\s+/g," ").trim();
+
+  // 1) DMS (degrees/minutes/seconds) with N/S/E/W, e.g.
+  //    28°09'13.2"N 69°48'59.7"E
+  //    30°11'52"N, 71°28'11"E
+  if(/[NSEW]/i.test(s) && (/[°º'"]/i.test(s) || /[0-9]\s*[NSEW]/i.test(s))){
+    var tokRe = /(\d[^NSEW]*?[NSEW])/ig;
+    var tokens = [];
+    var m;
+    while((m = tokRe.exec(s)) !== null){
+      tokens.push(m[0].trim());
+    }
+
+    var lat = 0, lon = 0;
+    tokens.forEach(function(t){
+      var dir = t.slice(-1).toUpperCase();
+      var dec = dmsToDecimal(t);
+      if(isNaN(dec)) return;
+      if(dir === "N" || dir === "S") lat = dec;
+      if(dir === "E" || dir === "W") lon = dec;
+    });
+
+    if(lat && lon && Math.abs(lat) <= 90 && Math.abs(lon) <= 180){
+      return {lat:lat, lon:lon};
+    }
   }
-  // Try space-separated pair
-  var m=s.match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/);
-  if(m){
-    var lat=parseFloat(m[1]), lon=parseFloat(m[2]);
-    if(!isNaN(lat) && !isNaN(lon) && Math.abs(lat)<=90 && Math.abs(lon)<=180) return {lat:lat, lon:lon};
+
+  // 2) Decimal degrees: "28.1537, 69.8166"
+  var parts = s.split(",");
+  if(parts.length >= 2){
+    var a = safeNumber(parts[0]);
+    var b = safeNumber(parts[1]);
+    if(Math.abs(a) <= 90 && Math.abs(b) <= 180) return {lat:a, lon:b};
   }
+
+  // 3) Decimal degrees space separated: "28.1537 69.8166"
+  var mm = s.match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/);
+  if(mm){
+    var la = parseFloat(mm[1]), lo = parseFloat(mm[2]);
+    if(!isNaN(la) && !isNaN(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) return {lat:la, lon:lo};
+  }
+
   return {lat:0, lon:0};
 }
 
