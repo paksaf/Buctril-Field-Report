@@ -38,7 +38,9 @@ var citySummary = [];
 var map = null;
 var mapMarkers = [];
 var clarityChart = null;
+var definiteChart = null;
 var cityFarmersChart = null;
+var adoptionChart = null;
 
 // ---------- CSV LOAD ----------
 function loadCSV() {
@@ -136,19 +138,63 @@ function normalizeRow(row, index) {
     obj[key] = val;
   });
 
-  // Farmers
+  // Farmers (be liberal with header names)
   var farmers = safeNumber(
-    obj["Total Farmers"] || obj["Farmers"] || obj["farmers"]
+    obj["Total Farmers"] ||
+      obj["Farmers"] ||
+      obj["No of Farmer Participate"] ||
+      obj["No of Farmers"] ||
+      obj["No. of Farmers"] ||
+      obj["Farmers Engaged"] ||
+      obj["Farmers engaged"] ||
+      obj["farmers"]
   );
 
-  // Acres: prefer Total Wheat Acres, then Estimated Buctril Acres, then generic Total Acres
+  // Acres (be liberal with header names)
   var acres = safeNumber(
     obj["Total Wheat Acres"] ||
-    obj["Estimated Buctril Acres from this Session"] ||
-    obj["Total Acres"] ||
-    obj["Acres"] ||
-    obj["acres"]
+      obj["Estimated Buctril Acres from this Session"] ||
+      obj["Wheat acres (approx.)"] ||
+      obj["Wheat acres"] ||
+      obj["Total Acres"] ||
+      obj["Acres"] ||
+      obj["acres"]
   );
+
+  // Campaign / perception metrics (optional columns)
+  var clarity = safeNumber(
+    obj["Message Clarity %"] ||
+      obj["Message Clarity"] ||
+      obj["Clarity %"] ||
+      obj["Clarity"] ||
+      obj["Message clarity"]
+  );
+  var definiteUse = safeNumber(
+    obj["Definite Use %"] ||
+      obj["Definite Use"] ||
+      obj["Definite Use Intent %"] ||
+      obj["Definite Use Intent"] ||
+      obj["Use Intent %"] ||
+      obj["Use Intent"] ||
+      obj["Definite Use Rate"]
+  );
+  var influencers = safeNumber(
+    obj["Influencers"] ||
+      obj["Influencers Identified"] ||
+      obj["Influencer"] ||
+      obj["Key Influencers"]
+  );
+  var awareness = safeNumber(
+    obj["Awareness %"] ||
+      obj["Awareness"] ||
+      obj["Awareness Rate %"] ||
+      obj["Awareness Rate"]
+  );
+
+  // Clamp percentages
+  if (!isNaN(clarity)) clarity = Math.max(0, Math.min(100, clarity));
+  if (!isNaN(definiteUse)) definiteUse = Math.max(0, Math.min(100, definiteUse));
+  if (!isNaN(awareness)) awareness = Math.max(0, Math.min(100, awareness));
 
   // Serial number
   var sn = obj["SN"] || obj["Sn"] || obj["sn"] || (index + 1);
@@ -157,8 +203,14 @@ function normalizeRow(row, index) {
   obj.__farmers = farmers;
   obj.__acres = acres;
 
+  obj.__messageClarity = clarity;
+  obj.__definiteUseRate = definiteUse;
+  obj.__influencers = influencers;
+  obj.__awarenessRate = awareness;
+
   return obj;
 }
+
 
 // ---------- DATES ----------
 function parseDate(value) {
@@ -276,6 +328,7 @@ function applyFilters() {
   buildCitySummary(filteredRows);
   updateHeroAndSnapshot(filteredRows);
   updateKeyMetrics(filteredRows);
+  updateCampaignMetrics(filteredRows);
   updateSessionTable(filteredRows);
   updateCityTable();
   updateCharts();
@@ -385,6 +438,62 @@ function updateKeyMetrics(rows) {
   );
 }
 
+
+// ---------- CAMPAIGN PERFORMANCE (CLARITY / INTENT / INFLUENCERS / AWARENESS) ----------
+function updateCampaignMetrics(rows) {
+  initChartsIfNeeded();
+
+  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
+
+  var claritySum = 0, clarityCnt = 0;
+  var defSum = 0, defCnt = 0;
+  var awareSum = 0, awareCnt = 0;
+  var totalInfluencers = 0;
+
+  rows.forEach(function (r) {
+    if (!isNaN(r.__messageClarity) && r.__messageClarity > 0) { claritySum += r.__messageClarity; clarityCnt += 1; }
+    if (!isNaN(r.__definiteUseRate) && r.__definiteUseRate > 0) { defSum += r.__definiteUseRate; defCnt += 1; }
+    if (!isNaN(r.__awarenessRate) && r.__awarenessRate > 0) { awareSum += r.__awarenessRate; awareCnt += 1; }
+    totalInfluencers += (r.__influencers || 0);
+  });
+
+  var avgClarity = clarityCnt ? (claritySum / clarityCnt) : 0;
+  var avgDefinite = defCnt ? (defSum / defCnt) : 0;
+  var avgAwareness = awareCnt ? (awareSum / awareCnt) : 0;
+
+  var totalDefiniteFarmers = rows.reduce(function (s, r) {
+    var pct = isNaN(r.__definiteUseRate) ? 0 : (r.__definiteUseRate || 0);
+    return s + Math.round((r.__farmers || 0) * pct / 100);
+  }, 0);
+
+  // Update hero numbers shown inside donut cards
+  setText("clarity-main", clarityCnt ? (Math.round(avgClarity) + "%") : "–");
+  setText("definite-main", defCnt ? (Math.round(avgDefinite) + "%") : "–");
+
+  // Update donut visuals
+  if (clarityChart) {
+    var cVal = clarityCnt ? Math.round(avgClarity) : 0;
+    clarityChart.data.datasets[0].data = [cVal, Math.max(0, 100 - cVal)];
+    clarityChart.update();
+  }
+  if (definiteChart) {
+    var dVal = defCnt ? Math.round(avgDefinite) : 0;
+    definiteChart.data.datasets[0].data = [dVal, Math.max(0, 100 - dVal)];
+    definiteChart.update();
+  }
+
+  // Adoption subtitle
+  var adoptionText = document.getElementById("adoption-text");
+  if (adoptionText) {
+    var defPct = totalFarmers ? Math.round((totalDefiniteFarmers / totalFarmers) * 100) : Math.round(avgDefinite);
+    adoptionText.textContent =
+      "Estimated definite-use farmers: " + formatInt(totalDefiniteFarmers) + " (" + defPct + "%)";
+  }
+
+  // Optionally expose totals in console for quick validation
+  // console.log({ avgClarity, avgDefinite, avgAwareness, totalInfluencers, totalDefiniteFarmers });
+}
+
 // ---------- TABLES ----------
 function getMediaIndexForDate(date) {
   if (!date) return "";
@@ -399,37 +508,35 @@ function updateSessionTable(rows) {
 
   rows.forEach(function (row) {
     var tr = document.createElement("tr");
+
     var d = row.__date ? row.__date.toISOString().slice(0, 10) : (row.__date_raw || "");
-    var fromCity = row["From City"] || row["From"] || "";
-    var toCity = row["City"] || row["To City"] || row["To"] || "";
-    var loc =
-      row["Village / Mauza"] || row["Session Location"] || row["Location"] || "";
-    var farmers = row.__farmers || "";
-    var acres = row.__acres || "";
-    var coordsObj = extractLatLng(row);
-    var coordsText = coordsObj.original || "";
-    var feedback =
-      row["Feedback/Observations"] ||
-      row["Feedback"] ||
-      row["Observations"] ||
-      row["Remarks"] ||
-      "";
-    var mediaIndex = row.__date ? getMediaIndexForDate(row.__date) : "";
+    var fromCity = (row["From City"] || row["From"] || "").trim();
+    var toCity = (row["City"] || row["To City"] || row["To"] || "").trim();
+    var loc = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
+
+    var farmers = row.__farmers || 0;
+    var acres = row.__acres || 0;
+
+    var clarity = row.__messageClarity;
+    var definite = row.__definiteUseRate;
+    var influencers = row.__influencers;
 
     tr.innerHTML =
       "<td>" + (row.__sn || "") + "</td>" +
-      "<td>" + d + "</td>" +
-      "<td>" + fromCity + "</td>" +
-      "<td>" + toCity + "</td>" +
-      "<td>" + loc + "</td>" +
-      "<td>" + farmers + "</td>" +
-      "<td>" + acres + "</td>" +
-      "<td>" + coordsText + "</td>" +
-      "<td>" + feedback + "</td>" +
-      "<td>" + mediaIndex + "</td>";
+      "<td>" + (d || "") + "</td>" +
+      "<td>" + (fromCity || "") + "</td>" +
+      "<td>" + (toCity || "") + "</td>" +
+      "<td>" + (loc || "") + "</td>" +
+      "<td>" + formatInt(farmers) + "</td>" +
+      "<td>" + formatInt(acres) + "</td>" +
+      "<td>" + (isNaN(clarity) ? "–" : (Math.round(clarity) + "%")) + "</td>" +
+      "<td>" + (isNaN(definite) ? "–" : (Math.round(definite) + "%")) + "</td>" +
+      "<td>" + formatInt(influencers) + "</td>";
+
     tbody.appendChild(tr);
   });
 }
+
 
 function updateCityTable() {
   var tbody = document.getElementById("city-rows");
@@ -450,7 +557,9 @@ function updateCityTable() {
 // ---------- CHARTS ----------
 function initChartsIfNeeded() {
   var clarityCtx = document.getElementById("clarityDonut");
+  var definiteCtx = document.getElementById("definiteDonut");
   var cityCtx = document.getElementById("cityFarmersChart");
+  var adoptionCtx = document.getElementById("adoptionChart");
 
   if (clarityCtx && !clarityChart) {
     clarityChart = new Chart(clarityCtx, {
@@ -458,7 +567,7 @@ function initChartsIfNeeded() {
       data: {
         labels: ["Clarity", "Gap"],
         datasets: [{
-          data: [97, 3],
+          data: [0, 100],
           backgroundColor: ["#66bb6a", "#e0e0e0"],
           borderWidth: 0
         }]
@@ -466,10 +575,26 @@ function initChartsIfNeeded() {
       options: {
         responsive: true,
         cutout: "70%",
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false }
-        }
+        plugins: { legend: { display: false }, tooltip: { enabled: true } }
+      }
+    });
+  }
+
+  if (definiteCtx && !definiteChart) {
+    definiteChart = new Chart(definiteCtx, {
+      type: "doughnut",
+      data: {
+        labels: ["Definite Use", "Gap"],
+        datasets: [{
+          data: [0, 100],
+          backgroundColor: ["#ff7043", "#e0e0e0"],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: "70%",
+        plugins: { legend: { display: false }, tooltip: { enabled: true } }
       }
     });
   }
@@ -495,10 +620,32 @@ function initChartsIfNeeded() {
       }
     });
   }
+
+  if (adoptionCtx && !adoptionChart) {
+    adoptionChart = new Chart(adoptionCtx, {
+      type: "bar",
+      data: {
+        labels: ["Total Farmers", "Estimated Definite-use"],
+        datasets: [{
+          label: "Farmers",
+          data: [0, 0],
+          backgroundColor: ["#1b5e20", "#ff7043"]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
 }
+
 
 function updateCharts() {
   initChartsIfNeeded();
+
+  // Top cities chart
   if (cityFarmersChart && citySummary.length) {
     var top = citySummary.slice(0, 6);
     var others = citySummary.slice(6);
@@ -506,15 +653,26 @@ function updateCharts() {
     var data = top.map(function (c) { return c.farmers; });
     if (others.length) {
       labels.push("Others");
-      data.push(
-        others.reduce(function (s, c) { return s + c.farmers; }, 0)
-      );
+      data.push(others.reduce(function (s, c) { return s + c.farmers; }, 0));
     }
     cityFarmersChart.data.labels = labels;
     cityFarmersChart.data.datasets[0].data = data;
     cityFarmersChart.update();
   }
+
+  // Adoption bar chart (total vs estimated definite-use)
+  if (adoptionChart) {
+    var totalFarmers = filteredRows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
+    var definiteFarmers = filteredRows.reduce(function (s, r) {
+      var pct = isNaN(r.__definiteUseRate) ? 0 : (r.__definiteUseRate || 0);
+      return s + Math.round((r.__farmers || 0) * pct / 100);
+    }, 0);
+
+    adoptionChart.data.datasets[0].data = [totalFarmers, definiteFarmers];
+    adoptionChart.update();
+  }
 }
+
 
 // ---------- MAP & COORD PARSING ----------
 function parseDMS(dmsStr) {
@@ -621,11 +779,11 @@ function initMediaGallery(rows) {
   if (!gallery) return;
   gallery.innerHTML = "";
 
+  // Media assets are indexed by unique date order: 1.jpeg / 1.mp4, 2.jpeg / 2.mp4, ...
   var dateToIndex = new Map();
-  uniqueDates.forEach(function (d, idx) {
-    dateToIndex.set(d.getTime(), idx + 1);
-  });
+  uniqueDates.forEach(function (d, idx) { dateToIndex.set(d.getTime(), idx + 1); });
 
+  // Pick one representative row per day (avoids duplicate media cards for same date)
   var byTime = new Map();
   rows.forEach(function (row) {
     var d = row.__date;
@@ -639,14 +797,13 @@ function initMediaGallery(rows) {
   times.forEach(function (t) {
     var row = byTime.get(t);
     var d = new Date(t);
-    var globalIndex = dateToIndex.get(t) || 0;
-    if (!globalIndex) return;
+    var mediaIndex = dateToIndex.get(t) || 0;
+    if (!mediaIndex) return;
 
-    var imgSrc = globalIndex + ".jpeg";
-    var vidSrc = globalIndex + ".mp4";
+    var imgSrc = mediaIndex + ".jpeg";
+    var vidSrc = mediaIndex + ".mp4";
 
-    var loc =
-      row["Village / Mauza"] || row["Session Location"] || row["Location"] || "";
+    var loc = row["Village / Mauza"] || row["Session Location"] || row["Location"] || ("Session " + mediaIndex);
     var city = row["City"] || row["From City"] || row["From"] || "";
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
@@ -655,22 +812,32 @@ function initMediaGallery(rows) {
     card.className = "media-card";
     card.innerHTML =
       "<div class='media-thumb-wrap hover-video'>" +
-      "<img src='" + imgSrc + "' alt='Session photo " + globalIndex + "' onerror=\"this.style.display='none';\" />" +
-      "<video muted loop playsinline onerror=\"this.style.display='none';\">" +
-      "<source src='" + vidSrc + "' type='video/mp4' />" +
-      "</video></div>" +
+        "<img src='" + imgSrc + "' alt='Session photo " + mediaIndex + "' onerror=\"this.style.display='none';\" />" +
+        "<video muted loop playsinline preload='metadata' onerror=\"this.style.display='none';\">" +
+          "<source src='" + vidSrc + "' type='video/mp4' />" +
+        "</video>" +
+        "<div class='media-overlay'><i class='fa-solid fa-play'></i></div>" +
+      "</div>" +
       "<div class='media-caption'>" +
-      "<strong>" + (loc || ("Session " + globalIndex)) + "</strong>" +
-      "<span>" + city + " • " + farmers + " farmers • " + acres + " acres</span>" +
-      "<span>" + d.toISOString().slice(0, 10) + "</span>" +
+        "<strong>" + (loc || ("Session " + mediaIndex)) + "</strong>" +
+        "<span>" + (city || "") + " • " + formatInt(farmers) + " farmers • " + formatInt(acres) + " acres</span>" +
+        "<span>" + d.toISOString().slice(0, 10) + "</span>" +
       "</div>";
 
-    card.addEventListener("click", function () {
-      openLightbox(imgSrc, vidSrc);
+    // Hover play (helps on browsers that block autoplay)
+    var videoEl = card.querySelector("video");
+    card.addEventListener("mouseenter", function () {
+      if (videoEl) { try { videoEl.play(); } catch (e) {} }
     });
+    card.addEventListener("mouseleave", function () {
+      if (videoEl) { try { videoEl.pause(); videoEl.currentTime = 0; } catch (e) {} }
+    });
+
+    card.addEventListener("click", function () { openLightbox(imgSrc, vidSrc); });
     gallery.appendChild(card);
   });
 }
+
 
 function openLightbox(imgSrc, vidSrc) {
   var lb = document.getElementById("lightbox");
@@ -678,18 +845,32 @@ function openLightbox(imgSrc, vidSrc) {
   var vid = document.getElementById("lb-video");
   if (!lb || !img || !vid) return;
 
-  img.src = imgSrc;
-  vid.src = vidSrc;
+  // Default: prefer video when available
+  img.style.display = "none";
+  vid.style.display = "block";
+
+  img.src = imgSrc || "";
+  vid.src = vidSrc || "";
   vid.load();
+
+  // If video fails, fall back to image
+  vid.onerror = function () {
+    vid.style.display = "none";
+    img.style.display = "block";
+  };
+
   lb.classList.add("active");
+
+  try { vid.play(); } catch (e) {}
 
   lb.onclick = function () {
     lb.classList.remove("active");
     img.src = "";
-    vid.pause();
+    try { vid.pause(); } catch (e) {}
     vid.src = "";
   };
 }
+
 
 // ---------- INIT ----------
 document.addEventListener("DOMContentLoaded", function () {
