@@ -30,6 +30,26 @@ function showErrorModal(message) {
   if (btn) btn.addEventListener("click", function () { modal.remove(); });
 }
 
+
+// Extract stable session/media index per session row (maps to {n}.jpeg / {n}.mp4)
+function extractSessionIndex(obj, fallbackIndex) {
+  var keys = [
+    "Session ID","Session Id","SessionID","ID","Id",
+    "SN","S/N","S. No","S.No","Sr","Sr.","Sr No","Sr. No",
+    "Serial","Serial No","Serial No.","No","#"
+  ];
+  for (var i = 0; i < keys.length; i++) {
+    var v = obj[keys[i]];
+    if (v === null || v === undefined || v === "") continue;
+    var m = String(v).match(/\d+/);
+    if (m) {
+      var n = parseInt(m[0], 10);
+      if (!isNaN(n) && n > 0) return n;
+    }
+  }
+  return (fallbackIndex || 0) + 1;
+}
+
 // ---------- GLOBAL STATE ----------
 var allRows = [];
 var filteredRows = [];
@@ -137,6 +157,11 @@ function normalizeRow(row, index) {
     if (typeof val === "string") val = val.trim();
     obj[key] = val;
   });
+
+  // Stable per-session media index (maps to {n}.jpeg / {n}.mp4)
+  obj.__mediaIndex = extractSessionIndex(obj, index);
+  obj.__sn = obj.__mediaIndex;
+  obj.__rowIndex = index;
 
   // Farmers (be liberal with header names)
   var farmers = safeNumber(
@@ -495,11 +520,10 @@ function updateCampaignMetrics(rows) {
 }
 
 // ---------- TABLES ----------
-function getMediaIndexForDate(date) {
-  if (!date) return "";
-  var idx = uniqueDates.findIndex(function (d) { return d.getTime() === date.getTime(); });
-  return idx >= 0 ? idx + 1 : "";
+function getMediaIndexForRow(row) {
+  return row && row.__mediaIndex ? row.__mediaIndex : "";
 }
+
 
 function updateSessionTable(rows) {
   var tbody = document.getElementById("session-rows");
@@ -777,34 +801,24 @@ function initMap(rows) {
 function initMediaGallery(rows) {
   var gallery = document.getElementById("media-gallery");
   if (!gallery) return;
+
   gallery.innerHTML = "";
 
-  // Media assets are indexed by unique date order: 1.jpeg / 1.mp4, 2.jpeg / 2.mp4, ...
-  var dateToIndex = new Map();
-  uniqueDates.forEach(function (d, idx) { dateToIndex.set(d.getTime(), idx + 1); });
+  rows.forEach(function (row, idx) {
+    // Media is indexed per session row (stable to CSV row numbering)
+    var mediaIndex =
+      row.__mediaIndex ||
+      row.__sn ||
+      (row.__rowIndex !== undefined ? row.__rowIndex + 1 : (idx + 1));
 
-  // Pick one representative row per day (avoids duplicate media cards for same date)
-  var byTime = new Map();
-  rows.forEach(function (row) {
-    var d = row.__date;
-    if (!d) return;
-    var t = d.getTime();
-    if (!byTime.has(t)) byTime.set(t, row);
-  });
-
-  var times = Array.from(byTime.keys()).sort(function (a, b) { return a - b; });
-
-  times.forEach(function (t) {
-    var row = byTime.get(t);
-    var d = new Date(t);
-    var mediaIndex = dateToIndex.get(t) || 0;
     if (!mediaIndex) return;
 
     var imgSrc = mediaIndex + ".jpeg";
     var vidSrc = mediaIndex + ".mp4";
 
-    var loc = row["Village / Mauza"] || row["Session Location"] || row["Location"] || ("Session " + mediaIndex);
-    var city = row["City"] || row["From City"] || row["From"] || "";
+    var d = row.__date ? row.__date.toISOString().slice(0, 10) : (row.__date_raw || "");
+    var loc = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || ("Session " + mediaIndex)).trim();
+    var city = (row["City"] || row["From City"] || row["From"] || "").trim();
     var farmers = row.__farmers || 0;
     var acres = row.__acres || 0;
 
@@ -812,31 +826,35 @@ function initMediaGallery(rows) {
     card.className = "media-card";
     card.innerHTML =
       "<div class='media-thumb-wrap hover-video'>" +
-        "<img src='" + imgSrc + "' alt='Session photo " + mediaIndex + "' onerror=\"this.style.display='none';\" />" +
-        "<video muted loop playsinline preload='metadata' onerror=\"this.style.display='none';\">" +
-          "<source src='" + vidSrc + "' type='video/mp4' />" +
-        "</video>" +
-        "<div class='media-overlay'><i class='fa-solid fa-play'></i></div>" +
+      "<img src='" + imgSrc + "' alt='Session photo " + mediaIndex + "' onerror=\"this.style.display='none';\" />" +
+      "<video muted loop playsinline preload='metadata' onerror=\"this.style.display='none';\">" +
+      "<source src='" + vidSrc + "' type='video/mp4' />" +
+      "</video>" +
       "</div>" +
       "<div class='media-caption'>" +
-        "<strong>" + (loc || ("Session " + mediaIndex)) + "</strong>" +
-        "<span>" + (city || "") + " • " + formatInt(farmers) + " farmers • " + formatInt(acres) + " acres</span>" +
-        "<span>" + d.toISOString().slice(0, 10) + "</span>" +
+      "<strong>" + (loc || ("Session " + mediaIndex)) + "</strong>" +
+      "<span>" + (city || "–") + " • " + formatInt(farmers) + " farmers • " + formatInt(acres) + " acres</span>" +
+      "<span>" + (d || ("Session #" + mediaIndex)) + " • Media #" + mediaIndex + "</span>" +
       "</div>";
 
-    // Hover play (helps on browsers that block autoplay)
-    var videoEl = card.querySelector("video");
-    card.addEventListener("mouseenter", function () {
-      if (videoEl) { try { videoEl.play(); } catch (e) {} }
-    });
-    card.addEventListener("mouseleave", function () {
-      if (videoEl) { try { videoEl.pause(); videoEl.currentTime = 0; } catch (e) {} }
+    card.addEventListener("click", function () {
+      openLightbox(imgSrc, vidSrc);
     });
 
-    card.addEventListener("click", function () { openLightbox(imgSrc, vidSrc); });
+    // Smooth hover playback (optional; safe if video is missing)
+    card.addEventListener("mouseenter", function () {
+      var v = card.querySelector("video");
+      if (v) { try { v.play(); } catch (e) {} }
+    });
+    card.addEventListener("mouseleave", function () {
+      var v = card.querySelector("video");
+      if (v) { try { v.pause(); v.currentTime = 0; } catch (e) {} }
+    });
+
     gallery.appendChild(card);
   });
 }
+
 
 
 function openLightbox(imgSrc, vidSrc) {
