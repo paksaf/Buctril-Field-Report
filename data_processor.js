@@ -1,15 +1,20 @@
 /****************************************************
- * Buctril Super Dashboard – Donut-driven City Navigation (multi-color)
- * - Reads sum_sheet.csv (same folder as index.html)
- * - Excludes Multan start-point rows (Multan + 0 farmers + 0 acres)
- * - Filters: RGN → City → Spot + Search
- * - Donuts:
- *    1) Avg Clarity (single-color)
- *    2) Avg Definite (single-color)
- *    3) Farmers by City (multi-color, click segment to filter)
- * - Media:
- *    Supports simple per-session naming: 1.jpg/1.jpeg + 1.mp4
- *    Also supports multi-media per session: 1a…1f (jpg/jpeg/mp4)
+ * Buctril Super Dashboard – Drilldown Donut (Cities outer ring, Spots inner ring)
+ *
+ * Fix for "all zeros" on GitHub Pages:
+ * - PapaParse transformHeader trims headers and collapses spaces
+ *   so headers like "No of Farmer Participate " still match.
+ * - Also provides a diagnostics banner listing detected headers
+ *   if farmers/acres are not being recognized.
+ *
+ * Files expected in SAME folder:
+ * - index.html
+ * - data_processor.js
+ * - sum_sheet.csv   (or Sum_Sheet.csv / SUM_SHEET.csv)
+ *
+ * Media:
+ * - Per session: 1.jpg/1.jpeg + 1.mp4
+ * - Or multi-media per session: 1a…1f (jpg/jpeg/mp4)
  ****************************************************/
 
 function safeText(v){ return (v===null||v===undefined) ? "" : String(v).trim(); }
@@ -32,6 +37,27 @@ function showErrorModal(msg){
   modal.querySelector("button").addEventListener("click", function(){ modal.remove(); });
 }
 
+function showDiagnostics(html){
+  var el=document.getElementById("diagnostics");
+  if(!el) return;
+  el.innerHTML=html;
+  el.style.display="block";
+}
+function hideDiagnostics(){
+  var el=document.getElementById("diagnostics");
+  if(!el) return;
+  el.style.display="none";
+  el.innerHTML="";
+}
+
+function normalizeHeader(h){
+  return safeText(h)
+    .replace(/^\ufeff/,"")
+    .replace(/\u00a0/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
 function getField(row, candidates){
   for(var i=0;i<candidates.length;i++){
     var k=candidates[i];
@@ -46,70 +72,59 @@ function getField(row, candidates){
   }
   return "";
 }
-function normName(s){ return safeText(s).replace(/\s+/g," ").trim(); }
 
-function isMultanStartPoint(r){
-  var c = normName(r.city).toLowerCase();
-  return (c==="multan" && (r.__farmers===0) && (r.__acres===0));
-}
+function normName(s){ return safeText(s).replace(/\s+/g," ").trim(); }
 function clampPct(x){ return Math.max(0, Math.min(100, x)); }
 function starsFromPct(p){
   var s = Math.max(0, Math.min(5, Math.round(p/20)));
   return "★".repeat(s) + "☆".repeat(5-s);
 }
-function cityColor(city){
-  var c = normName(city).toLowerCase();
+
+// Stable city colors
+function cityHue(city){
+  var c=normName(city).toLowerCase();
   var h=0;
-  for(var i=0;i<c.length;i++){ h = (h*31 + c.charCodeAt(i)) % 360; }
-  return "hsl(" + h + ", 70%, 55%)";
+  for(var i=0;i<c.length;i++){ h=(h*31 + c.charCodeAt(i)) % 360; }
+  return h;
+}
+function cityColor(city){ return "hsl(" + cityHue(city) + ", 70%, 55%)"; }
+function spotColor(city, idx){
+  var h=cityHue(city);
+  var l=72 - (idx%6)*6;
+  return "hsl(" + h + ", 70%, " + l + "%)";
 }
 
 var allRows=[], filteredRows=[];
 var map=null, mapMarkers=[];
-var clarityDonut=null, definiteDonut=null, cityDonut=null;
+var clarityDonut=null, definiteDonut=null, drillDonut=null;
 var MEDIA_LETTERS=["a","b","c","d","e","f"];
 
-function loadCSV(){
-  var loading=document.getElementById("loading");
-  fetch("sum_sheet.csv?cache=" + Date.now())
-    .then(function(res){
-      if(!res.ok) throw new Error("sum_sheet.csv not found ("+res.status+")");
-      return res.text();
-    })
-    .then(function(text){
-      var lines=text.split(/\r?\n/);
-      if(lines.length && /^summary\b/i.test(lines[0].trim())){
-        lines.shift();
-        text=lines.join("\n");
-      }
-      if(typeof Papa==="undefined") throw new Error("PapaParse not loaded (Papa is undefined).");
+var CSV_CANDIDATES=["sum_sheet.csv","Sum_Sheet.csv","SUM_SHEET.csv"];
 
-      var parsed=Papa.parse(text, {header:true, dynamicTyping:false, skipEmptyLines:true});
-      if(parsed.errors && parsed.errors.length){
-        console.error("CSV parse errors:", parsed.errors);
-        showErrorModal("CSV parsing errors detected. Ensure commas inside text fields are quoted.");
-      }
-
-      allRows=(parsed.data||[])
-        .map(function(row, idx){ return normalizeRow(row, idx); })
-        .filter(function(r){ return r && (r.__farmers>0); })
-        .filter(function(r){ return normName(r.city).toLowerCase() !== "multan"; });
-
-      initCharts();
-      initFilters();
-      applyFilters();
-
-      if(loading) loading.remove();
-    })
-    .catch(function(err){
-      console.error(err);
-      showErrorModal("Error loading data: " + err.message);
-      if(loading) loading.remove();
+function fetchFirstAvailableCSV(){
+  var i=0;
+  function tryNext(){
+    if(i>=CSV_CANDIDATES.length){
+      throw new Error("CSV not found. Tried: " + CSV_CANDIDATES.join(", "));
+    }
+    var name=CSV_CANDIDATES[i++];
+    return fetch(name + "?cache=" + Date.now()).then(function(res){
+      if(res.ok) return res.text();
+      return tryNext();
     });
+  }
+  return tryNext();
+}
+
+function isExcludedRow(r){
+  var c=(r.city||"").trim().toLowerCase();
+  if(c==="multan") return true;
+  if(!r.city && !r.spot && !r.date) return true;
+  return false;
 }
 
 function normalizeRow(row, idx){
-  var sid = safeText(getField(row, ["SN","Sr No","Sr. No","Session ID","SessionID","ID","Id","S#","S.No","S No"]));
+  var sid=safeText(getField(row, ["SN","Sr No","Sr. No","Session ID","SessionID","ID","Id","S#","S.No","S No"]));
   var id = sid!=="" ? safeNumber(sid) : (idx+1);
 
   var rgn = safeText(getField(row, ["RGN","Region","REGION","Rgn"]));
@@ -118,7 +133,10 @@ function normalizeRow(row, idx){
   var spot = normName(getField(row, ["Session Location","Village / Mauza","Village/Mauza","Spot","Location","Venue","Mauza","Village"]));
   var date = safeText(getField(row, ["Date","Activity Date","Day","Session Date"]));
 
-  var farmers = safeNumber(getField(row, ["No of Farmer Participate","Farmers","Farmers Engaged","No of Farmers","No. of Farmers","Participants","Attendees"]));
+  var farmers = safeNumber(getField(row, [
+    "No of Farmer Participate","No of Farmers Participate","No of Farmer Participated",
+    "Farmers","Farmers Engaged","No of Farmers","No. of Farmers","Participants","Attendees"
+  ]));
   var acres = safeNumber(getField(row, ["Acres","Acres Covered","Total Acres"]));
 
   var clarity = safeNumber(getField(row, ["Message Clarity %","Message Clarity","Clarity %","Clarity","Msg Clarity"]));
@@ -138,6 +156,59 @@ function normalizeRow(row, idx){
   };
 }
 
+function loadCSV(){
+  var loading=document.getElementById("loading");
+
+  fetchFirstAvailableCSV()
+    .then(function(text){
+      var lines=text.split(/\r?\n/);
+      if(lines.length && /^summary\b/i.test(lines[0].trim())){
+        lines.shift(); text=lines.join("\n");
+      }
+
+      if(typeof Papa==="undefined") throw new Error("PapaParse not loaded (Papa is undefined).");
+
+      var parsed=Papa.parse(text, {
+        header:true,
+        dynamicTyping:false,
+        skipEmptyLines:true,
+        transformHeader: function(h){ return normalizeHeader(h); }
+      });
+
+      var fields=(parsed.meta && parsed.meta.fields) ? parsed.meta.fields : [];
+
+      allRows=(parsed.data||[])
+        .map(function(row, idx){ return normalizeRow(row, idx); })
+        .filter(function(r){ return r && !isExcludedRow(r); });
+
+      var hasAny = allRows.length>0;
+      var farmersSum = allRows.reduce(function(s,r){return s+(r.__farmers||0);},0);
+      var acresSum = allRows.reduce(function(s,r){return s+(r.__acres||0);},0);
+
+      if(!hasAny || (farmersSum===0 && acresSum===0)){
+        showDiagnostics(
+          "Data loaded, but key columns were not recognized (Farmers/Acres). " +
+          "Detected headers:<br><code>" + (fields||[]).join("</code>, <code>") + "</code><br>" +
+          "Fix: rename your CSV headers to standard names like <code>City</code>, <code>Session Location</code>, " +
+          "<code>No of Farmer Participate</code>, <code>Acres</code>, <code>RGN</code>."
+        );
+      } else {
+        hideDiagnostics();
+      }
+
+      initCharts();
+      initFilters();
+      applyFilters();
+      if(loading) loading.remove();
+    })
+    .catch(function(err){
+      console.error(err);
+      showErrorModal("Error loading data: " + err.message);
+      if(loading) loading.remove();
+    });
+}
+
+// ---------------- Filters ----------------
 function initFilters(){
   var rgnSel=document.getElementById("filter-rgn");
   var citySel=document.getElementById("filter-city");
@@ -150,25 +221,17 @@ function initFilters(){
   rebuildSpotOptions();
 
   rgnSel.addEventListener("change", function(){
-    rebuildCityOptions();
-    rebuildSpotOptions();
-    applyFilters();
+    rebuildCityOptions(); rebuildSpotOptions(); applyFilters();
   });
   citySel.addEventListener("change", function(){
-    rebuildSpotOptions();
-    applyFilters();
+    rebuildSpotOptions(); applyFilters();
   });
   spotSel.addEventListener("change", applyFilters);
   search.addEventListener("input", applyFilters);
 
   clearBtn.addEventListener("click", function(){
-    rgnSel.value="";
-    citySel.value="";
-    spotSel.value="";
-    search.value="";
-    rebuildCityOptions();
-    rebuildSpotOptions();
-    applyFilters();
+    rgnSel.value=""; citySel.value=""; spotSel.value=""; search.value="";
+    rebuildCityOptions(); rebuildSpotOptions(); applyFilters();
   });
 }
 
@@ -176,7 +239,6 @@ function rebuildRegionOptions(){
   var rgnSel=document.getElementById("filter-rgn");
   var cur=rgnSel.value||"";
   rgnSel.innerHTML="<option value=''>All Regions</option>";
-
   var set=new Set();
   allRows.forEach(function(r){ if(r.rgn) set.add(r.rgn); });
   Array.from(set).sort().forEach(function(v){
@@ -184,19 +246,16 @@ function rebuildRegionOptions(){
   });
   if(cur) rgnSel.value=cur;
 }
-
 function rebuildCityOptions(){
   var rgnSel=document.getElementById("filter-rgn");
   var citySel=document.getElementById("filter-city");
   var region=rgnSel.value||"";
   var cur=citySel.value||"";
-
   citySel.innerHTML="<option value=''>All Cities</option>";
   var set=new Set();
   allRows.forEach(function(r){
     if(region && r.rgn!==region) return;
     if(!r.city) return;
-    if(r.city.toLowerCase()==="multan") return;
     set.add(r.city);
   });
   Array.from(set).sort().forEach(function(c){
@@ -204,16 +263,13 @@ function rebuildCityOptions(){
   });
   if(cur && set.has(cur)) citySel.value=cur; else citySel.value="";
 }
-
 function rebuildSpotOptions(){
   var rgnSel=document.getElementById("filter-rgn");
   var citySel=document.getElementById("filter-city");
   var spotSel=document.getElementById("filter-spot");
-
   var region=rgnSel.value||"";
   var city=citySel.value||"";
   var cur=spotSel.value||"";
-
   spotSel.innerHTML="<option value=''>All Spots</option>";
   var set=new Set();
   allRows.forEach(function(r){
@@ -246,12 +302,13 @@ function applyFilters(){
 
   updateMetrics(filteredRows);
   updateDonuts(filteredRows);
-  updateCityDonut(filteredRows);
+  updateDrillDonut();
   updateSessionTable(filteredRows);
   updateMap(filteredRows);
   updateMedia(filteredRows);
 }
 
+// ---------------- Metrics/Donuts ----------------
 function updateMetrics(rows){
   var sessions=rows.length;
   var farmers=rows.reduce(function(s,r){return s+(r.__farmers||0);},0);
@@ -272,7 +329,7 @@ function updateMetrics(rows){
     avgCl = rows.reduce(function(s,r){return s+(r.__messageClarity||0);},0)/rows.length;
     avgDef = rows.reduce(function(s,r){return s+(r.__definiteUseRate||0);},0)/rows.length;
     avgAw = rows.reduce(function(s,r){return s+(r.__awarenessRate||0);},0)/rows.length;
-    infl = rows.reduce(function(s,r){return s+(r.__influencers||0);},0);
+    infl  = rows.reduce(function(s,r){return s+(r.__influencers||0);},0);
     defFarmers = rows.reduce(function(s,r){
       return s + Math.round((r.__farmers||0)*(r.__definiteUseRate||0)/100);
     },0);
@@ -310,7 +367,7 @@ function updateMetrics(rows){
 function initCharts(){
   var c1=document.getElementById("clarityDonut");
   var c2=document.getElementById("definiteDonut");
-  var c3=document.getElementById("cityDonut");
+  var c3=document.getElementById("drillDonut");
   if(!c1||!c2||!c3) return;
 
   clarityDonut=new Chart(c1, {
@@ -325,32 +382,51 @@ function initCharts(){
     options:{responsive:true,maintainAspectRatio:false,cutout:"80%",plugins:{legend:{display:false}}}
   });
 
-  cityDonut=new Chart(c3, {
+  drillDonut=new Chart(c3, {
     type:"doughnut",
-    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderWidth:0}]},
+    data:{
+      labels:[],
+      datasets:[
+        {label:"Cities", data:[], backgroundColor:[], borderWidth:0, radius:"100%", cutout:"70%"},
+        {label:"Spots", data:[], backgroundColor:[], borderWidth:0, radius:"68%", cutout:"40%"}
+      ]
+    },
     options:{
-      responsive:true,maintainAspectRatio:false,cutout:"74%",
+      responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
         tooltip:{
           callbacks:{
-            label:function(ctx){
-              var label=ctx.label||"";
-              var val=ctx.parsed||0;
-              return label + ": " + formatInt(val) + " farmers";
-            }
+            title:function(items){ return items && items.length ? items[0].dataset.label : ""; },
+            label:function(ctx){ return (ctx.label||"") + ": " + formatInt(ctx.parsed||0) + " farmers"; }
           }
         }
       },
-      onClick: function(evt, elements){
+      onClick:function(evt, elements){
         if(!elements || !elements.length) return;
-        var idx=elements[0].index;
-        var city = this.data.labels[idx];
-        if(city){
-          var citySel=document.getElementById("filter-city");
-          citySel.value=city;
-          rebuildSpotOptions();
-          applyFilters();
+        var el=elements[0];
+        var dsIndex=el.datasetIndex;
+        var idx=el.index;
+
+        if(dsIndex===0){
+          var city = drillDonut.data.datasets[0]._keys[idx];
+          if(city){
+            var citySel=document.getElementById("filter-city");
+            citySel.value=city;
+            rebuildSpotOptions();
+            applyFilters();
+          }
+        } else if(dsIndex===1){
+          var spot = drillDonut.data.datasets[1]._keys[idx];
+          if(spot){
+            var spotSel=document.getElementById("filter-spot");
+            spotSel.value=spot;
+            applyFilters();
+            setTimeout(function(){
+              var target=document.querySelector("[data-session-block='true']");
+              if(target) target.scrollIntoView({behavior:"smooth", block:"start"});
+            }, 100);
+          }
         }
       }
     }
@@ -375,37 +451,83 @@ function updateDonuts(rows){
   setText("definite-main", Math.round(avgDef)+"%");
 }
 
-function buildCitySummary(rows){
+function summaryByCity(rows){
   var m={};
   rows.forEach(function(r){
-    var c=r.city||"Unknown";
-    if(!m[c]) m[c]={city:c, farmers:0, sessions:0, acres:0};
-    m[c].farmers += (r.__farmers||0);
-    m[c].acres += (r.__acres||0);
-    m[c].sessions += 1;
+    if(!r.city) return;
+    if(!m[r.city]) m[r.city]={key:r.city, farmers:0};
+    m[r.city].farmers += (r.__farmers||0);
   });
-  var arr=Object.values(m).filter(function(x){ return x.city && x.city.toLowerCase()!=="multan"; });
-  arr.sort(function(a,b){ return b.farmers-a.farmers; });
+  var arr=Object.values(m);
+  arr.sort(function(a,b){return b.farmers-a.farmers;});
+  return arr;
+}
+function summaryBySpot(rows){
+  var m={};
+  rows.forEach(function(r){
+    var k=r.spot||"Unknown";
+    if(!m[k]) m[k]={key:k, farmers:0};
+    m[k].farmers += (r.__farmers||0);
+  });
+  var arr=Object.values(m);
+  arr.sort(function(a,b){return b.farmers-a.farmers;});
   return arr;
 }
 
-function updateCityDonut(rows){
-  if(!cityDonut) return;
+function updateDrillDonut(){
+  if(!drillDonut) return;
 
-  var sum=buildCitySummary(rows);
-  var labels=sum.map(function(s){return s.city;});
-  var data=sum.map(function(s){return Math.round(s.farmers);});
-  var colors=labels.map(cityColor);
+  var rgnVal=safeText(document.getElementById("filter-rgn").value);
+  var cityVal=safeText(document.getElementById("filter-city").value);
+  var q=safeText(document.getElementById("filter-search").value).toLowerCase();
 
-  cityDonut.data.labels=labels;
-  cityDonut.data.datasets[0].data=data;
-  cityDonut.data.datasets[0].backgroundColor=colors;
-  cityDonut.update();
+  var base = allRows.filter(function(r){
+    if(rgnVal && r.rgn!==rgnVal) return false;
+    if(q){
+      var hay=(safeText(r.rgn)+" "+safeText(r.city)+" "+safeText(r.spot)+" "+safeText(r.from)).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
 
-  var total=data.reduce(function(a,b){return a+b;},0);
-  setText("city-main", total ? formatInt(total) : "–");
+  var cities = summaryByCity(base).slice(0, 12);
+  var cityLabels = cities.map(function(x){return x.key;});
+  var cityData = cities.map(function(x){return Math.round(x.farmers);});
+  var cityColors = cityLabels.map(cityColor);
+
+  var innerBase = base;
+  var innerTitle = "Top spots (overall)";
+  if(cityVal){
+    innerBase = base.filter(function(r){ return r.city===cityVal; });
+    innerTitle = "Spots in " + cityVal;
+  }
+
+  var spots = summaryBySpot(innerBase).slice(0, 10);
+  var spotLabels = spots.map(function(x){return x.key;});
+  var spotData = spots.map(function(x){return Math.round(x.farmers);});
+  var spotColors = spotLabels.map(function(_,i){
+    return cityVal ? spotColor(cityVal, i) : "hsl(" + (i*36 % 360) + ", 70%, 65%)";
+  });
+
+  drillDonut.data.labels = cityLabels.concat(spotLabels);
+
+  drillDonut.data.datasets[0].data = cityData;
+  drillDonut.data.datasets[0].backgroundColor = cityColors;
+  drillDonut.data.datasets[0]._keys = cityLabels.slice();
+
+  drillDonut.data.datasets[1].data = spotData;
+  drillDonut.data.datasets[1].backgroundColor = spotColors;
+  drillDonut.data.datasets[1]._keys = spotLabels.slice();
+
+  drillDonut.update();
+
+  var farmers=filteredRows.reduce(function(s,r){return s+(r.__farmers||0);},0);
+  setText("drill-main", farmers ? formatInt(farmers) : "–");
+  var sub=document.getElementById("drill-sub");
+  if(sub) sub.textContent = "Cities (outer) → " + innerTitle + " (inner)";
 }
 
+// ---------------- Table ----------------
 function updateSessionTable(rows){
   var tbody=document.getElementById("session-table-body");
   if(!tbody) return;
@@ -424,6 +546,7 @@ function updateSessionTable(rows){
   });
 }
 
+// ---------------- Map ----------------
 function ensureMap(){
   var el=document.getElementById("route-map");
   if(!el) return;
@@ -462,6 +585,7 @@ function updateMap(rows){
   }
 }
 
+// ---------------- Media ----------------
 function mediaCandidatesForSession(sessionId){
   var id=String(sessionId);
   var candidates=[ {key:id, img:[id+".jpg", id+".jpeg"], vid:id+".mp4"} ];
@@ -489,6 +613,7 @@ function updateMedia(rows){
   rows.forEach(function(r){
     var block=document.createElement("div");
     block.className="sessionBlock";
+    block.setAttribute("data-session-block","true");
 
     var head=document.createElement("div");
     head.className="sessionHead";
@@ -518,7 +643,9 @@ function updateMedia(rows){
       img.alt="Session "+r.id+" "+c.key;
       img.src=c.img[0];
       img.onerror=function(){
-        if(img.src.endsWith(".jpg") && c.img[1]){ img.src=c.img[1]; return; }
+        if(img.src.endsWith(".jpg") && c.img[1]){
+          img.src=c.img[1]; return;
+        }
         tile.dataset.noimg="1"; maybeRemove();
       };
 
@@ -544,9 +671,14 @@ function updateMedia(rows){
 
       tile.appendChild(thumb);
       tile.appendChild(cap);
+
       tile.addEventListener("click", function(){ openLightbox(img, vid); });
 
-      function maybeRemove(){ if(tile.dataset.noimg==="1" && tile.dataset.novid==="1"){ tile.remove(); } }
+      function maybeRemove(){
+        if(tile.dataset.noimg==="1" && tile.dataset.novid==="1"){
+          tile.remove();
+        }
+      }
 
       reel.appendChild(tile);
     });
@@ -556,7 +688,7 @@ function updateMedia(rows){
         var note=document.createElement("div");
         note.className="muted";
         note.style.fontWeight="1000";
-        note.textContent="No media files found for this session (upload files like "+r.id+".jpg or "+r.id+"a.jpg).";
+        note.textContent="No media found for this session (upload "+r.id+".jpg or "+r.id+"a.jpg etc.).";
         block.appendChild(note);
       }
     }, 600);
@@ -566,6 +698,7 @@ function updateMedia(rows){
   });
 }
 
+// ---------------- Lightbox ----------------
 function openLightbox(imgEl, vidEl){
   var lb=document.getElementById("lightbox");
   var lbImg=document.getElementById("lb-img");
