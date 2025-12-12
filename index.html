@@ -4,1373 +4,341 @@
   <meta charset="UTF-8" />
   <title>Buctril Super Farmer Education Drive – Fact Sheet Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta
-    name="description"
-    content="Interactive fact-sheet dashboard for the Buctril Super Farmer Education Drive: sessions, farmers, acres, route map, and media gallery."
-  />
 
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
-    rel="stylesheet"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
-  <!-- Font Awesome -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    crossorigin="anonymous"
-    referrerpolicy="no-referrer"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <style>
-    :root {
-      --bg-page: linear-gradient(to bottom, #f4f7f1, #e8f5e9);
-      --bg-card: #ffffff;
-      --bg-soft: #edf4e7;
-      --accent-main: #1b5e20;
-      --accent-soft: #e8f5e9;
-      --text-main: #163020;
-      --text-muted: #607d8b;
-      --border-subtle: rgba(0, 0, 0, 0.08);
-      --shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.08);
-      --radius-lg: 16px;
-      --radius-xl: 22px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: "Roboto", system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
-      color: var(--text-main);
-      background: var(--bg-page);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Background video */
-    .bg-layer {
-      position: fixed;
-      inset: 0;
-      z-index: -2;
-      overflow: hidden;
-    }
-
-    #bg-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      filter: blur(1px) brightness(0.8);
-    }
-
-    .bg-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      background: linear-gradient(
-        to bottom right,
-        rgba(255, 255, 255, 0.9),
-        rgba(232, 245, 233, 0.9)
-      );
-    }
-
-    .page {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 16px 16px 32px;
-    }
-
-    /* TOP LOGO STRIP */
-    .top-bar-logos {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    .top-logo-left,
-    .top-logo-center,
-    .top-logo-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .top-logo-center {
-      justify-content: center;
-      flex: 1;
-      flex-wrap: wrap;
-    }
-
-    .top-logo-right {
-      justify-content: flex-end;
-      min-width: 180px;
-    }
-
-    .top-bar-logos img {
-      display: block;
-    }
-
-    .logo-bayer {
-      height: 46px;
-      width: auto;
-    }
-
-    .logo-product {
-      height: 56px;
-      width: auto;
-      border-radius: 12px;
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
-      background: #ffffff;
-      padding: 4px 8px;
-    }
-
-    .logo-interact {
-      height: 40px;
-      width: auto;
-      border-radius: 999px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
-      background: #ffffff;
-    }
-
-    .top-logo-caption {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-align: right;
-    }
-
-    @media (max-width: 600px) {
-      .top-bar-logos {
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-      }
-      .top-logo-left,
-      .top-logo-center,
-      .top-logo-right {
-        justify-content: center;
-        width: 100%;
-      }
-      .top-logo-right {
-        flex-direction: column;
-        align-items: center;
-      }
-      .top-logo-caption {
-        text-align: center;
-        width: 100%;
-      }
-      .logo-bayer,
-      .logo-product,
-      .logo-interact {
-        max-width: 130px;
-      }
-    }
-
-    /* HEADER / HERO */
-    header {
-      margin-bottom: 16px;
-    }
-
-    .hero-top-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-
-    .brand-mark {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .logo-circle {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, #fffde7, #c0e9a8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      box-shadow: 0 0 0 2px rgba(200, 230, 201, 0.7);
-      color: #1b5e20;
-    }
-
-    .brand-text h1 {
-      font-size: clamp(22px, 3vw, 30px);
-      font-weight: 700;
-      color: #154734;
-    }
-
-    .brand-text p {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-
-    .chip {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(21, 71, 52, 0.12);
-      background: rgba(255, 255, 255, 0.8);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease,
-        background 0.15s ease;
-    }
-
-    .chip:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-      background: #ffffff;
-    }
-
-    .primary-chip {
-      background: #e8f5e9;
-      color: #1b5e20;
-      border-color: rgba(46, 125, 50, 0.4);
-      font-weight: 600;
-    }
-
-    @media (max-width: 900px) {
-      .hero-top-row {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .hero-actions {
-        justify-content: flex-start;
-      }
-    }
-
-    /* GENERIC CARD */
-    .card {
-      background: var(--bg-card);
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-soft);
-      border: 1px solid var(--border-subtle);
-      padding: 14px 16px 16px;
-      margin-bottom: 16px;
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .card-header h2 {
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-    }
-
-    .pill-icon {
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      color: var(--accent-main);
-      flex-shrink: 0;
-    }
-
-    .hero-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr);
-      gap: 16px;
-    }
-
-    @media (max-width: 900px) {
-      .hero-grid {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    .hero-title {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: #1b5e20;
-    }
-
-    .hero-subtitle {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    .hero-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .hero-meta span {
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: var(--bg-soft);
-    }
-
-    .hero-metrics {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-      gap: 8px;
-      align-items: center;
-    }
-
-    @media (max-width: 600px) {
-      .hero-metrics {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    .hero-donut-wrap {
-      text-align: center;
-    }
-
-    .hero-donut-wrap canvas {
-      max-width: 130px;
-      margin: 0 auto;
-    }
-    .hero-donut-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-      align-items: center;
-    }
-
-
-    .hero-donut-main {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1b5e20;
-      margin-top: 4px;
-    }
-
-    .hero-donut-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .hero-metric-list {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 6px;
-      font-size: 12px;
-    }
-
-    .hero-metric-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 8px;
-      border-radius: 10px;
-      background: var(--bg-soft);
-    }
-
-    .hero-metric-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      box-shadow: 0 0 0 1px rgba(46, 125, 50, 0.2);
-      color: var(--accent-main);
-    }
-
-    .hero-metric-text span {
-      display: block;
-      line-height: 1.2;
-    }
-
-    .hero-metric-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-
-    .hero-metric-value {
-      font-weight: 600;
-      color: #1b5e20;
-    }
-
-    /* FILTER BAR */
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 16px;
-      padding: 10px 12px;
-      border-radius: var(--radius-lg);
-      background: rgba(255, 255, 255, 0.95);
-      box-shadow: var(--shadow-soft);
-      border: 1px solid var(--border-subtle);
-      align-items: center;
-    }
-
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: 11px;
-    }
-
-    .filter-group label {
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-
-    .filter-group input,
-    .filter-group select {
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 8px;
-      border: 1px solid #cfd8dc;
-      background: #ffffff;
-      min-width: 130px;
-    }
-
-    .filter-actions {
-      margin-left: auto;
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      border-radius: 999px;
-      border: none;
-      padding: 6px 14px;
-      font-size: 12px;
-      cursor: pointer;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .btn-primary {
-      background: var(--accent-main);
-      color: #ffffff;
-    }
-
-    .btn-secondary {
-      background: #eceff1;
-      color: #455a64;
-    }
-
-    /* LAYOUT */
-    .two-col {
-      display: grid;
-      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr);
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    @media (max-width: 900px) {
-      .two-col {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    /* SNAPSHOT */
-    .snapshot-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
-    }
-
-    .snapshot-card {
-      border-radius: 14px;
-      padding: 8px 10px;
-      background: var(--bg-soft);
-      border: 1px solid rgba(46, 125, 50, 0.15);
-      font-size: 12px;
-    }
-
-    .snapshot-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-
-    .snapshot-value {
-      font-weight: 600;
-      color: #1b5e20;
-    }
-
-    /* MAP + METRICS */
-    #route-map {
-      width: 100%;
-      min-height: 260px;
-      border-radius: 16px;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .key-metrics-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 8px;
-      font-size: 12px;
-    }
-
-    .metric-card {
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: var(--bg-soft);
-      border: 1px solid rgba(0, 0, 0, 0.04);
-    }
-
-    .metric-card-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-
-    .metric-card-value {
-      font-size: 18px;
-      font-weight: 600;
-      color: #1b5e20;
-    }
-
-    .metric-card-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    /* TABLES */
-    .table-wrapper {
-      max-height: 260px;
-      overflow: auto;
-      border-radius: 12px;
-      border: 1px solid #e0e0e0;
-      background: #ffffff;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-    }
-
-    thead {
-      background: #c5e1a5;
-    }
-
-    thead th {
-      padding: 6px 8px;
-      text-align: left;
-      color: #1b5e20;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    tbody td {
-      padding: 5px 8px;
-      border-bottom: 1px solid #eeeeee;
-      color: #37474f;
-      vertical-align: top;
-    }
-
-    tbody tr:nth-child(even) {
-      background: #fafafa;
-    }
-
-    /* CHART CONTAINERS */
-    .chart-container {
-      margin-top: 8px;
-      border-radius: 14px;
-      padding: 8px 10px;
-      background: #fafafa;
-      border: 1px solid rgba(0, 0, 0, 0.06);
-    }
-
-    
-    
-    .card-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-top: 12px;
-    }
-    .card-row > .card {
-      flex: 1 1 320px;
-      margin-top: 0;
-    }
-.chart-subtitle {
-      margin-top: 4px;
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-.chart-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-
-    .chart-container canvas {
-      max-height: 220px;
-    }
-
-    /* MEDIA GALLERY */
-    .media-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-      gap: 10px;
-    }
-
-    .media-card {
-      border-radius: 14px;
-      background: #ffffff;
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-      overflow: hidden;
-      font-size: 11px;
-      cursor: pointer;
-    }
-
-    .media-thumb-wrap {
-      position: relative;
-      width: 100%;
-      height: 110px;
-      overflow: hidden;
-    }
-
-    .media-thumb-wrap img,
-    .media-thumb-wrap video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    
-    .media-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      color: #ffffff;
-      background: rgba(0, 0, 0, 0.18);
-      opacity: 0.9;
-      transition: opacity 0.2s ease-out;
-      pointer-events: none;
-    }
-
-    .media-card:hover .media-overlay {
-      opacity: 0.15;
-    }
-.media-thumb-wrap video {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.2s ease-out;
-      pointer-events: none;
-    }
-
-    .media-thumb-wrap.hover-video:hover video {
-      opacity: 1;
-    }
-
-    .media-caption {
-      padding: 6px 8px 8px;
-    }
-
-    .media-caption strong {
-      display: block;
-      margin-bottom: 2px;
-      color: #1b5e20;
-    }
-
-    .media-caption span {
-      display: block;
-      color: var(--text-muted);
-    }
-
-    /* FEEDBACK */
-    .feedback-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
-      margin: 8px 0;
-    }
-
-    .feedback-field {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      font-size: 12px;
-    }
-
-    .feedback-field label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-
-    .feedback-field input,
-    .feedback-field textarea {
-      font-size: 12px;
-      padding: 6px 8px;
-      border-radius: 8px;
-      border: 1px solid #cfd8dc;
-      background: #ffffff;
-      resize: vertical;
-      min-height: 38px;
-    }
-
-    .feedback-actions {
-      margin-top: 4px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .feedback-status {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .feedback-status.success {
-      color: #1b5e20;
-    }
-
-    .feedback-status.error {
-      color: #b71c1c;
-    }
-
-    .feedback-note {
-      margin-top: 6px;
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    /* LOADING + ERROR */
-    #loading-message {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .spinner {
-      border: 3px solid rgba(0, 0, 0, 0.1);
-      border-top: 3px solid #2e7d32;
-      border-radius: 50%;
-      width: 16px;
-      height: 16px;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .error-modal {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #ffffff;
-      padding: 16px 18px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-      border-radius: 10px;
-      z-index: 1000;
-      max-width: 320px;
-      font-size: 13px;
-    }
-
-    .error-modal p {
-      margin-bottom: 10px;
-      color: #b71c1c;
-    }
-
-    .error-modal button {
-      padding: 6px 12px;
-      border-radius: 999px;
-      border: none;
-      background: var(--accent-main);
-      color: #ffffff;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    /* LIGHTBOX */
-    .lightbox {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-      padding: 16px;
-    }
-
-    .lightbox img,
-    .lightbox video {
-      max-width: 90%;
-      max-height: 90%;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-      background: #000;
-    }
-
-    .lightbox.active {
-      display: flex;
-    }
-
-    /* FOOTER */
-    .footer-note {
-      margin-top: 8px;
-      font-size: 11px;
-      color: var(--text-muted);
-      text-align: center;
-    }
-
-    .footer-note strong {
-      color: #1b5e20;
-    }
+    :root{
+      --bg-page:#f5f5f5;
+      --bg-card:#ffffff;
+      --color-primary:#1b5e20;
+      --color-secondary:#ff7043;
+      --color-accent:#66bb6a;
+      --color-text:#333;
+      --color-subtext:#757575;
+      --radius:10px;
+      --shadow:0 4px 10px rgba(0,0,0,.08);
+      --shadow2:0 1px 4px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Roboto,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg-page);color:var(--color-text);line-height:1.55}
+    .container{max-width:1320px;margin:18px auto;padding:0 14px}
+    h1,h2{margin:0;color:var(--color-primary)}
+    h1{font-size:26px;font-weight:800}
+    h2{font-size:18px;font-weight:700}
+    .muted{color:var(--color-subtext)}
+    .card{background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;overflow:hidden}
+    .card + .card{margin-top:16px}
+    .card-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eee}
+    .pill-icon{background:var(--color-primary);color:#fff;border-radius:999px;padding:8px 12px;font-size:14px}
+    .hero{
+      position:relative;
+      border-radius:var(--radius);
+      overflow:hidden;
+      box-shadow:var(--shadow);
+      margin-bottom:16px;
+      min-height:170px;
+      background:linear-gradient(135deg,#e8f5e9 0%,#a5d6a7 100%);
+    }
+    .hero video{
+      position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.14;filter:saturate(.95);
+    }
+    .hero-inner{position:relative;padding:20px}
+    .hero-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .hero-sub{margin-top:6px;color:var(--color-subtext);font-weight:500}
+    .hero-metrics{display:flex;gap:26px;flex-wrap:wrap;margin-top:14px}
+    .hero-metric{font-size:34px;font-weight:800;color:var(--color-secondary)}
+    .hero-metric small{display:block;font-size:12px;font-weight:700;color:var(--color-primary);letter-spacing:.04em;margin-top:-4px}
+    .hero-tags{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+    .tag{background:rgba(27,94,32,.08);color:var(--color-primary);padding:4px 10px;border-radius:999px;font-weight:700;font-size:12px}
+
+    .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    label{font-weight:700;color:var(--color-primary);font-size:13px}
+    select,input[type="text"]{
+      padding:9px 10px;border:1px solid #ccc;border-radius:8px;font-size:14px;min-width:170px;background:#fff
+    }
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+    .col-4{grid-column:span 4}
+    .col-6{grid-column:span 6}
+    .col-8{grid-column:span 8}
+    .col-12{grid-column:span 12}
+    @media (max-width:980px){
+      .col-4,.col-6,.col-8{grid-column:span 12}
+    }
+
+    .snapshot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+    .snapshot-card{border:1px solid #e5e5e5;border-radius:12px;padding:12px;background:#fafafa;text-align:center}
+    .snapshot-label{font-size:12px;color:var(--color-subtext);text-transform:uppercase;letter-spacing:.06em;font-weight:800}
+    .snapshot-value{font-size:22px;font-weight:900;color:var(--color-primary);margin-top:3px}
+    .bar{height:7px;background:#e6e6e6;border-radius:999px;overflow:hidden;margin-top:8px}
+    .bar > div{height:100%;background:var(--color-accent);width:0%;transition:width .4s ease}
+    .stars{font-size:12px;color:#ffc107;margin-top:4px}
+
+    .donut-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center}
+    @media (max-width:980px){ .donut-wrap{grid-template-columns:1fr} }
+
+    .donut-card{position:relative;height:220px}
+    .donut-center{
+      position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none
+    }
+    .donut-center .big{font-size:34px;font-weight:900;color:var(--color-primary);line-height:1}
+    .donut-center .small{font-size:12px;font-weight:800;color:var(--color-subtext);text-transform:uppercase;letter-spacing:.08em;margin-top:6px}
+
+    #route-map{height:420px;border-radius:12px}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px 10px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
+    th{background:var(--color-primary);color:#fff;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
+    tr:nth-child(even){background:#fafafa}
+    tr:hover{background:#f1f8e9}
+
+    .media-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+    .session-group{border:1px solid #eee;border-radius:14px;padding:12px;background:#fff;box-shadow:var(--shadow2)}
+    .session-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .session-head strong{color:var(--color-primary)}
+    .session-meta{font-size:12px;color:var(--color-subtext);font-weight:700}
+
+    .media-card{border-radius:12px;overflow:hidden;box-shadow:var(--shadow2);background:#fff;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease}
+    .media-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+    .thumb{position:relative;width:100%;padding-top:56.25%;background:#f0f0f0}
+    .thumb img,.thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+    .thumb video{display:none}
+    .media-card:hover .thumb video{display:block}
+    .media-card:hover .thumb img{display:none}
+    .play-badge{
+      position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;
+      border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900
+    }
+    .caption{padding:10px}
+    .caption .t{font-weight:900;color:var(--color-primary);font-size:13px}
+    .caption .s{color:var(--color-subtext);font-size:12px;margin-top:2px;font-weight:700}
+
+    #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(6px)}
+    #lightbox.active{display:flex}
+    .lb-inner{position:relative;max-width:92vw;max-height:92vh}
+    #lb-img,#lb-video{max-width:92vw;max-height:92vh;display:none}
+    #lb-close{position:absolute;top:-46px;right:0;color:#fff;font-size:30px;cursor:pointer;opacity:.9}
+    #lb-close:hover{opacity:1}
+
+    #loading-message{padding:22px;text-align:center;font-weight:900;color:var(--color-primary)}
+    .error-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff0f0;border:2px solid #ff3b30;
+      padding:16px;border-radius:12px;box-shadow:var(--shadow);z-index:10000;max-width:520px}
+    .error-modal p{margin:0 0 10px 0;color:#b00020;font-weight:800}
+    .error-modal button{background:#ff3b30;color:#fff;border:none;border-radius:10px;padding:8px 12px;font-weight:900;cursor:pointer}
   </style>
 </head>
 <body>
-  <!-- Background video + overlay -->
-  <div class="bg-layer">
-    <video id="bg-video" autoplay muted loop playsinline>
-      <source src="tmp.mp4" type="video/mp4" />
-    </video>
-  </div>
-  <div class="bg-overlay"></div>
+  <div class="container">
+    <div id="loading-message">Loading data…</div>
 
-  <div class="page">
-    <header>
-      <!-- Logo strip -->
-      <div class="top-bar-logos">
-        <div class="top-logo-left">
-          <img src="Bayer.jpg" alt="Bayer logo" class="logo-bayer" />
-        </div>
-        <div class="top-logo-center">
-          <img src="Buctril.jpg" alt="Buctril Super" class="logo-product" />
-          <img src="Atlantis.jpg" alt="Atlantis" class="logo-product" />
-        </div>
-        <div class="top-logo-right">
-          <img src="Interact.gif" alt="Interact developer logo" class="logo-interact" />
-          <span class="top-logo-caption">Dashboard by INTERACT</span>
-        </div>
-      </div>
-
-      <!-- Hero row -->
-      <div class="hero-top-row">
-        <div class="brand-mark">
-          <div class="logo-circle">
-            <i class="fas fa-wheat-awn"></i>
-          </div>
-          <div class="brand-text">
+    <header class="hero">
+      <video autoplay muted loop playsinline preload="metadata">
+        <source src="tmp.mp4" type="video/mp4" />
+      </video>
+      <div class="hero-inner">
+        <div class="hero-title">
+          <div>
             <h1>Buctril Super Farmer Education Drive</h1>
-            <p>From education to acres: tracking sessions, farmers and crop coverage.</p>
+            <div class="hero-sub">Interactive Fact Sheet Dashboard</div>
           </div>
+          <div class="muted" style="font-weight:800">Campaign Days: <span id="metric-days">–</span></div>
         </div>
-        <div class="hero-actions">
-          <div class="chip primary-chip">
-            <i class="fas fa-seedling"></i>
-            <span>Empowering Farmers, Enhancing Agriculture</span>
-          </div>
-          <div class="chip">
-            <i class="fas fa-bullhorn"></i>
-            <span>Activation executed &amp; reported by <strong>INTERACT</strong></span>
-          </div>
-          <button class="chip" type="button" onclick="openFeedbackSection()">
-            <i class="fas fa-comment-dots"></i>
-            <span>Comments &amp; feedback</span>
-          </button>
-          <button class="chip" type="button" onclick="shareOnX()">
-            <i class="fab fa-x-twitter"></i>
-            <span>Share on X</span>
-          </button>
-          <button class="chip" type="button" onclick="copyLink()">
-            <i class="fas fa-link"></i>
-            <span>Copy link</span>
-          </button>
-        </div>
-      </div>
 
-      <div id="loading-message">
-        Loading data from <code>sum_sheet.csv</code>…
-        <span class="spinner" id="spinner"></span>
-      </div>
-
-      <!-- Hero cards -->
-      <div class="hero-grid card">
-        <div>
-          <div class="hero-title">Marketing Team Fact-Sheet Dashboard</div>
-          <div class="hero-subtitle">
-            Sessions, farmers, acres and locations as recorded in the consolidated field reports.
-          </div>
-          <div class="hero-meta">
-            <span>Date range: <strong id="hero-date-range">–</strong></span>
-            <span>Sessions: <strong id="hero-sessions">–</strong></span>
-            <span>Farmers: <strong id="hero-farmers">–</strong></span>
-            <span>Acres: <strong id="hero-acres">–</strong></span>
-          </div>
+        <div class="hero-metrics">
+          <div class="hero-metric"><span id="hero-farmers">–</span><small>FARMERS ENGAGED</small></div>
+          <div class="hero-metric"><span id="hero-sessions">–</span><small>SESSIONS CONDUCTED</small></div>
         </div>
-        
-<div class="hero-metrics">
-          <div class="hero-donut-grid">
-            <div class="hero-donut-wrap">
-              <canvas id="clarityDonut"></canvas>
-              <div class="hero-donut-main" id="clarity-main">–</div>
-              <div class="hero-donut-sub">Avg. message clarity (filtered view)</div>
-            </div>
-            <div class="hero-donut-wrap">
-              <canvas id="definiteDonut"></canvas>
-              <div class="hero-donut-main" id="definite-main">–</div>
-              <div class="hero-donut-sub">Definite use intent (filtered view)</div>
-            </div>
-          </div>
-          <div class="hero-metric-list">
-            <div class="hero-metric-item">
-              <div class="hero-metric-icon">
-                <i class="fas fa-chart-column"></i>
-              </div>
-              <div class="hero-metric-text">
-                <span class="hero-metric-label">Sessions executed</span>
-                <span class="hero-metric-value" id="metric-sessions-hero">–</span>
-              </div>
-            </div>
-            <div class="hero-metric-item">
-              <div class="hero-metric-icon">
-                <i class="fas fa-users"></i>
-              </div>
-              <div class="hero-metric-text">
-                <span class="hero-metric-label">Farmers reached</span>
-                <span class="hero-metric-value" id="metric-farmers-hero">–</span>
-              </div>
-            </div>
-            <div class="hero-metric-item">
-              <div class="hero-metric-icon">
-                <i class="fas fa-seedling"></i>
-              </div>
-              <div class="hero-metric-text">
-                <span class="hero-metric-label">Acres represented</span>
-                <span class="hero-metric-value" id="metric-acres-hero">–</span>
-              </div>
-            </div>
-          </div></div>
+
+        <div class="hero-tags">
+          <span class="tag">Target Crop: Cotton</span>
+          <span class="tag">Target Weed: Narrow-leaf weeds</span>
+          <span class="tag">Filters: RGN → City → Spot</span>
+        </div>
       </div>
     </header>
 
-    <!-- Filters -->
-    <section class="filters">
-      <div class="filter-group">
-        <label for="start-date">Start date</label>
-        <input type="date" id="start-date" />
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon"><i class="fas fa-filter"></i></div>
+        <h2>Filters (RGN / City / Spot)</h2>
       </div>
-      <div class="filter-group">
-        <label for="end-date">End date</label>
-        <input type="date" id="end-date" />
+
+      <div class="filters">
+        <label for="filter-rgn"><i class="fas fa-map"></i> RGN:</label>
+        <select id="filter-rgn"><option value="">All Regions</option></select>
+
+        <label for="filter-city"><i class="fas fa-city"></i> City:</label>
+        <select id="filter-city"><option value="">All Cities</option></select>
+
+        <label for="filter-spot"><i class="fas fa-location-dot"></i> Spot:</label>
+        <select id="filter-spot"><option value="">All Spots</option></select>
+
+        <label for="filter-search"><i class="fas fa-search"></i> Search:</label>
+        <input id="filter-search" type="text" placeholder="Search city, spot, from…" />
       </div>
-      <div class="filter-group">
-        <label for="from-city-filter">From city</label>
-        <select id="from-city-filter">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div class="filter-actions">
-        <button class="btn btn-primary" type="button" onclick="applyFilters()">
-          <i class="fas fa-filter"></i> Apply
-        </button>
-        <button class="btn btn-secondary" type="button" onclick="resetFilters()">
-          <i class="fas fa-rotate-left"></i> Reset
-        </button>
+
+      <div class="muted" style="margin-top:10px;font-weight:700">
+        Note: “Multan” is excluded automatically (start point, not a farmer session).
       </div>
     </section>
 
-    <!-- Snapshot + Map/metrics -->
-    <section class="two-col">
-      <section class="card">
-        <div class="card-header">
-          <div class="pill-icon"><i class="fas fa-chart-bar"></i></div>
-          <h2>Campaign snapshot (current filters)</h2>
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon"><i class="fas fa-chart-simple"></i></div>
+        <h2>Campaign Snapshot (Filtered)</h2>
+      </div>
+      <div class="snapshot-grid">
+        <div class="snapshot-card">
+          <div class="snapshot-label">Sessions</div>
+          <div class="snapshot-value" id="metric-sessions">–</div>
         </div>
-        <div class="snapshot-grid">
-          <div class="snapshot-card">
-            <div class="snapshot-label">Sessions</div>
-            <div class="snapshot-value" id="snap-sessions">–</div>
-          </div>
-          <div class="snapshot-card">
-            <div class="snapshot-label">Farmers reached</div>
-            <div class="snapshot-value" id="snap-farmers">–</div>
-          </div>
-          <div class="snapshot-card">
-            <div class="snapshot-label">Acres covered</div>
-            <div class="snapshot-value" id="snap-acres">–</div>
-          </div>
-          <div class="snapshot-card">
-            <div class="snapshot-label">Cities &amp; villages</div>
-            <div class="snapshot-value" id="snap-locations">–</div>
-          </div>
+        <div class="snapshot-card">
+          <div class="snapshot-label">Farmers</div>
+          <div class="snapshot-value" id="metric-farmers">–</div>
         </div>
-      </section>
+        <div class="snapshot-card">
+          <div class="snapshot-label">Acres Covered</div>
+          <div class="snapshot-value" id="metric-acres">–</div>
+        </div>
+        <div class="snapshot-card">
+          <div class="snapshot-label">Cities Visited</div>
+          <div class="snapshot-value" id="metric-cities">–</div>
+        </div>
+      </div>
+    </section>
 
-      <section class="card">
+    <section class="card">
+      <div class="card-header">
+        <div class="pill-icon"><i class="fas fa-gauge-high"></i></div>
+        <h2>Performance (Filtered)</h2>
+      </div>
+
+      <div class="snapshot-grid">
+        <div class="snapshot-card">
+          <div class="snapshot-label">Avg. Message Clarity</div>
+          <div class="snapshot-value" id="metric-clarity">–</div>
+          <div class="bar"><div id="clarity-progress"></div></div>
+          <div class="stars" id="clarity-stars"></div>
+        </div>
+
+        <div class="snapshot-card">
+          <div class="snapshot-label">Avg. Definite Use</div>
+          <div class="snapshot-value" id="metric-definite">–</div>
+          <div class="bar"><div id="definite-progress"></div></div>
+        </div>
+
+        <div class="snapshot-card">
+          <div class="snapshot-label">Influencers Identified</div>
+          <div class="snapshot-value" id="metric-influencers">–</div>
+          <div class="bar"><div id="influencers-progress"></div></div>
+        </div>
+
+        <div class="snapshot-card">
+          <div class="snapshot-label">Avg. Awareness Rate</div>
+          <div class="snapshot-value" id="metric-awareness">–</div>
+          <div class="bar"><div id="awareness-progress"></div></div>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:16px">
+        <div class="col-6">
+          <div class="donut-card">
+            <canvas id="clarityDonut"></canvas>
+            <div class="donut-center">
+              <div class="big" id="clarity-main">–</div>
+              <div class="small">Avg. message clarity</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="donut-card">
+            <canvas id="definiteDonut"></canvas>
+            <div class="donut-center">
+              <div class="big" id="definite-main">–</div>
+              <div class="small">Avg. definite use</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="muted" style="font-weight:800;margin-top:6px" id="adoption-text">Estimated definite-use farmers: –</div>
+    </section>
+
+    <div class="grid">
+      <section class="card col-8">
         <div class="card-header">
-          <div class="pill-icon"><i class="fas fa-map-location-dot"></i></div>
-          <h2>Route map (circle size = acres)</h2>
+          <div class="pill-icon"><i class="fas fa-map-marked-alt"></i></div>
+          <h2>Route Map</h2>
         </div>
         <div id="route-map"></div>
       </section>
-    </section>
 
-    <!-- Key metrics right of map -->
-    <section class="two-col">
-      <section class="card">
+      <section class="card col-4">
         <div class="card-header">
-          <div class="pill-icon"><i class="fas fa-calculator"></i></div>
-          <h2>Key engagement metrics</h2>
+          <div class="pill-icon"><i class="fas fa-chart-column"></i></div>
+          <h2>Adoption (Farmers)</h2>
         </div>
-        <div class="key-metrics-grid">
-          <div class="metric-card">
-            <div class="metric-card-label">Total sessions</div>
-            <div class="metric-card-value" id="metric-total-sessions">–</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-card-label">Total farmers</div>
-            <div class="metric-card-value" id="metric-total-farmers">–</div>
-            <div class="metric-card-sub">
-              Avg / session: <strong id="metric-farmers-per-session">–</strong>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-card-label">Total acres</div>
-            <div class="metric-card-value" id="metric-total-acres">–</div>
-            <div class="metric-card-sub">
-              Avg / session: <strong id="metric-acres-per-session">–</strong>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-card-label">Coverage</div>
-            <div class="metric-card-value" id="metric-coverage">–</div>
-            <div class="metric-card-sub">
-              Cities: <strong id="metric-cities">–</strong>,
-              Villages: <strong id="metric-villages">–</strong>,
-              Sessions with GPS: <strong id="metric-sessions-with-coords">–</strong>
-            </div>
-          </div>
+        <div style="height:320px">
+          <canvas id="adoptionChart"></canvas>
         </div>
       </section>
+    </div>
 
-      <section class="card">
-        <div class="card-header">
-          <div class="pill-icon"><i class="fas fa-city"></i></div>
-          <h2>Top cities by farmers</h2>
-        </div>
-        <div class="chart-container">
-          <div class="chart-title">Share of farmers by city (top 6 + others)</div>
-          <canvas id="cityFarmersChart"></canvas>
-        </div>
-      </section>
-        
-        <div class="card-row">
-<section class="card" style="margin-top: 12px;">
-          <div class="card-header">
-            <div>
-              <div class="pill-icon"><i class="fas fa-person-booth"></i></div>
-              <h2>Farmer adoption snapshot</h2>
-            </div>
-          </div>
-          <div class="chart-container">
-            <div class="chart-title">Total farmers reached vs est. definite-use farmers</div>
-            <canvas id="adoptionChart"></canvas>
-            <div class="chart-subtitle" id="adoption-text">Estimated definite-use farmers: &ndash;</div>
-          </div>
-        </section>
-
-        </div>
-    </section>
-
-    <!-- Session table -->
     <section class="card">
       <div class="card-header">
-        <div class="pill-icon"><i class="fas fa-clipboard-list"></i></div>
-        <h2>Session-wise detail</h2>
+        <div class="pill-icon"><i class="fas fa-table"></i></div>
+        <h2>Session Details (Filtered)</h2>
       </div>
-      <div class="table-wrapper">
+      <div style="overflow:auto">
         <table>
           <thead>
             <tr>
-              <th>SN</th>
+              <th>Session ID</th>
               <th>Date</th>
-              <th>From city</th>
-              <th>To city</th>
-              <th>Village / location</th>
+              <th>RGN</th>
+              <th>City</th>
+              <th>Spot</th>
               <th>Farmers</th>
               <th>Acres</th>
-              <th>Clarity %</th>
+              <th>Clarity</th>
               <th>Definite Use</th>
               <th>Influencers</th>
             </tr>
           </thead>
-          <tbody id="session-rows"></tbody>
+          <tbody id="session-table-body"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- City pivot table -->
     <section class="card">
       <div class="card-header">
-        <div class="pill-icon"><i class="fas fa-table"></i></div>
-        <h2>Pivot – by city</h2>
+        <div class="pill-icon"><i class="fas fa-camera"></i></div>
+        <h2>Media Gallery (Per Session Row)</h2>
       </div>
-      <div class="table-wrapper" style="max-height: 220px;">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>City</th>
-              <th>Sessions</th>
-              <th>Farmers</th>
-              <th>Acres</th>
-            </tr>
-          </thead>
-          <tbody id="city-rows"></tbody>
-        </table>
+      <div class="muted" style="font-weight:800;margin-bottom:10px">
+        Naming supported per session: <code>1a.jpg … 1f.jpg</code> and <code>1a.mp4 … 1f.mp4</code> (also supports .jpeg).
       </div>
-      <div class="chart-subtitle">Totals per city (sessions, farmers, acres) for current filters</div>
+      <div id="media-gallery"></div>
     </section>
+  </div>
 
-    <!-- Media gallery -->
-    <section class="card">
-      <div class="card-header">
-        <div class="pill-icon"><i class="fas fa-camera-retro"></i></div>
-        <h2>Media gallery – photos &amp; short clips</h2>
-      </div>
-      <div class="media-grid" id="media-gallery"></div>
-      <div class="footer-note" style="margin-top: 10px;">
-        Media slots map to session rows in <strong>sum_sheet.csv</strong>:
-        <code>1.jpeg / 1.mp4</code>, <code>2.jpeg / 2.mp4</code>, … placed in the same folder.
-      </div>
-    </section>
-
-    <!-- Feedback -->
-    <section class="card" id="feedback-section">
-      <div class="card-header">
-        <div class="pill-icon"><i class="fas fa-comment-dots"></i></div>
-        <h2>Comments &amp; feedback</h2>
-      </div>
-      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
-        Share your comments or suggestions for this dashboard. You may share only your
-        <strong>contact number</strong> if you prefer not to share an email address.
-      </p>
-      <form id="feedback-form">
-        <div class="feedback-grid">
-          <div class="feedback-field">
-            <label for="fb-name">Name (optional)</label>
-            <input id="fb-name" name="name" type="text" placeholder="Your name" />
-          </div>
-          <div class="feedback-field">
-            <label for="fb-phone">Contact number (optional)</label>
-            <input id="fb-phone" name="phone" type="tel" placeholder="+92-3xx-xxxxxxx" />
-          </div>
-          <div class="feedback-field">
-            <label for="fb-email">Email (optional)</label>
-            <input id="fb-email" name="email" type="email" placeholder="you@example.com" />
-          </div>
-          <div class="feedback-field">
-            <label for="fb-org">Organization / role (optional)</label>
-            <input id="fb-org" name="org" type="text" placeholder="e.g. Bayer Marketing / Sales" />
-          </div>
-        </div>
-        <div class="feedback-field">
-          <label for="fb-message">Comment / feedback</label>
-          <textarea id="fb-message" name="message" rows="4" required
-            placeholder="Write your message for interact@paksaf.com here…"></textarea>
-        </div>
-        <div class="feedback-actions">
-          <button class="btn btn-primary" type="submit">
-            <i class="fas fa-paper-plane"></i>
-            <span>Send feedback</span>
-          </button>
-          <a class="chip" href="tel:+923000000000">
-            <i class="fas fa-phone"></i>
-            Call / WhatsApp (example)
-          </a>
-        </div>
-        <p id="feedback-status" class="feedback-status"></p>
-        <p class="feedback-note">
-          Submitting opens your email application and pre-fills an email to
-          <strong>interact@paksaf.com</strong> with your message plus any contact details you shared.
-          If your mail app does not open, you can send a manual email or call / WhatsApp on the contact above.
-        </p>
-      </form>
-    </section>
-
-    <div class="footer-note">
-      Brand activation executed and reported by <strong>INTERACT</strong>. Dashboard prepared for
-      <strong>Bayer Marketing Team</strong>.
-    </div>
-    <div class="footer-note" style="margin-top: 4px;">
-      <button class="chip primary-chip" type="button" onclick="openFeedbackSection()">
-        <i class="fas fa-comment-dots"></i>
-        <span>Share your comments &amp; feedback</span>
-      </button>
+  <div id="lightbox">
+    <div class="lb-inner">
+      <div id="lb-close"><i class="fas fa-times-circle"></i></div>
+      <img id="lb-img" alt="Media" />
+      <video id="lb-video" controls autoplay loop playsinline></video>
     </div>
   </div>
 
-  <!-- Lightbox overlay -->
-  <div class="lightbox" id="lightbox">
-    <img id="lb-img" src="" alt="Session media image" />
-    <video id="lb-video" controls playsinline></video>
-  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <!-- JS libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-  <!-- Dashboard logic -->
-  <script src="data_processor.js?v=20251212_3"></script>
-
-  <!-- Page-level helpers: feedback, share, etc. -->
-  <script>
-    function openFeedbackSection() {
-      var section = document.getElementById("feedback-section");
-      if (section) {
-        section.scrollIntoView({ behavior: "smooth", block: "start" });
-        var msg = document.getElementById("fb-message");
-        if (msg) {
-          try { msg.focus(); } catch (e) {}
-        }
-      }
-    }
-
-    function shareOnX() {
-      var url = encodeURIComponent(window.location.href);
-      var text = encodeURIComponent(
-        "Buctril Super Farmer Education Drive – interactive fact sheet dashboard (sessions, acres, engagement & map)."
-      );
-      var shareUrl = "https://twitter.com/intent/tweet?url=" + url + "&text=" + text;
-      window.open(shareUrl, "_blank", "noopener,noreferrer");
-    }
-
-    function copyLink() {
-      var url = window.location.href;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url);
-      } else {
-        window.prompt("Copy this URL:", url);
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-      var form = document.getElementById("feedback-form");
-      var statusEl = document.getElementById("feedback-status");
-      if (!form || !statusEl) return;
-
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-
-        var name = (document.getElementById("fb-name").value || "").trim();
-        var phone = (document.getElementById("fb-phone").value || "").trim();
-        var email = (document.getElementById("fb-email").value || "").trim();
-        var org = (document.getElementById("fb-org").value || "").trim();
-        var msg = (document.getElementById("fb-message").value || "").trim();
-
-        if (!msg) {
-          statusEl.textContent = "Please add your comment or feedback before submitting.";
-          statusEl.classList.remove("success");
-          statusEl.classList.add("error");
-          return;
-        }
-
-        var subject = "Feedback – Buctril Super Farmer Education Drive Dashboard";
-        var bodyLines = [];
-        if (name) bodyLines.push("Name: " + name);
-        if (phone) bodyLines.push("Contact number: " + phone);
-        if (email) bodyLines.push("Email: " + email);
-        if (org) bodyLines.push("Organization / Role: " + org);
-        if (bodyLines.length) bodyLines.push("");
-        bodyLines.push("Message:");
-        bodyLines.push(msg);
-
-        var body = bodyLines.join("\n");
-        var mailtoLink =
-          "mailto:interact@paksaf.com?subject=" +
-          encodeURIComponent(subject) +
-          "&body=" +
-          encodeURIComponent(body);
-
-        statusEl.textContent =
-          "Opening your email application so you can send this feedback to interact@paksaf.com…";
-        statusEl.classList.remove("error");
-        statusEl.classList.add("success");
-
-        window.location.href = mailtoLink;
-      });
-    });
-  </script>
+  <script src="data_processor.js?v=20251212_regen"></script>
 </body>
 </html>

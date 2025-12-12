@@ -1,15 +1,31 @@
 /****************************************************
- * Buctril Field Report – Data Processor
+ * Buctril Super Dashboard – Data Processor (RGN/City/Spot + Per-Session Media)
  * Expects files in SAME FOLDER as index.html:
- *   - sum_sheet.csv
- *   - 1.jpeg, 1.mp4, 2.jpeg, 2.mp4, ...
+ * - sum_sheet.csv
+ * - tmp.mp4 (optional background)
+ * Media naming per session row (Session ID):
+ *   1a.jpg / 1a.jpeg / 1a.mp4 ... up to 1f.*
+ *   2a.jpg ... 17f.mp4 etc.
  ****************************************************/
 
-// ---------- BASIC HELPERS ----------
+// ------------------------- Helpers -------------------------
+function safeText(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+
 function safeNumber(val) {
-  if (val === null || val === undefined) return 0;
-  var n = parseFloat(String(val).replace(/,/g, "").trim());
+  if (val === null || val === undefined || val === "") return 0;
+  // Handles "1,002", "45%", " 12.5 "
+  var str = String(val).replace(/,/g, "").trim();
+  var m = str.match(/-?\d+(?:\.\d+)?/);
+  if (!m) return 0;
+  var n = parseFloat(m[0]);
   return isNaN(n) ? 0 : n;
+}
+
+function formatInt(n) {
+  try { return Math.round(n).toLocaleString("en-US"); } catch { return String(n); }
 }
 
 function setText(id, value) {
@@ -23,875 +39,711 @@ function showErrorModal(message) {
 
   var modal = document.createElement("div");
   modal.className = "error-modal";
-  modal.innerHTML =
-    "<p>" + message + "</p><button type='button'>Close</button>";
+  modal.innerHTML = "<p>" + message + "</p><button type='button'>Close</button>";
   document.body.appendChild(modal);
   var btn = modal.querySelector("button");
   if (btn) btn.addEventListener("click", function () { modal.remove(); });
 }
 
-
-// Extract stable session/media index per session row (maps to {n}.jpeg / {n}.mp4)
-function extractSessionIndex(obj, fallbackIndex) {
-  var keys = [
-    "Session ID","Session Id","SessionID","ID","Id",
-    "SN","S/N","S. No","S.No","Sr","Sr.","Sr No","Sr. No",
-    "Serial","Serial No","Serial No.","No","#"
-  ];
-  for (var i = 0; i < keys.length; i++) {
-    var v = obj[keys[i]];
-    if (v === null || v === undefined || v === "") continue;
-    var m = String(v).match(/\d+/);
-    if (m) {
-      var n = parseInt(m[0], 10);
-      if (!isNaN(n) && n > 0) return n;
+function getField(row, candidates) {
+  // candidates: array of possible column names
+  for (var i = 0; i < candidates.length; i++) {
+    var k = candidates[i];
+    if (row.hasOwnProperty(k) && safeText(row[k]) !== "") return row[k];
+  }
+  // try case-insensitive match
+  var keys = Object.keys(row);
+  for (var j = 0; j < candidates.length; j++) {
+    var want = candidates[j].toLowerCase();
+    for (var t = 0; t < keys.length; t++) {
+      if (keys[t].toLowerCase() === want && safeText(row[keys[t]]) !== "") return row[keys[t]];
     }
   }
-  return (fallbackIndex || 0) + 1;
+  return "";
 }
 
-// ---------- GLOBAL STATE ----------
+function normalizeCityName(s) {
+  return safeText(s).replace(/\s+/g, " ").trim();
+}
+
+function isMultanStartPoint(r) {
+  // Exclude "Multan" when it's not an engagement session.
+  // Conservative rule: if city is Multan AND farmers & acres are zero -> drop.
+  var city = normalizeCityName(r.city).toLowerCase();
+  return city === "multan" && (r.__farmers === 0) && (r.__acres === 0);
+}
+
+function starsFromPct(pct) {
+  var s = Math.max(0, Math.min(5, Math.round(pct / 20)));
+  return "★".repeat(s) + "☆".repeat(5 - s);
+}
+
+// ------------------------- Global State -------------------------
 var allRows = [];
 var filteredRows = [];
-var uniqueDates = [];
-var citySummary = [];
+
 var map = null;
 var mapMarkers = [];
-var clarityChart = null;
-var definiteChart = null;
-var cityFarmersChart = null;
+
+var clarityDonut = null;
+var definiteDonut = null;
 var adoptionChart = null;
 
-// ---------- CSV LOAD ----------
+// Media letters (a..f)
+var MEDIA_LETTERS = ["a","b","c","d","e","f"];
+
+// ------------------------- CSV Load + Parse -------------------------
 function loadCSV() {
   var loadingEl = document.getElementById("loading-message");
-
   fetch("sum_sheet.csv?cache=" + Date.now())
-    .then(function (resp) {
-      if (!resp.ok) throw new Error("Failed to load CSV: " + resp.status);
-      return resp.text();
+    .then(function (res) {
+      if (!res.ok) throw new Error("sum_sheet.csv not found (" + res.status + ")");
+      return res.text();
     })
-    .then(function (text) {
-      Papa.parse(text, {
-        header: false,
+    .then(function (csvText) {
+      // Remove a "Summary..." first line if present
+      var lines = csvText.split(/\r?\n/);
+      if (lines.length > 0 && /^summary\b/i.test(lines[0].trim())) {
+        lines.shift();
+        csvText = lines.join("\n");
+      }
+
+      if (typeof Papa === "undefined") {
+        throw new Error("PapaParse library not loaded (Papa is undefined).");
+      }
+
+      var parsed = Papa.parse(csvText, {
+        header: true,
+        dynamicTyping: false,
         skipEmptyLines: true,
-        complete: function (result) {
-          try {
-            var rows = result.data || [];
-            if (!rows.length) {
-              if (loadingEl) loadingEl.textContent = "No data found in sum_sheet.csv.";
-              showErrorModal("sum_sheet.csv appears to be empty.");
-              return;
-            }
-
-            // 1) Drop the first BOM + Summary line
-            if (rows.length && rows[0].length) {
-              var firstCell = rows[0][0] || "";
-              var norm = String(firstCell)
-                .replace(/^\uFEFF/, "") // remove BOM
-                .trim()
-                .toLowerCase();
-              if (norm === "summary") {
-                rows.shift();
-              }
-            }
-
-            if (!rows.length) {
-              if (loadingEl) loadingEl.textContent = "No usable rows in sum_sheet.csv.";
-              showErrorModal("sum_sheet.csv does not contain any detail rows.");
-              return;
-            }
-
-            // 2) Next row is the real header row (SN, From City, City, Date, ...)
-            var headerRow = rows.shift();
-            var headers = headerRow.map(function (h) {
-              if (h === null || h === undefined) return "";
-              return String(h).replace(/^\uFEFF/, "").trim();
-            });
-
-            // 3) Turn remaining rows into objects keyed by the headers
-            allRows = rows.map(function (r, idx) {
-              var obj = {};
-              headers.forEach(function (h, colIdx) {
-                if (!h) return; // ignore blank header cells
-                obj[h] = r[colIdx];
-              });
-              return normalizeRow(obj, idx);
-            });
-
-            preProcessDates(allRows);
-            populateFilterOptions(allRows);
-            applyFilters(); // initial render
-
-            if (loadingEl) {
-              var spinner = document.getElementById("spinner");
-              if (spinner && spinner.parentNode) spinner.parentNode.removeChild(spinner);
-              loadingEl.textContent = "Data loaded from sum_sheet.csv – filters are now active.";
-            }
-          } catch (e) {
-            console.error("Processing error:", e);
-            if (loadingEl) loadingEl.textContent = "Error processing data.";
-            showErrorModal("Error processing sum_sheet.csv – please check file format.");
-          }
-        },
-        error: function (err) {
-          console.error("CSV parse error:", err);
-          if (loadingEl) loadingEl.textContent = "Error loading data.";
-          showErrorModal("Could not parse sum_sheet.csv. Please confirm file format.");
-        }
       });
+
+      if (parsed.errors && parsed.errors.length) {
+        console.error("CSV parse errors:", parsed.errors);
+        showErrorModal("CSV parsing errors detected. Please verify your CSV formatting (commas inside fields must be quoted).");
+      }
+
+      allRows = (parsed.data || [])
+        .map(function (row, idx) { return normalizeRow(row, idx); })
+        .filter(function (r) { return r && r.__farmers > 0; }) // keep real sessions only
+        .filter(function (r) { return !isMultanStartPoint(r); }); // remove Multan start point
+
+      // Initial render
+      initCharts();
+      initFilters();
+      applyFilters();
+
+      if (loadingEl) loadingEl.remove();
     })
     .catch(function (err) {
-      console.error("CSV fetch error:", err);
-      if (loadingEl) loadingEl.textContent = "Error loading data.";
-      showErrorModal("Could not load sum_sheet.csv. Please confirm it is in the same folder as index.html.");
+      console.error(err);
+      showErrorModal("Error loading data: " + err.message);
+      if (loadingEl) loadingEl.remove();
     });
 }
 
-// Normalize each row, trim keys/values, and compute helper fields
-function normalizeRow(row, index) {
-  var obj = {};
-  Object.keys(row).forEach(function (k) {
-    var key = (k || "").trim();
-    var val = row[k];
-    if (typeof val === "string") val = val.trim();
-    obj[key] = val;
-  });
+function normalizeRow(row, idx) {
+  // Determine stable Session ID for media mapping
+  var sid = safeText(getField(row, ["SN","Sr No","Sr. No","Session ID","SessionID","ID","Id","S#","S.No","S No"]));
+  var sessionId = sid !== "" ? safeNumber(sid) : (idx + 1);
 
-  // Stable per-session media index (maps to {n}.jpeg / {n}.mp4)
-  obj.__mediaIndex = extractSessionIndex(obj, index);
-  obj.__sn = obj.__mediaIndex;
-  obj.__rowIndex = index;
+  var rgn = safeText(getField(row, ["RGN","Region","REGION","Rgn"]));
+  var city = normalizeCityName(getField(row, ["City","To City","To","District","District/City"]));
+  var fromCity = normalizeCityName(getField(row, ["From City","From","Starting City","Start City"]));
+  var spot = normalizeCityName(getField(row, ["Session Location","Village / Mauza","Village/Mauza","Spot","Location","Venue","Mauza","Village"]));
+  var dateStr = safeText(getField(row, ["Date","Activity Date","Day","Session Date"]));
 
-  // Farmers (be liberal with header names)
-  var farmers = safeNumber(
-    obj["Total Farmers"] ||
-      obj["Farmers"] ||
-      obj["No of Farmer Participate"] ||
-      obj["No of Farmers"] ||
-      obj["No. of Farmers"] ||
-      obj["Farmers Engaged"] ||
-      obj["Farmers engaged"] ||
-      obj["farmers"]
-  );
+  // numbers
+  var farmers = safeNumber(getField(row, ["No of Farmer Participate","Farmers","Farmers Engaged","No of Farmers","No. of Farmers","No of farmer","Participants","Attendees"]));
+  var acres = safeNumber(getField(row, ["Acres","Acres Covered","Total Acres"]));
 
-  // Acres (be liberal with header names)
-  var acres = safeNumber(
-    obj["Total Wheat Acres"] ||
-      obj["Estimated Buctril Acres from this Session"] ||
-      obj["Wheat acres (approx.)"] ||
-      obj["Wheat acres"] ||
-      obj["Total Acres"] ||
-      obj["Acres"] ||
-      obj["acres"]
-  );
+  // campaign metrics
+  var clarity = safeNumber(getField(row, ["Message Clarity %","Message Clarity","Clarity %","Clarity","Msg Clarity"]));
+  var definite = safeNumber(getField(row, ["Definite Use %","Definite Use","Definite Use %","Use Intent %","Use Intent","Definite"]));
+  var influencers = safeNumber(getField(row, ["Influencers","No of Influencers","Influencers Identified"]));
+  var awareness = safeNumber(getField(row, ["Awareness %","Awareness","Awareness Rate"]));
 
-  // Campaign / perception metrics (optional columns)
-  var clarity = safeNumber(
-    obj["Message Clarity %"] ||
-      obj["Message Clarity"] ||
-      obj["Clarity %"] ||
-      obj["Clarity"] ||
-      obj["Message clarity"]
-  );
-  var definiteUse = safeNumber(
-    obj["Definite Use %"] ||
-      obj["Definite Use"] ||
-      obj["Definite Use Intent %"] ||
-      obj["Definite Use Intent"] ||
-      obj["Use Intent %"] ||
-      obj["Use Intent"] ||
-      obj["Definite Use Rate"]
-  );
-  var influencers = safeNumber(
-    obj["Influencers"] ||
-      obj["Influencers Identified"] ||
-      obj["Influencer"] ||
-      obj["Key Influencers"]
-  );
-  var awareness = safeNumber(
-    obj["Awareness %"] ||
-      obj["Awareness"] ||
-      obj["Awareness Rate %"] ||
-      obj["Awareness Rate"]
-  );
+  // geo
+  var lat = safeNumber(getField(row, ["Latitude","Lat"]));
+  var lon = safeNumber(getField(row, ["Longitude","Lng","Long","Lon"]));
 
-  // Clamp percentages
-  if (!isNaN(clarity)) clarity = Math.max(0, Math.min(100, clarity));
-  if (!isNaN(definiteUse)) definiteUse = Math.max(0, Math.min(100, definiteUse));
-  if (!isNaN(awareness)) awareness = Math.max(0, Math.min(100, awareness));
+  return {
+    __raw: row,
+    id: sessionId,              // displayed session id + used for media file prefixes
+    rgn: rgn,
+    city: city,
+    from: fromCity,
+    spot: spot,
+    date: dateStr,
 
-  // Serial number
-  var sn = obj["SN"] || obj["Sn"] || obj["sn"] || (index + 1);
+    __farmers: farmers,
+    __acres: acres,
 
-  obj.__sn = sn;
-  obj.__farmers = farmers;
-  obj.__acres = acres;
+    __messageClarity: clarity,
+    __definiteUseRate: definite,
+    __influencers: influencers,
+    __awarenessRate: awareness,
 
-  obj.__messageClarity = clarity;
-  obj.__definiteUseRate = definiteUse;
-  obj.__influencers = influencers;
-  obj.__awarenessRate = awareness;
-
-  return obj;
-}
-
-
-// ---------- DATES ----------
-function parseDate(value) {
-  if (!value) return null;
-  var v = String(value).trim();
-
-  // Try built-in parsing first (covers e.g. 2024-11-23)
-  var parsed = Date.parse(v);
-  if (!isNaN(parsed)) return new Date(parsed);
-
-  // pattern: 23-Nov-25 or 23/Nov/2025
-  var m = v.match(/^(\d{1,2})[-\/](\w+)[-\/](\d{2,4})$/i);
-  var months = {
-    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    latitude: lat,
+    longitude: lon
   };
-
-  if (m) {
-    var day = parseInt(m[1], 10);
-    var monStr = m[2].toLowerCase();
-    var yearStr = m[3];
-    if (!months.hasOwnProperty(monStr)) return null;
-    var year = parseInt(yearStr, 10);
-    if (year < 100) year += year < 50 ? 2000 : 1900;
-    return new Date(year, months[monStr], day);
-  }
-
-  // pattern: 23-Nov (no year) – assume current year
-  var m2 = v.match(/^(\d{1,2})[-\/](\w+)$/i);
-  if (m2) {
-    var day2 = parseInt(m2[1], 10);
-    var monStr2 = m2[2].toLowerCase();
-    if (!months.hasOwnProperty(monStr2)) return null;
-    var nowYear = new Date().getFullYear();
-    return new Date(nowYear, months[monStr2], day2);
-  }
-
-  return null;
 }
 
-function preProcessDates(rows) {
-  uniqueDates = [];
-  rows.forEach(function (row) {
-    var dateStr = row["Activity Date"] || row["Date"] || row["date"] || "";
-    var d = parseDate(dateStr);
-    row.__date_raw = dateStr;
-    row.__date = d;
-    if (d && !uniqueDates.find(function (x) { return x.getTime() === d.getTime(); })) {
-      uniqueDates.push(d);
-    }
+// ------------------------- Filters -------------------------
+function initFilters() {
+  var rgnSel = document.getElementById("filter-rgn");
+  var citySel = document.getElementById("filter-city");
+  var spotSel = document.getElementById("filter-spot");
+  var searchEl = document.getElementById("filter-search");
+
+  if (!rgnSel || !citySel || !spotSel) return;
+
+  // Attach listeners
+  rgnSel.addEventListener("change", function () {
+    // When region changes, rebuild city/spot options to match region
+    rebuildCityAndSpotOptions();
+    applyFilters();
   });
 
-  uniqueDates.sort(function (a, b) { return a - b; });
+  citySel.addEventListener("change", function () {
+    // When city changes, rebuild spot options to match region+city
+    rebuildSpotOptions();
+    applyFilters();
+  });
 
-  if (uniqueDates.length) {
-    var start = uniqueDates[0].toISOString().slice(0, 10);
-    var end = uniqueDates[uniqueDates.length - 1].toISOString().slice(0, 10);
-    setText("hero-date-range", start + " → " + end);
+  spotSel.addEventListener("change", applyFilters);
+
+  if (searchEl) {
+    searchEl.addEventListener("input", function () {
+      // keep city/spot options but apply filtering live
+      applyFilters();
+    });
   }
+
+  rebuildRegionOptions();
+  rebuildCityAndSpotOptions();
 }
 
-// ---------- FILTERS ----------
-function populateFilterOptions(rows) {
-  var cityEl = document.getElementById("from-city-filter");
-  if (!cityEl) return;
-  var citiesSet = new Set();
-  rows.forEach(function (row) {
-    var c = (row["From City"] || row["From"] || "").trim();
-    if (c) citiesSet.add(c);
+function rebuildRegionOptions() {
+  var rgnSel = document.getElementById("filter-rgn");
+  if (!rgnSel) return;
+
+  var current = rgnSel.value || "";
+  rgnSel.innerHTML = "<option value=''>All Regions</option>";
+
+  var set = new Set();
+  allRows.forEach(function (r) {
+    var v = safeText(r.rgn);
+    if (v) set.add(v);
   });
-  var cities = Array.from(citiesSet).sort(function (a, b) {
-    return a.localeCompare(b);
+  Array.from(set).sort().forEach(function (v) {
+    var opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    rgnSel.appendChild(opt);
   });
 
-  while (cityEl.options.length > 1) cityEl.remove(1);
-  cities.forEach(function (c) {
+  // restore selection if still present
+  if (current) rgnSel.value = current;
+}
+
+function rebuildCityAndSpotOptions() {
+  rebuildCityOptions();
+  rebuildSpotOptions();
+}
+
+function rebuildCityOptions() {
+  var rgnSel = document.getElementById("filter-rgn");
+  var citySel = document.getElementById("filter-city");
+  if (!citySel) return;
+
+  var region = rgnSel ? (rgnSel.value || "") : "";
+  var currentCity = citySel.value || "";
+
+  citySel.innerHTML = "<option value=''>All Cities</option>";
+
+  var set = new Set();
+  allRows.forEach(function (r) {
+    if (region && safeText(r.rgn) !== region) return;
+    var c = safeText(r.city);
+    if (!c) return;
+    if (c.toLowerCase() === "multan") return; // extra safety
+    set.add(c);
+  });
+
+  Array.from(set).sort().forEach(function (c) {
     var opt = document.createElement("option");
     opt.value = c;
     opt.textContent = c;
-    cityEl.appendChild(opt);
+    citySel.appendChild(opt);
   });
+
+  if (currentCity && Array.from(set).includes(currentCity)) {
+    citySel.value = currentCity;
+  } else {
+    citySel.value = "";
+  }
 }
 
-function resetFilters() {
-  var s = document.getElementById("start-date");
-  var e = document.getElementById("end-date");
-  var c = document.getElementById("from-city-filter");
-  if (s) s.value = "";
-  if (e) e.value = "";
-  if (c) c.value = "";
-  applyFilters();
+function rebuildSpotOptions() {
+  var rgnSel = document.getElementById("filter-rgn");
+  var citySel = document.getElementById("filter-city");
+  var spotSel = document.getElementById("filter-spot");
+  if (!spotSel) return;
+
+  var region = rgnSel ? (rgnSel.value || "") : "";
+  var city = citySel ? (citySel.value || "") : "";
+  var currentSpot = spotSel.value || "";
+
+  spotSel.innerHTML = "<option value=''>All Spots</option>";
+
+  var set = new Set();
+  allRows.forEach(function (r) {
+    if (region && safeText(r.rgn) !== region) return;
+    if (city && safeText(r.city) !== city) return;
+    var s = safeText(r.spot);
+    if (s) set.add(s);
+  });
+
+  Array.from(set).sort().forEach(function (s) {
+    var opt = document.createElement("option");
+    opt.value = s;
+    opt.textContent = s;
+    spotSel.appendChild(opt);
+  });
+
+  if (currentSpot && Array.from(set).includes(currentSpot)) {
+    spotSel.value = currentSpot;
+  } else {
+    spotSel.value = "";
+  }
 }
 
 function applyFilters() {
-  if (!allRows.length) return;
-  var startEl = document.getElementById("start-date");
-  var endEl = document.getElementById("end-date");
-  var cityEl = document.getElementById("from-city-filter");
+  var rgnVal = safeText(document.getElementById("filter-rgn")?.value);
+  var cityVal = safeText(document.getElementById("filter-city")?.value);
+  var spotVal = safeText(document.getElementById("filter-spot")?.value);
+  var searchVal = safeText(document.getElementById("filter-search")?.value).toLowerCase();
 
-  var startDate = startEl && startEl.value ? new Date(startEl.value + "T00:00:00") : null;
-  var endDate = endEl && endEl.value ? new Date(endEl.value + "T23:59:59") : null;
-  var cityFilter = cityEl && cityEl.value ? cityEl.value.trim().toLowerCase() : "";
+  filteredRows = allRows.filter(function (r) {
+    if (rgnVal && safeText(r.rgn) !== rgnVal) return false;
+    if (cityVal && safeText(r.city) !== cityVal) return false;
+    if (spotVal && safeText(r.spot) !== spotVal) return false;
 
-  filteredRows = allRows.filter(function (row) {
-    var d = row.__date;
-    if (startDate && (!d || d < startDate)) return false;
-    if (endDate && (!d || d > endDate)) return false;
-    if (cityFilter) {
-      var fromCity = (row["From City"] || row["From"] || "").toLowerCase();
-      if (!fromCity.includes(cityFilter)) return false;
+    if (searchVal) {
+      var hay = (safeText(r.rgn) + " " + safeText(r.city) + " " + safeText(r.spot) + " " + safeText(r.from)).toLowerCase();
+      if (!hay.includes(searchVal)) return false;
     }
     return true;
   });
 
-  buildCitySummary(filteredRows);
-  updateHeroAndSnapshot(filteredRows);
-  updateKeyMetrics(filteredRows);
-  updateCampaignMetrics(filteredRows);
+  // update UI
+  updateMetrics(filteredRows);
+  updateDonuts(filteredRows);
+  updateAdoptionChart(filteredRows);
   updateSessionTable(filteredRows);
-  updateCityTable();
-  updateCharts();
-  initMap(filteredRows);
-  initMediaGallery(filteredRows);
+  updateMap(filteredRows);
+  updateMediaGallery(filteredRows);
 }
 
-// ---------- SUMMARY BUILDERS ----------
-function buildCitySummary(rows) {
-  var mapByCity = new Map();
-  rows.forEach(function (row) {
-    // Use destination City primarily; fall back to From City
-    var city =
-      (row["City"] || row["From City"] || row["From"] || "Unknown").trim() || "Unknown";
-    var farmers = row.__farmers || 0;
-    var acres = row.__acres || 0;
-    if (!mapByCity.has(city)) {
-      mapByCity.set(city, { city: city, sessions: 0, farmers: 0, acres: 0 });
-    }
-    var item = mapByCity.get(city);
-    item.sessions += 1;
-    item.farmers += farmers;
-    item.acres += acres;
-  });
-  citySummary = Array.from(mapByCity.values()).sort(function (a, b) {
-    return b.farmers - a.farmers;
-  });
-}
-
-// ---------- HERO + SNAPSHOT ----------
-function formatInt(value) {
-  if (value === null || value === undefined || isNaN(value)) return "–";
-  return Math.round(value).toLocaleString("en-PK");
-}
-
-function formatFloat(value, decimals) {
-  if (value === null || value === undefined || isNaN(value)) return "–";
-  var d = decimals === undefined ? 1 : decimals;
-  return value.toFixed(d);
-}
-
-function updateHeroAndSnapshot(rows) {
+// ------------------------- Metrics + Donuts -------------------------
+function updateMetrics(rows) {
   var totalSessions = rows.length;
   var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
   var totalAcres = rows.reduce(function (s, r) { return s + (r.__acres || 0); }, 0);
+  var uniqueCities = new Set(rows.map(function (r) { return r.city; }).filter(Boolean)).size;
+  var uniqueDays = new Set(rows.map(function (r) { return r.date; }).filter(Boolean)).size;
 
-  setText("hero-sessions", formatInt(totalSessions));
+  setText("metric-sessions", formatInt(totalSessions));
+  setText("metric-farmers", formatInt(totalFarmers));
+  setText("metric-acres", formatInt(totalAcres));
+  setText("metric-cities", formatInt(uniqueCities));
+  setText("metric-days", formatInt(uniqueDays));
+
   setText("hero-farmers", formatInt(totalFarmers));
-  setText("hero-acres", formatInt(totalAcres));
+  setText("hero-sessions", formatInt(totalSessions));
 
-  setText("metric-sessions-hero", formatInt(totalSessions));
-  setText("metric-farmers-hero", formatInt(totalFarmers));
-  setText("metric-acres-hero", formatInt(totalAcres));
-
-  setText("snap-sessions", formatInt(totalSessions));
-  setText("snap-farmers", formatInt(totalFarmers));
-  setText("snap-acres", formatInt(totalAcres));
-
-  var cities = new Set();
-  var villages = new Set();
-  rows.forEach(function (row) {
-    var city = (row["City"] || row["From City"] || row["From"] || "").trim();
-    var v = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
-    if (city) cities.add(city);
-    if (v) villages.add(v);
-  });
-  setText("snap-locations", cities.size + " cities / " + villages.size + " villages");
-}
-
-// ---------- KEY METRICS ----------
-function updateKeyMetrics(rows) {
-  var totalSessions = rows.length;
-  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
-  var totalAcres = rows.reduce(function (s, r) { return s + (r.__acres || 0); }, 0);
-
-  setText("metric-total-sessions", formatInt(totalSessions));
-  setText("metric-total-farmers", formatInt(totalFarmers));
-  setText(
-    "metric-farmers-per-session",
-    totalSessions ? formatFloat(totalFarmers / totalSessions, 1) : "–"
-  );
-  setText("metric-total-acres", formatInt(totalAcres));
-  setText(
-    "metric-acres-per-session",
-    totalSessions ? formatFloat(totalAcres / totalSessions, 1) : "–"
-  );
-
-  var cities = new Set();
-  var villages = new Set();
-  var sessionsWithCoords = 0;
-
-  rows.forEach(function (row) {
-    var c = (row["City"] || row["From City"] || row["From"] || "").trim();
-    var v = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
-    if (c) cities.add(c);
-    if (v) villages.add(v);
-    var coordsObj = extractLatLng(row);
-    if (coordsObj.lat && coordsObj.lng) sessionsWithCoords += 1;
-  });
-
-  setText("metric-cities", cities.size || "–");
-  setText("metric-villages", villages.size || "–");
-  setText("metric-sessions-with-coords", sessionsWithCoords || "–");
-  setText(
-    "metric-coverage",
-    (cities.size || 0) + " cities • " + (villages.size || 0) + " villages"
-  );
-}
-
-
-// ---------- CAMPAIGN PERFORMANCE (CLARITY / INTENT / INFLUENCERS / AWARENESS) ----------
-function updateCampaignMetrics(rows) {
-  initChartsIfNeeded();
-
-  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
-
-  var claritySum = 0, clarityCnt = 0;
-  var defSum = 0, defCnt = 0;
-  var awareSum = 0, awareCnt = 0;
-  var totalInfluencers = 0;
-
-  rows.forEach(function (r) {
-    if (!isNaN(r.__messageClarity) && r.__messageClarity > 0) { claritySum += r.__messageClarity; clarityCnt += 1; }
-    if (!isNaN(r.__definiteUseRate) && r.__definiteUseRate > 0) { defSum += r.__definiteUseRate; defCnt += 1; }
-    if (!isNaN(r.__awarenessRate) && r.__awarenessRate > 0) { awareSum += r.__awarenessRate; awareCnt += 1; }
-    totalInfluencers += (r.__influencers || 0);
-  });
-
-  var avgClarity = clarityCnt ? (claritySum / clarityCnt) : 0;
-  var avgDefinite = defCnt ? (defSum / defCnt) : 0;
-  var avgAwareness = awareCnt ? (awareSum / awareCnt) : 0;
-
-  var totalDefiniteFarmers = rows.reduce(function (s, r) {
-    var pct = isNaN(r.__definiteUseRate) ? 0 : (r.__definiteUseRate || 0);
-    return s + Math.round((r.__farmers || 0) * pct / 100);
-  }, 0);
-
-  // Update hero numbers shown inside donut cards
-  setText("clarity-main", clarityCnt ? (Math.round(avgClarity) + "%") : "–");
-  setText("definite-main", defCnt ? (Math.round(avgDefinite) + "%") : "–");
-
-  // Update donut visuals
-  if (clarityChart) {
-    var cVal = clarityCnt ? Math.round(avgClarity) : 0;
-    clarityChart.data.datasets[0].data = [cVal, Math.max(0, 100 - cVal)];
-    clarityChart.update();
-  }
-  if (definiteChart) {
-    var dVal = defCnt ? Math.round(avgDefinite) : 0;
-    definiteChart.data.datasets[0].data = [dVal, Math.max(0, 100 - dVal)];
-    definiteChart.update();
+  // campaign metrics
+  var avgClarity = 0, avgDef = 0, avgAware = 0, totalInfl = 0, defFarmers = 0;
+  if (rows.length > 0) {
+    avgClarity = rows.reduce(function (s, r) { return s + (r.__messageClarity || 0); }, 0) / rows.length;
+    avgDef = rows.reduce(function (s, r) { return s + (r.__definiteUseRate || 0); }, 0) / rows.length;
+    avgAware = rows.reduce(function (s, r) { return s + (r.__awarenessRate || 0); }, 0) / rows.length;
+    totalInfl = rows.reduce(function (s, r) { return s + (r.__influencers || 0); }, 0);
+    defFarmers = rows.reduce(function (s, r) {
+      return s + Math.round((r.__farmers || 0) * (r.__definiteUseRate || 0) / 100);
+    }, 0);
   }
 
-  // Adoption subtitle
+  setText("metric-clarity", Math.round(avgClarity) + "%");
+  setText("metric-definite", Math.round(avgDef) + "%");
+  setText("metric-influencers", formatInt(totalInfl));
+  setText("metric-awareness", Math.round(avgAware) + "%");
+
+  var clarityBar = document.getElementById("clarity-progress");
+  var defBar = document.getElementById("definite-progress");
+  var inflBar = document.getElementById("influencers-progress");
+  var awareBar = document.getElementById("awareness-progress");
+  var stars = document.getElementById("clarity-stars");
+
+  if (clarityBar) clarityBar.style.width = Math.max(0, Math.min(100, Math.round(avgClarity))) + "%";
+  if (defBar) defBar.style.width = Math.max(0, Math.min(100, Math.round(avgDef))) + "%";
+  if (awareBar) awareBar.style.width = Math.max(0, Math.min(100, Math.round(avgAware))) + "%";
+
+  // influencers scale: dynamic max by current dataset to avoid always tiny bars
+  var maxInfl = allRows.reduce(function (m, r) { return Math.max(m, r.__influencers || 0); }, 0) || 1;
+  if (inflBar) inflBar.style.width = Math.round(Math.min(100, (totalInfl / (maxInfl * Math.max(1, rows.length / 3))) * 100)) + "%";
+
+  if (stars) stars.textContent = starsFromPct(avgClarity);
+
   var adoptionText = document.getElementById("adoption-text");
   if (adoptionText) {
-    var defPct = totalFarmers ? Math.round((totalDefiniteFarmers / totalFarmers) * 100) : Math.round(avgDefinite);
-    adoptionText.textContent =
-      "Estimated definite-use farmers: " + formatInt(totalDefiniteFarmers) + " (" + defPct + "%)";
+    var pct = totalFarmers > 0 ? Math.round((defFarmers / totalFarmers) * 100) : Math.round(avgDef);
+    adoptionText.textContent = "Estimated definite-use farmers: " + formatInt(defFarmers) + " (" + pct + "%)";
   }
-
-  // Optionally expose totals in console for quick validation
-  // console.log({ avgClarity, avgDefinite, avgAwareness, totalInfluencers, totalDefiniteFarmers });
 }
 
-// ---------- TABLES ----------
-function getMediaIndexForRow(row) {
-  return row && row.__mediaIndex ? row.__mediaIndex : "";
+function updateDonuts(rows) {
+  if (!clarityDonut || !definiteDonut) return;
+
+  var avgClarity = 0, avgDef = 0;
+  if (rows.length > 0) {
+    avgClarity = rows.reduce(function (s, r) { return s + (r.__messageClarity || 0); }, 0) / rows.length;
+    avgDef = rows.reduce(function (s, r) { return s + (r.__definiteUseRate || 0); }, 0) / rows.length;
+  }
+  avgClarity = Math.max(0, Math.min(100, avgClarity));
+  avgDef = Math.max(0, Math.min(100, avgDef));
+
+  clarityDonut.data.datasets[0].data = [avgClarity, 100 - avgClarity];
+  definiteDonut.data.datasets[0].data = [avgDef, 100 - avgDef];
+
+  clarityDonut.update();
+  definiteDonut.update();
+
+  setText("clarity-main", Math.round(avgClarity) + "%");
+  setText("definite-main", Math.round(avgDef) + "%");
 }
 
+// ------------------------- Charts -------------------------
+function initCharts() {
+  // Donuts
+  var ctx1 = document.getElementById("clarityDonut");
+  var ctx2 = document.getElementById("definiteDonut");
+  if (!ctx1 || !ctx2) return;
 
-function updateSessionTable(rows) {
-  var tbody = document.getElementById("session-rows");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  rows.forEach(function (row) {
-    var tr = document.createElement("tr");
-
-    var d = row.__date ? row.__date.toISOString().slice(0, 10) : (row.__date_raw || "");
-    var fromCity = (row["From City"] || row["From"] || "").trim();
-    var toCity = (row["City"] || row["To City"] || row["To"] || "").trim();
-    var loc = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || "").trim();
-
-    var farmers = row.__farmers || 0;
-    var acres = row.__acres || 0;
-
-    var clarity = row.__messageClarity;
-    var definite = row.__definiteUseRate;
-    var influencers = row.__influencers;
-
-    tr.innerHTML =
-      "<td>" + (row.__sn || "") + "</td>" +
-      "<td>" + (d || "") + "</td>" +
-      "<td>" + (fromCity || "") + "</td>" +
-      "<td>" + (toCity || "") + "</td>" +
-      "<td>" + (loc || "") + "</td>" +
-      "<td>" + formatInt(farmers) + "</td>" +
-      "<td>" + formatInt(acres) + "</td>" +
-      "<td>" + (isNaN(clarity) ? "–" : (Math.round(clarity) + "%")) + "</td>" +
-      "<td>" + (isNaN(definite) ? "–" : (Math.round(definite) + "%")) + "</td>" +
-      "<td>" + formatInt(influencers) + "</td>";
-
-    tbody.appendChild(tr);
+  clarityDonut = new Chart(ctx1, {
+    type: "doughnut",
+    data: {
+      labels: ["Clarity", "Remaining"],
+      datasets: [{
+        data: [0, 100],
+        backgroundColor: ["#66bb6a", "#e0e0e0"],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "80%",
+      plugins: { legend: { display: false }, tooltip: { enabled: true } }
+    }
   });
-}
 
-
-function updateCityTable() {
-  var tbody = document.getElementById("city-rows");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-  citySummary.forEach(function (row, i) {
-    var tr = document.createElement("tr");
-    tr.innerHTML =
-      "<td>" + (i + 1) + "</td>" +
-      "<td>" + row.city + "</td>" +
-      "<td>" + row.sessions + "</td>" +
-      "<td>" + formatInt(row.farmers) + "</td>" +
-      "<td>" + formatInt(row.acres) + "</td>";
-    tbody.appendChild(tr);
+  definiteDonut = new Chart(ctx2, {
+    type: "doughnut",
+    data: {
+      labels: ["Definite Use", "Remaining"],
+      datasets: [{
+        data: [0, 100],
+        backgroundColor: ["#ff7043", "#e0e0e0"],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "80%",
+      plugins: { legend: { display: false }, tooltip: { enabled: true } }
+    }
   });
-}
 
-// ---------- CHARTS ----------
-function initChartsIfNeeded() {
-  var clarityCtx = document.getElementById("clarityDonut");
-  var definiteCtx = document.getElementById("definiteDonut");
-  var cityCtx = document.getElementById("cityFarmersChart");
-  var adoptionCtx = document.getElementById("adoptionChart");
-
-  if (clarityCtx && !clarityChart) {
-    clarityChart = new Chart(clarityCtx, {
-      type: "doughnut",
-      data: {
-        labels: ["Clarity", "Gap"],
-        datasets: [{
-          data: [0, 100],
-          backgroundColor: ["#66bb6a", "#e0e0e0"],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        cutout: "70%",
-        plugins: { legend: { display: false }, tooltip: { enabled: true } }
-      }
-    });
-  }
-
-  if (definiteCtx && !definiteChart) {
-    definiteChart = new Chart(definiteCtx, {
-      type: "doughnut",
-      data: {
-        labels: ["Definite Use", "Gap"],
-        datasets: [{
-          data: [0, 100],
-          backgroundColor: ["#ff7043", "#e0e0e0"],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        cutout: "70%",
-        plugins: { legend: { display: false }, tooltip: { enabled: true } }
-      }
-    });
-  }
-
-  if (cityCtx && !cityFarmersChart) {
-    cityFarmersChart = new Chart(cityCtx, {
-      type: "bar",
-      data: {
-        labels: [],
-        datasets: [{
-          label: "Farmers",
-          data: [],
-          backgroundColor: "#66bb6a"
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { autoSkip: false }, grid: { display: false } },
-          y: { beginAtZero: true }
-        }
-      }
-    });
-  }
-
-  if (adoptionCtx && !adoptionChart) {
-    adoptionChart = new Chart(adoptionCtx, {
+  // Adoption bar
+  var ctx3 = document.getElementById("adoptionChart");
+  if (ctx3) {
+    adoptionChart = new Chart(ctx3, {
       type: "bar",
       data: {
         labels: ["Total Farmers", "Estimated Definite-use"],
         datasets: [{
           label: "Farmers",
           data: [0, 0],
-          backgroundColor: ["#1b5e20", "#ff7043"]
+          backgroundColor: ["#90caf9", "#66bb6a"],
+          borderWidth: 0
         }]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+        scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return formatInt(v); } } } }
       }
     });
   }
 }
 
+function updateAdoptionChart(rows) {
+  if (!adoptionChart) return;
 
-function updateCharts() {
-  initChartsIfNeeded();
+  var totalFarmers = rows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
+  var defFarmers = rows.reduce(function (s, r) {
+    return s + Math.round((r.__farmers || 0) * (r.__definiteUseRate || 0) / 100);
+  }, 0);
 
-  // Top cities chart
-  if (cityFarmersChart && citySummary.length) {
-    var top = citySummary.slice(0, 6);
-    var others = citySummary.slice(6);
-    var labels = top.map(function (c) { return c.city; });
-    var data = top.map(function (c) { return c.farmers; });
-    if (others.length) {
-      labels.push("Others");
-      data.push(others.reduce(function (s, c) { return s + c.farmers; }, 0));
-    }
-    cityFarmersChart.data.labels = labels;
-    cityFarmersChart.data.datasets[0].data = data;
-    cityFarmersChart.update();
-  }
-
-  // Adoption bar chart (total vs estimated definite-use)
-  if (adoptionChart) {
-    var totalFarmers = filteredRows.reduce(function (s, r) { return s + (r.__farmers || 0); }, 0);
-    var definiteFarmers = filteredRows.reduce(function (s, r) {
-      var pct = isNaN(r.__definiteUseRate) ? 0 : (r.__definiteUseRate || 0);
-      return s + Math.round((r.__farmers || 0) * pct / 100);
-    }, 0);
-
-    adoptionChart.data.datasets[0].data = [totalFarmers, definiteFarmers];
-    adoptionChart.update();
-  }
+  adoptionChart.data.datasets[0].data = [totalFarmers, defFarmers];
+  adoptionChart.update();
 }
 
+// ------------------------- Session Table -------------------------
+function updateSessionTable(rows) {
+  var tbody = document.getElementById("session-table-body");
+  if (!tbody) return;
 
-// ---------- MAP & COORD PARSING ----------
-function parseDMS(dmsStr) {
-  if (!dmsStr) return null;
-  var s = String(dmsStr).trim();
-  var m = s.match(
-    /(\d+(?:\.\d+)?)[°\s]+(\d+(?:\.\d+)?)[\'’]?\s*(\d*(?:\.\d+)?)["”]?\s*([NSEW])/i
-  );
-  if (!m) return null;
-  var deg = parseFloat(m[1]) || 0;
-  var min = parseFloat(m[2]) || 0;
-  var sec = parseFloat(m[3]) || 0;
-  var hemi = m[4].toUpperCase();
-  var dec = deg + min / 60 + sec / 3600;
-  if (hemi === "S" || hemi === "W") dec = -dec;
-  return dec;
+  tbody.innerHTML = "";
+  rows.forEach(function (r) {
+    var tr = document.createElement("tr");
+    function td(v){ var x=document.createElement("td"); x.textContent=v; return x; }
+
+    tr.appendChild(td(String(r.id)));
+    tr.appendChild(td(r.date || ""));
+    tr.appendChild(td(r.rgn || ""));
+    tr.appendChild(td(r.city || ""));
+    tr.appendChild(td(r.spot || ""));
+    tr.appendChild(td(formatInt(r.__farmers || 0)));
+    tr.appendChild(td(formatInt(r.__acres || 0)));
+    tr.appendChild(td((Math.round(r.__messageClarity || 0)) + "%"));
+    tr.appendChild(td((Math.round(r.__definiteUseRate || 0)) + "%"));
+    tr.appendChild(td(formatInt(r.__influencers || 0)));
+
+    tbody.appendChild(tr);
+  });
 }
 
-function extractLatLng(row) {
-  var lat = safeNumber(row["Latitude"] || row["lat"]);
-  var lng = safeNumber(row["Longitude"] || row["lng"]);
-  var original = "";
-
-  if (lat && lng) {
-    original = lat + ", " + lng;
-    return { lat: lat, lng: lng, original: original };
-  }
-
-  var spot = row["Spot Coordinates"] || row["Coordinates"] || "";
-  if (spot) {
-    var text = String(spot).trim();
-    var m = text.match(/([0-9°'".\s]+[NS])[, ]+([0-9°'".\s]+[EW])/i);
-    if (m) {
-      var latStr = m[1];
-      var lngStr = m[2];
-      var dLat = parseDMS(latStr);
-      var dLng = parseDMS(lngStr);
-      if (dLat && dLng) {
-        return { lat: dLat, lng: dLng, original: text };
-      }
-    }
-    original = text;
-  }
-
-  return { lat: 0, lng: 0, original: original };
-}
-
-function initMap(rows) {
-  var mapEl = document.getElementById("route-map");
-  if (!mapEl) return;
+// ------------------------- Map -------------------------
+function ensureMap() {
+  var container = document.getElementById("route-map");
+  if (!container) return;
 
   if (!map) {
-    map = L.map("route-map");
+    map = L.map("route-map").setView([30.3753, 69.3451], 5);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
   }
+}
 
-  mapMarkers.forEach(function (mk) { mk.remove(); });
+function updateMap(rows) {
+  ensureMap();
+  if (!map) return;
+
+  // clear old
+  mapMarkers.forEach(function (m) { try { map.removeLayer(m); } catch(e){} });
   mapMarkers = [];
-  var coordsArr = [];
 
-  rows.forEach(function (row) {
-    var coordsObj = extractLatLng(row);
-    var lat = coordsObj.lat;
-    var lng = coordsObj.lng;
-    if (!lat || !lng) return;
+  var bounds = [];
+  rows.forEach(function (r) {
+    if (!r.latitude || !r.longitude) return;
+    if (r.latitude === 0 || r.longitude === 0) return;
 
-    var farmers = row.__farmers || 0;
-    var acres = row.__acres || 0;
-    var loc =
-      row["Village / Mauza"] || row["Session Location"] || row["Location"] || "Session";
-    var fromCity = row["From City"] || row["From"] || "";
-    var radius = Math.max(4, Math.min(18, acres ? acres / 200 : 6));
+    var coords = [r.latitude, r.longitude];
+    bounds.push(coords);
 
-    var popup =
-      "<strong>" + loc + "</strong><br/>" +
-      "From: " + fromCity + "<br/>" +
-      "Farmers: " + farmers + "<br/>" +
-      "Acres: " + acres;
+    var html = "<strong>" + (r.spot || r.city || "Session") + "</strong><br/>" +
+      "RGN: " + (r.rgn || "—") + "<br/>" +
+      "City: " + (r.city || "—") + "<br/>" +
+      "Date: " + (r.date || "—") + "<br/>" +
+      "Farmers: " + formatInt(r.__farmers || 0) + "<br/>" +
+      "Acres: " + formatInt(r.__acres || 0);
 
-    var circle = L.circleMarker([lat, lng], {
-      radius: radius,
-      color: "#2e7d32",
-      fillColor: "#66bb6a",
-      fillOpacity: 0.7
-    }).addTo(map);
-
-    circle.bindPopup(popup);
-    mapMarkers.push(circle);
-    coordsArr.push([lat, lng]);
+    var marker = L.marker(coords).addTo(map).bindPopup(html);
+    mapMarkers.push(marker);
   });
 
-  if (coordsArr.length) {
-    var bounds = L.latLngBounds(coordsArr);
-    map.fitBounds(bounds, { padding: [20, 20] });
+  if (bounds.length) {
+    map.fitBounds(L.latLngBounds(bounds), { padding: [22, 22] });
   }
+  // if no bounds, keep current view
 }
 
-// ---------- MEDIA GALLERY ----------
-function initMediaGallery(rows) {
-  var gallery = document.getElementById("media-gallery");
-  if (!gallery) return;
+// ------------------------- Media (per session row) -------------------------
+function updateMediaGallery(rows) {
+  var container = document.getElementById("media-gallery");
+  if (!container) return;
 
-  gallery.innerHTML = "";
+  container.innerHTML = "";
 
-  rows.forEach(function (row, idx) {
-    // Media is indexed per session row (stable to CSV row numbering)
-    var mediaIndex =
-      row.__mediaIndex ||
-      row.__sn ||
-      (row.__rowIndex !== undefined ? row.__rowIndex + 1 : (idx + 1));
+  if (!rows.length) {
+    var empty = document.createElement("div");
+    empty.className = "muted";
+    empty.style.fontWeight = "800";
+    empty.textContent = "No sessions match your current filters.";
+    container.appendChild(empty);
+    return;
+  }
 
-    if (!mediaIndex) return;
+  rows.forEach(function (r) {
+    var group = document.createElement("div");
+    group.className = "session-group";
 
-    var imgSrc = mediaIndex + ".jpeg";
-    var vidSrc = mediaIndex + ".mp4";
+    var head = document.createElement("div");
+    head.className = "session-head";
+    head.innerHTML =
+      "<div><strong>Session " + r.id + "</strong> — " + (r.city || "") + (r.spot ? (" • " + r.spot) : "") + "</div>" +
+      "<div class='session-meta'>" + (r.date || "") + "</div>";
+    group.appendChild(head);
 
-    var d = row.__date ? row.__date.toISOString().slice(0, 10) : (row.__date_raw || "");
-    var loc = (row["Village / Mauza"] || row["Session Location"] || row["Location"] || ("Session " + mediaIndex)).trim();
-    var city = (row["City"] || row["From City"] || row["From"] || "").trim();
-    var farmers = row.__farmers || 0;
-    var acres = row.__acres || 0;
+    var grid = document.createElement("div");
+    grid.className = "media-gallery";
 
-    var card = document.createElement("div");
-    card.className = "media-card";
-    card.innerHTML =
-      "<div class='media-thumb-wrap hover-video'>" +
-      "<img src='" + imgSrc + "' alt='Session photo " + mediaIndex + "' onerror=\"this.style.display='none';\" />" +
-      "<video muted loop playsinline preload='metadata' onerror=\"this.style.display='none';\">" +
-      "<source src='" + vidSrc + "' type='video/mp4' />" +
-      "</video>" +
-      "</div>" +
-      "<div class='media-caption'>" +
-      "<strong>" + (loc || ("Session " + mediaIndex)) + "</strong>" +
-      "<span>" + (city || "–") + " • " + formatInt(farmers) + " farmers • " + formatInt(acres) + " acres</span>" +
-      "<span>" + (d || ("Session #" + mediaIndex)) + " • Media #" + mediaIndex + "</span>" +
-      "</div>";
+    // Create placeholders for a..f; hide if missing
+    MEDIA_LETTERS.forEach(function (letter) {
+      var prefix = String(r.id) + letter;
 
-    card.addEventListener("click", function () {
-      openLightbox(imgSrc, vidSrc);
+      var imgSrcJpg = prefix + ".jpg";
+      var imgSrcJpeg = prefix + ".jpeg";
+      var vidSrc = prefix + ".mp4";
+
+      // Card uses img as thumb, video on hover. We try jpg first, then jpeg if jpg fails.
+      var card = document.createElement("div");
+      card.className = "media-card";
+
+      var thumb = document.createElement("div");
+      thumb.className = "thumb";
+
+      var img = document.createElement("img");
+      img.alt = "Session " + r.id + " (" + letter + ")";
+      img.src = imgSrcJpg;
+      img.onerror = function () {
+        // fallback to jpeg
+        if (img.src.endsWith(".jpg")) {
+          img.src = imgSrcJpeg;
+          return;
+        }
+        // if jpeg also fails, hide entire card (unless video exists later)
+        card.dataset.noimg = "1";
+        maybeHideCard();
+      };
+
+      var video = document.createElement("video");
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "none";
+      video.style.display = "none";
+      video.src = vidSrc;
+      video.addEventListener("error", function () {
+        card.dataset.novid = "1";
+        maybeHideCard();
+      });
+
+      var badge = document.createElement("div");
+      badge.className = "play-badge";
+      badge.innerHTML = "<i class='fas fa-play'></i>";
+
+      thumb.appendChild(img);
+      thumb.appendChild(video);
+      thumb.appendChild(badge);
+
+      var cap = document.createElement("div");
+      cap.className = "caption";
+      cap.innerHTML =
+        "<div class='t'>Media " + String(r.id) + letter + "</div>" +
+        "<div class='s'>" + (r.city || "") + (r.spot ? (" • " + r.spot) : "") + "</div>";
+
+      card.appendChild(thumb);
+      card.appendChild(cap);
+
+      // Hover play/pause (best-effort)
+      card.addEventListener("mouseenter", function () {
+        if (video && video.src) { try { video.play(); } catch(e){} }
+      });
+      card.addEventListener("mouseleave", function () {
+        if (video) { try { video.pause(); } catch(e){} }
+      });
+
+      card.addEventListener("click", function () {
+        openLightbox(img, video);
+      });
+
+      function maybeHideCard() {
+        // Hide if BOTH image and video missing
+        if (card.dataset.noimg === "1" && card.dataset.novid === "1") {
+          card.remove();
+        }
+      }
+
+      grid.appendChild(card);
     });
 
-    // Smooth hover playback (optional; safe if video is missing)
-    card.addEventListener("mouseenter", function () {
-      var v = card.querySelector("video");
-      if (v) { try { v.play(); } catch (e) {} }
-    });
-    card.addEventListener("mouseleave", function () {
-      var v = card.querySelector("video");
-      if (v) { try { v.pause(); v.currentTime = 0; } catch (e) {} }
-    });
-
-    gallery.appendChild(card);
+    group.appendChild(grid);
+    container.appendChild(group);
   });
 }
 
-
-
-function openLightbox(imgSrc, vidSrc) {
+// ------------------------- Lightbox -------------------------
+function openLightbox(imgEl, videoEl) {
   var lb = document.getElementById("lightbox");
-  var img = document.getElementById("lb-img");
-  var vid = document.getElementById("lb-video");
-  if (!lb || !img || !vid) return;
-
-  // Default: prefer video when available
-  img.style.display = "none";
-  vid.style.display = "block";
-
-  img.src = imgSrc || "";
-  vid.src = vidSrc || "";
-  vid.load();
-
-  // If video fails, fall back to image
-  vid.onerror = function () {
-    vid.style.display = "none";
-    img.style.display = "block";
-  };
+  var lbImg = document.getElementById("lb-img");
+  var lbVid = document.getElementById("lb-video");
+  if (!lb || !lbImg || !lbVid) return;
 
   lb.classList.add("active");
 
-  try { vid.play(); } catch (e) {}
+  // Default: show video if it exists and is likely valid; fall back to image
+  var vidSrc = videoEl ? safeText(videoEl.src) : "";
+  var imgSrc = imgEl ? safeText(imgEl.src) : "";
 
-  lb.onclick = function () {
-    lb.classList.remove("active");
-    img.src = "";
-    try { vid.pause(); } catch (e) {}
-    vid.src = "";
-  };
+  lbVid.pause();
+  lbVid.removeAttribute("src");
+  lbVid.load();
+
+  lbImg.style.display = "none";
+  lbVid.style.display = "none";
+
+  if (vidSrc) {
+    lbVid.src = vidSrc;
+    lbVid.style.display = "block";
+    lbVid.load();
+    var p = lbVid.play();
+    if (p && typeof p.catch === "function") p.catch(function () {});
+    // If video fails, fall back to image
+    lbVid.onerror = function () {
+      lbVid.style.display = "none";
+      if (imgSrc) {
+        lbImg.src = imgSrc;
+        lbImg.style.display = "block";
+      }
+    };
+  } else if (imgSrc) {
+    lbImg.src = imgSrc;
+    lbImg.style.display = "block";
+  }
 }
 
+function closeLightbox() {
+  var lb = document.getElementById("lightbox");
+  var lbVid = document.getElementById("lb-video");
+  if (lb) lb.classList.remove("active");
+  if (lbVid) { try { lbVid.pause(); } catch(e){} }
+}
 
-// ---------- INIT ----------
+// ------------------------- Boot -------------------------
 document.addEventListener("DOMContentLoaded", function () {
   loadCSV();
-  initChartsIfNeeded();
+
+  var lb = document.getElementById("lightbox");
+  if (lb) {
+    lb.addEventListener("click", function (e) {
+      if (e.target === lb || e.target.closest("#lb-close")) closeLightbox();
+    });
+  }
 });
