@@ -1,11 +1,14 @@
 /****************************************************
  * Buctril Super Dashboard – Drilldown Donut (Cities outer ring, Spots inner ring)
  *
- * Fix for "all zeros" on GitHub Pages:
- * - PapaParse transformHeader trims headers and collapses spaces
- *   so headers like "No of Farmer Participate " still match.
- * - Also provides a diagnostics banner listing detected headers
- *   if farmers/acres are not being recognized.
+ * This build FIXES your current CSV schema:
+ * Your file has columns like:
+ * - Total Farmers
+ * - Estimated Buctril Acres from this Session
+ * - Definite Use Rate
+ * - Awareness Rate
+ * - Average Understanding Score
+ * - Coorrdinates / Spot Coordinates (lat,lng as text)
  *
  * Files expected in SAME folder:
  * - index.html
@@ -59,10 +62,12 @@ function normalizeHeader(h){
 }
 
 function getField(row, candidates){
+  // Exact match first
   for(var i=0;i<candidates.length;i++){
     var k=candidates[i];
     if(row.hasOwnProperty(k) && safeText(row[k])!=="") return row[k];
   }
+  // Case-insensitive exact match
   var keys=Object.keys(row);
   for(var j=0;j<candidates.length;j++){
     var want=candidates[j].toLowerCase();
@@ -78,6 +83,28 @@ function clampPct(x){ return Math.max(0, Math.min(100, x)); }
 function starsFromPct(p){
   var s = Math.max(0, Math.min(5, Math.round(p/20)));
   return "★".repeat(s) + "☆".repeat(5-s);
+}
+
+// Parse "lat,lng" (or "lat lng") inside a single column like "Coorrdinates" or "Spot Coordinates"
+function parseLatLon(maybe){
+  var s=safeText(maybe);
+  if(!s) return {lat:0, lon:0};
+  // Replace common separators
+  s=s.replace(/[;]/g,",").replace(/\s+/g," ").trim();
+  // Try comma-separated first
+  var parts=s.split(",");
+  if(parts.length>=2){
+    var a=safeNumber(parts[0]);
+    var b=safeNumber(parts[1]);
+    if(Math.abs(a)<=90 && Math.abs(b)<=180) return {lat:a, lon:b};
+  }
+  // Try space-separated pair
+  var m=s.match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/);
+  if(m){
+    var lat=parseFloat(m[1]), lon=parseFloat(m[2]);
+    if(!isNaN(lat) && !isNaN(lon) && Math.abs(lat)<=90 && Math.abs(lon)<=180) return {lat:lat, lon:lon};
+  }
+  return {lat:0, lon:0};
 }
 
 // Stable city colors
@@ -118,7 +145,7 @@ function fetchFirstAvailableCSV(){
 
 function isExcludedRow(r){
   var c=(r.city||"").trim().toLowerCase();
-  if(c==="multan") return true;
+  if(c==="multan") return true; // per your instruction
   if(!r.city && !r.spot && !r.date) return true;
   return false;
 }
@@ -127,25 +154,77 @@ function normalizeRow(row, idx){
   var sid=safeText(getField(row, ["SN","Sr No","Sr. No","Session ID","SessionID","ID","Id","S#","S.No","S No"]));
   var id = sid!=="" ? safeNumber(sid) : (idx+1);
 
-  var rgn = safeText(getField(row, ["RGN","Region","REGION","Rgn"]));
-  var city = normName(getField(row, ["City","To City","To","District","District/City"]));
+  // Your CSV has: Tehsil / District, Village / Mauza, Spot Coordinates, Coorrdinates (typo)
+  var rgn = safeText(getField(row, ["RGN","Region","REGION","Rgn","Tehsil / District","Tehsil/District","District"]));
+  var city = normName(getField(row, ["City","To City","To","District/City","Tehsil / District"]));
   var from = normName(getField(row, ["From City","From","Starting City","Start City"]));
-  var spot = normName(getField(row, ["Session Location","Village / Mauza","Village/Mauza","Spot","Location","Venue","Mauza","Village"]));
-  var date = safeText(getField(row, ["Date","Activity Date","Day","Session Date"]));
+  var spot = normName(getField(row, ["Village / Mauza","Village/Mauza","Session Location","Spot","Location","Venue","Mauza","Village"]));
+  var date = safeText(getField(row, ["Activity Date","Date","Session Date","Day"]));
 
+  // Key metrics (YOUR schema)
   var farmers = safeNumber(getField(row, [
-    "No of Farmer Participate","No of Farmers Participate","No of Farmer Participated",
-    "Farmers","Farmers Engaged","No of Farmers","No. of Farmers","Participants","Attendees"
+    "Total Farmers","Total Wheat Farmers","Farmers","No of Farmer Participate","No of Farmers","Participants"
   ]));
-  var acres = safeNumber(getField(row, ["Acres","Acres Covered","Total Acres"]));
 
-  var clarity = safeNumber(getField(row, ["Message Clarity %","Message Clarity","Clarity %","Clarity","Msg Clarity"]));
-  var definite = safeNumber(getField(row, ["Definite Use %","Definite Use","Use Intent %","Use Intent","Definite"]));
-  var influencers = safeNumber(getField(row, ["Influencers","No of Influencers","Influencers Identified"]));
-  var awareness = safeNumber(getField(row, ["Awareness %","Awareness","Awareness Rate"]));
+  var acres = safeNumber(getField(row, [
+    "Estimated Buctril Acres from this Session",
+    "Estimated Buctril Acres",
+    "Total Wheat Acres",
+    "Acres",
+    "Acres Covered"
+  ]));
 
+  // Performance metrics (YOUR schema)
+  var clarity = safeNumber(getField(row, [
+    "Average Understanding Score",
+    "Message Clarity %",
+    "Message Clarity",
+    "Clarity %"
+  ]));
+
+  var definite = safeNumber(getField(row, [
+    "Definite Use Rate",
+    "Definite Use %",
+    "Definite Use"
+  ]));
+
+  // Fallback: if definite not present, compute from plan counts
+  if(definite===0 && farmers>0){
+    var yesCount = safeNumber(getField(row, ["Plan Yes Count","Will Definitely Use","Yes Count"]));
+    if(yesCount>0) definite = (yesCount / farmers) * 100;
+  }
+
+  var influencers = safeNumber(getField(row, [
+    "No. of Key Influencers (Names Highlighted)",
+    "No of Key Influencers (Names Highlighted)",
+    "No. of Key Influencers",
+    "Influencers",
+    "Influencers Identified"
+  ]));
+
+  var awareness = safeNumber(getField(row, [
+    "Awareness Rate",
+    "Awareness %",
+    "Awareness"
+  ]));
+
+  // Coordinates: either separate lat/lon or combined string
   var lat = safeNumber(getField(row, ["Latitude","Lat"]));
   var lon = safeNumber(getField(row, ["Longitude","Lng","Long","Lon"]));
+  if((!lat || !lon) || (lat===0 && lon===0)){
+    var combined = getField(row, ["Coorrdinates","Coordinates","Spot Coordinates"]);
+    var p = parseLatLon(combined);
+    lat = lat || p.lat;
+    lon = lon || p.lon;
+  }
+
+  // Normalize clarity if it looks like 0-5 or 0-10 scale
+  // (If your score is already 0-100, it remains unchanged.)
+  if(clarity>0 && clarity<=10){
+    clarity = clarity*10; // interpret as 0-10 → 0-100
+  } else if(clarity>0 && clarity<=5){
+    clarity = clarity*20; // interpret as 0-5 → 0-100
+  }
 
   return {
     __raw: row,
@@ -165,7 +244,6 @@ function loadCSV(){
       if(lines.length && /^summary\b/i.test(lines[0].trim())){
         lines.shift(); text=lines.join("\n");
       }
-
       if(typeof Papa==="undefined") throw new Error("PapaParse not loaded (Papa is undefined).");
 
       var parsed=Papa.parse(text, {
@@ -185,12 +263,13 @@ function loadCSV(){
       var farmersSum = allRows.reduce(function(s,r){return s+(r.__farmers||0);},0);
       var acresSum = allRows.reduce(function(s,r){return s+(r.__acres||0);},0);
 
-      if(!hasAny || (farmersSum===0 && acresSum===0)){
+      if(!hasAny){
+        showDiagnostics("CSV loaded but no usable rows were found after filtering. Detected headers:<br><code>"+(fields||[]).join("</code>, <code>")+"</code>");
+      } else if(farmersSum===0 && acresSum===0){
         showDiagnostics(
-          "Data loaded, but key columns were not recognized (Farmers/Acres). " +
-          "Detected headers:<br><code>" + (fields||[]).join("</code>, <code>") + "</code><br>" +
-          "Fix: rename your CSV headers to standard names like <code>City</code>, <code>Session Location</code>, " +
-          "<code>No of Farmer Participate</code>, <code>Acres</code>, <code>RGN</code>."
+          "Data loaded, but key columns were not recognized (Farmers/Acres). Detected headers:<br><code>" +
+          (fields||[]).join("</code>, <code>") + "</code><br>" +
+          "Fix: confirm your CSV has numeric values in <code>Total Farmers</code> and <code>Estimated Buctril Acres from this Session</code> (or tell me which columns to use)."
         );
       } else {
         hideDiagnostics();
