@@ -1,0 +1,217 @@
+[
+  // Group 1
+  {
+    "type": "video",
+    "src": "assets/gallery/1.mp4",
+    "alt": "Activation Video 1",
+    "caption": "Activation Session 1 (Main Video)",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1 content."
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1.jpg",
+    "alt": "Activation Photo 1",
+    "caption": "Activation Session 1 (Main Photo)",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1a.jpg",
+    "alt": "Activation Photo 1a",
+    "caption": "Activation Session 1 - Variant A",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1b.jpg",
+    "alt": "Activation Photo 1b",
+    "caption": "Activation Session 1 - Variant B",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1c.jpg",
+    "alt": "Activation Photo 1c",
+    "caption": "Activation Session 1 - Variant C",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1d.jpg",
+    "alt": "Activation Photo 1d",
+    "caption": "Activation Session 1 - Variant D",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1e.jpg",
+    "alt": "Activation Photo 1e",
+    "caption": "Activation Session 1 - Variant E",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/1f.jpg",
+    "alt": "Activation Photo 1f",
+    "caption": "Activation Session 1 - Variant F",
+    "transcript": ""
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/1a.mp4",
+    "alt": "Activation Video 1a",
+    "caption": "Activation Session 1 - Variant A Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1a content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/1b.mp4",
+    "alt": "Activation Video 1b",
+    "caption": "Activation Session 1 - Variant B Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1b content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/1c.mp4",
+    "alt": "Activation Video 1c",
+    "caption": "Activation Session 1 - Variant C Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1c content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/1d.mp4",
+    "alt": "Activation Video 1d",
+    "caption": "Activation Session 1 - Variant D Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1d content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/1e.mp4",
+    "alt": "Activation Video 1e",
+    "caption": "Activation Session 1 - Variant E Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1e content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/1f.mp4",
+    "alt": "Activation Video 1f",
+    "caption": "Activation Session 1 - Variant F Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 1f content."
+  },
+
+  // ... (Entries for groups 2 through 17 would follow the same pattern) ...
+
+  // Group 18
+  {
+    "type": "video",
+    "src": "assets/gallery/18.mp4",
+    "alt": "Activation Video 18",
+    "caption": "Activation Session 18 (Main Video)",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18 content."
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18.jpg",
+    "alt": "Activation Photo 18",
+    "caption": "Activation Session 18 (Main Photo)",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18a.jpg",
+    "alt": "Activation Photo 18a",
+    "caption": "Activation Session 18 - Variant A",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18b.jpg",
+    "alt": "Activation Photo 18b",
+    "caption": "Activation Session 18 - Variant B",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18c.jpg",
+    "alt": "Activation Photo 18c",
+    "caption": "Activation Session 18 - Variant C",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18d.jpg",
+    "alt": "Activation Photo 18d",
+    "caption": "Activation Session 18 - Variant D",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18e.jpg",
+    "alt": "Activation Photo 18e",
+    "caption": "Activation Session 18 - Variant E",
+    "transcript": ""
+  },
+  {
+    "type": "image",
+    "src": "assets/gallery/18f.jpg",
+    "alt": "Activation Photo 18f",
+    "caption": "Activation Session 18 - Variant F",
+    "transcript": ""
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/18a.mp4",
+    "alt": "Activation Video 18a",
+    "caption": "Activation Session 18 - Variant A Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18a content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/18b.mp4",
+    "alt": "Activation Video 18b",
+    "caption": "Activation Session 18 - Variant B Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18b content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/18c.mp4",
+    "alt": "Activation Video 18c",
+    "caption": "Activation Session 18 - Variant C Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18c content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/18d.mp4",
+    "alt": "Activation Video 18d",
+    "caption": "Activation Session 18 - Variant D Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18d content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/18e.mp4",
+    "alt": "Activation Video 18e",
+    "caption": "Activation Session 18 - Variant E Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18e content."
+  },
+  {
+    "type": "video",
+    "src": "assets/gallery/18f.mp4",
+    "alt": "Activation Video 18f",
+    "caption": "Activation Session 18 - Variant F Video",
+    "vtt": "",
+    "transcript": "Brief description of Activation 18f content."
+  }
+]
