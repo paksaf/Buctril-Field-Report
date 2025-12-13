@@ -1,375 +1,466 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Buctril Super Farmer Education Drive</title>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <!-- SheetJS (XLSX) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
 
   <style>
     :root{
-      --bg0:#061326;
-      --bg1:#071a2e;
-      --card:rgba(255,255,255,.06);
-      --card2:rgba(255,255,255,.08);
-      --stroke:rgba(255,255,255,.10);
-      --text:#eaf2ff;
-      --muted:rgba(234,242,255,.70);
-      --green:#2bb673;
-      --green2:#19a463;
-      --shadow: 0 16px 50px rgba(0,0,0,.35);
-      --r:18px;
+      /* Green theme (clean + readable on GitHub Pages) */
+      --p:#1b5e20;            /* primary */
+      --p2:#2e7d32;
+      --pSoft:rgba(27,94,32,.10);
+      --accent:#ff7043;       /* orange accent */
+      --bg:#f5f7f5;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --border:#e7ebe7;
+      --shadow:0 10px 24px rgba(0,0,0,.08);
+      --r:16px;
     }
-
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
       margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
-      color:var(--text);
-      background:
-        radial-gradient(1200px 700px at 20% 0%, rgba(43,182,115,.18), transparent 60%),
-        radial-gradient(900px 600px at 90% 10%, rgba(43,182,115,.12), transparent 55%),
-        linear-gradient(180deg, var(--bg1), var(--bg0));
-      overflow-x:hidden;
+      font-family:Roboto,system-ui,-apple-system,Segoe UI,Arial,sans-serif;
+      background:var(--bg);
+      color:#111827;
     }
-
-    /* Background video */
-    .bgwrap{
-      position:fixed; inset:0; z-index:-2; overflow:hidden;
-      background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55));
-    }
-    #bgVideo{
-      position:absolute; inset:-10%;
-      width:120%; height:120%;
-      object-fit:cover;
-      filter: blur(0px);
-      opacity:.20;
-      transform: scale(1.05);
-    }
-    .bgshade{position:absolute; inset:0; background:linear-gradient(180deg, rgba(6,19,38,.35), rgba(6,19,38,.92)); z-index:1}
-
-    .container{max-width:1200px; margin:0 auto; padding:22px 18px 44px}
+    .container{max-width:1400px;margin:18px auto;padding:0 14px}
     .hero{
       position:relative;
-      padding:18px 18px 16px;
-      border-radius:24px;
-      background: linear-gradient(135deg, rgba(43,182,115,.22), rgba(43,182,115,.08));
-      border:1px solid rgba(43,182,115,.22);
-      box-shadow: var(--shadow);
       overflow:hidden;
+      border-radius:var(--r);
+      background:linear-gradient(135deg,#e8f5e9 0%,#a5d6a7 100%);
+      box-shadow:var(--shadow);
+      padding:18px 18px 14px 18px;
     }
-    .hero:before{
-      content:"";
-      position:absolute; inset:-1px;
-      background: radial-gradient(800px 260px at 20% 0%, rgba(43,182,115,.35), transparent 70%);
-      pointer-events:none;
+    .heroVideo{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      object-fit:cover;
+      opacity:.14;
+      display:none; /* enabled when bg found */
     }
-    .toprow{display:flex; align-items:center; justify-content:space-between; gap:14px; position:relative}
-    .brand{display:flex; align-items:center; gap:12px}
-    .logos{display:flex; align-items:center; gap:10px}
-    .logos img{height:32px; width:auto; object-fit:contain; filter: drop-shadow(0 8px 12px rgba(0,0,0,.22))}
-    .title{font-weight:800; letter-spacing:.2px; font-size:28px; margin:6px 0 0}
-    .subtitle{margin:2px 0 0; color:var(--muted); font-weight:600}
-    .campDays{
-      color:rgba(234,242,255,.86);
-      font-weight:700;
-      padding:10px 12px;
-      border-radius:14px;
-      background: rgba(0,0,0,.18);
-      border: 1px solid rgba(255,255,255,.10);
-      min-width: 190px;
-      text-align:right;
+    .heroTop{
+      position:relative;
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
     }
-    .chips{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; position:relative}
-    .chip{
-      display:inline-flex; gap:8px; align-items:center;
-      padding:8px 10px;
+    .titleBlock h1{margin:0;color:var(--p);font-size:32px;font-weight:900;letter-spacing:-.02em}
+    .titleBlock .sub{margin-top:6px;color:rgba(17,24,39,.65);font-weight:800}
+    .rightBlock{
+      display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .logos{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .logo{
+      width:58px;height:44px;
+      border-radius:12px;
+      background:rgba(255,255,255,.65);
+      border:1px solid rgba(0,0,0,.06);
+      overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 6px 14px rgba(0,0,0,.06);
+    }
+    .logo img{width:100%;height:100%;object-fit:contain;display:block}
+    .meta{
+      display:flex; flex-direction:column; align-items:flex-end;
+      gap:4px;
+      font-weight:900;
+      color:rgba(17,24,39,.75);
+      min-width:170px;
+    }
+    .meta .big{font-size:14px}
+    .meta .small{font-size:12px;color:rgba(17,24,39,.55);font-weight:900}
+    .kpis{
+      position:relative;
+      display:flex; gap:26px; flex-wrap:wrap;
+      margin-top:14px;
+      align-items:flex-end;
+    }
+    .kpi{
+      font-weight:900;
+      color:var(--accent);
+      font-size:36px;
+      line-height:1;
+    }
+    .kpi small{
+      display:block;
+      margin-top:2px;
+      font-size:12px;
+      letter-spacing:.08em;
+      color:var(--p);
+      font-weight:900;
+    }
+    .tags{position:relative;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+    .tag{
+      background:var(--pSoft);
+      color:var(--p);
+      border:1px solid rgba(27,94,32,.10);
+      padding:5px 10px;
       border-radius:999px;
-      background:rgba(0,0,0,.18);
-      border:1px solid rgba(255,255,255,.10);
-      color:rgba(234,242,255,.86);
-      font-weight:700;
+      font-size:12px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      padding:16px;
+      margin-top:14px;
+    }
+    .card h2{margin:0;color:var(--p);font-size:18px;font-weight:900}
+    .muted{color:var(--muted);font-weight:700}
+    .headerRow{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      background:var(--p);
+      color:#fff;
+      padding:9px 12px;
+      border-radius:999px;
+      font-weight:900;
       font-size:13px;
     }
-    .chip .dot{width:8px; height:8px; border-radius:999px; background:var(--green)}
-    .chip button{
-      appearance:none; border:none; background:transparent; color:inherit; font-weight:800; cursor:pointer
-    }
-
-    .section{
-      margin-top:18px;
-      padding:16px;
-      border-radius:22px;
-      border:1px solid var(--stroke);
-      background: rgba(255,255,255,.05);
-      box-shadow: var(--shadow);
-    }
-
-    .secTitle{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px}
-    .secTitle h2{margin:0; font-size:18px; letter-spacing:.2px}
-    .secTitle p{margin:0; color:var(--muted); font-weight:600}
 
     .filters{
-      display:grid;
-      grid-template-columns: 1fr 1fr 1.4fr;
-      gap:12px;
+      display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:10px
     }
-    .fgroup{display:flex; flex-direction:column; gap:6px}
-    label{color:rgba(234,242,255,.80); font-weight:800; font-size:12px; letter-spacing:.35px; text-transform:uppercase}
+    label{font-weight:900;color:var(--p);font-size:13px}
     select,input{
-      width:100%;
-      padding:12px 12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.22);
-      color:var(--text);
-      outline:none;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #cdd6cd;
+      font-size:14px;
+      min-width:200px;
+      background:#fff;
     }
-    input::placeholder{color:rgba(234,242,255,.45)}
-    .row{
+    input{min-width:280px}
+    .btn{
+      border:none;
+      border-radius:12px;
+      padding:10px 12px;
+      font-weight:900;
+      cursor:pointer;
+      background:#edf6ed;
+      color:var(--p);
+    }
+    .btn:hover{filter:brightness(.98)}
+
+    .snap{
       display:grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns:repeat(4, minmax(160px,1fr));
       gap:12px;
       margin-top:12px;
     }
-    .kpi{
-      padding:14px;
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.18);
-    }
-    .kpi .k{color:rgba(234,242,255,.70); font-weight:900; font-size:12px; letter-spacing:.35px; text-transform:uppercase}
-    .kpi .v{font-size:26px; font-weight:900; margin-top:6px}
-    .kpi .s{color:rgba(234,242,255,.70); font-weight:700; margin-top:4px; font-size:12px}
-
-    .grid2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:12px;
-    }
-    .card{
-      border-radius:22px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.18);
-      padding:14px;
-      overflow:hidden;
-    }
-    .card h3{margin:0 0 8px; font-size:14px; color:rgba(234,242,255,.90); letter-spacing:.2px}
-    .hint{color:var(--muted); font-weight:650; font-size:13px; margin-top:8px}
-    .canvasWrap{height:340px}
-    canvas{width:100% !important; height:100% !important}
-
-    .insightsGrid{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:12px;
-    }
-
-    .mediaGrid{
-      display:grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap:12px;
-    }
-    .mcard{
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.18);
-      overflow:hidden;
-      position:relative;
-      min-height:165px;
-    }
-    .mhead{
-      position:absolute; inset:0 0 auto 0;
-      padding:10px 10px 8px;
-      background: linear-gradient(180deg, rgba(0,0,0,.55), transparent);
-      font-weight:900; letter-spacing:.2px;
-      font-size:14px;
-      z-index:2;
-    }
-    .mfoot{
-      position:absolute; inset:auto 0 0 0;
-      padding:8px 10px;
-      background: linear-gradient(0deg, rgba(0,0,0,.65), transparent);
-      color:rgba(234,242,255,.85);
-      font-weight:750;
-      font-size:12px;
-      z-index:2;
-    }
-    .mbody{position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
-    .mcard img,.mcard video{
-      width:100%; height:100%; object-fit:cover; display:block;
-      filter:saturate(1.05);
-    }
-    .missing{
-      width:100%; height:100%;
-      display:flex; align-items:center; justify-content:center;
-      text-align:center;
-      padding:10px;
-      color:rgba(234,242,255,.65);
-      font-weight:800;
-      font-size:12px;
-      background: linear-gradient(135deg, rgba(43,182,115,.10), rgba(255,255,255,.02));
-    }
-
-    .statusLine{
-      margin-top:10px;
-      padding:10px 12px;
+    @media (max-width:980px){ .snap{grid-template-columns:repeat(2, minmax(160px,1fr));} }
+    .snapcard{
+      border:1px solid var(--border);
       border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.18);
-      color:rgba(234,242,255,.80);
-      font-weight:750;
-      font-size:13px;
+      padding:12px;
+      background:#fafcfb;
+    }
+    .lbl{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+    .val{margin-top:2px;font-size:22px;font-weight:900;color:var(--p)}
+    .bar{height:7px;background:#e6e6e6;border-radius:999px;overflow:hidden;margin-top:8px}
+    .bar>div{height:100%;width:0%;background:#66bb6a;transition:width .25s ease}
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(12, 1fr);
+      gap:14px;
+      margin-top:12px;
+    }
+    .c6{grid-column:span 6}
+    .c12{grid-column:span 12}
+    @media (max-width:980px){ .c6,.c12{grid-column:span 12} }
+
+    .chartWrap{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      background:#fff;
+      min-height:340px;
+    }
+    .chartTitle{font-weight:900;color:var(--p);font-size:13px;margin:0 0 6px 0}
+    .chartHint{font-size:12px;color:var(--muted);font-weight:800;margin:0 0 10px 0}
+    canvas{max-width:100%}
+    .chartWrap canvas{width:100% !important; height:280px !important;}
+    @media (max-width:560px){ .chartWrap canvas{height:260px !important;} }
+
+    .dq{
+      margin-top:10px;
+      border:1px dashed #ff9800;
+      background:#fff7e6;
+      border-radius:14px;
+      padding:10px 12px;
+      color:#8a4b00;
+      font-weight:900;
+      display:none;
+    }
+    .dq code{font-weight:900}
+
+    /* Gallery */
+    .gallery{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(220px, 1fr));
+      gap:12px;
+      margin-top:12px;
+    }
+    @media (max-width:1200px){ .gallery{grid-template-columns:repeat(3, minmax(220px, 1fr));} }
+    @media (max-width:980px){ .gallery{grid-template-columns:repeat(2, minmax(220px, 1fr));} }
+    @media (max-width:560px){ .gallery{grid-template-columns:repeat(1, minmax(220px, 1fr));} }
+
+    .tile{
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow:0 4px 10px rgba(0,0,0,.06);
+      background:#fff;
+      cursor:pointer;
+    }
+    .thumb{
+      position:relative;
+      padding-top:56.25%;
+      background:linear-gradient(135deg,#eef2ee,#f6f8f6);
+    }
+    .thumb img,.thumb video{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .badge{
+      position:absolute; right:10px; bottom:10px;
+      background:rgba(0,0,0,.55);
+      color:#fff;
+      padding:6px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:900;
+    }
+    .cap{padding:10px 12px}
+    .cap .t{font-weight:900;color:var(--p);font-size:13px}
+    .cap .s{margin-top:2px;color:var(--muted);font-weight:800;font-size:12px}
+
+    /* Lightbox */
+    .lightbox{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.88);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      padding:18px;
+    }
+    .lightbox.active{display:flex}
+    .lbInner{
+      width:min(1100px, 94vw);
+      max-height:94vh;
+      background:#0b1220;
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .lbHead{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:12px 14px;
+      background:rgba(255,255,255,.06);
+      color:#fff;
+      font-weight:900;
+    }
+    .lbHead button{
+      border:none;border-radius:12px;padding:8px 10px;
+      font-weight:900;cursor:pointer;background:#ff3b30;color:#fff;
+    }
+    .lbBody{padding:12px}
+    .lbBody img,.lbBody video{
+      width:100%;
+      max-height:78vh;
+      object-fit:contain;
+      display:block;
+      border-radius:12px;
+      background:#000;
     }
 
-    @media(max-width:1100px){
-      .mediaGrid{grid-template-columns: repeat(3, 1fr);}
-    }
-    @media(max-width:900px){
-      .row{grid-template-columns: 1fr 1fr;}
-      .grid2{grid-template-columns:1fr}
-      .insightsGrid{grid-template-columns:1fr}
-      .filters{grid-template-columns:1fr}
-      .mediaGrid{grid-template-columns: repeat(2, 1fr);}
-      .campDays{min-width:auto; text-align:left}
-      .toprow{flex-direction:column; align-items:flex-start}
-    }
-    @media(max-width:520px){
-      .mediaGrid{grid-template-columns: 1fr;}
+    /* Status */
+    #loading{
+      margin:0 0 12px 0;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#ffffff;
+      border:1px solid var(--border);
+      box-shadow:0 6px 14px rgba(0,0,0,.06);
+      font-weight:900;
+      color:var(--p);
     }
   </style>
 </head>
-
 <body>
-  <div class="bgwrap" aria-hidden="true">
-    <video id="bgVideo" autoplay muted loop playsinline></video>
-    <div class="bgshade"></div>
-  </div>
-
   <div class="container">
-    <div class="hero">
-      <div class="toprow">
-        <div class="brand">
-          <div class="logos" aria-label="Logos">
-            <img id="logoBayer" alt="Bayer" />
-            <img id="logoBuctril" alt="Buctril" />
-            <img id="logoInteract" alt="Interact" />
+
+    <div id="loading">Loading…</div>
+
+    <header class="hero">
+      <video id="bgVideo" class="heroVideo" autoplay muted loop playsinline preload="metadata"></video>
+
+      <div class="heroTop">
+        <div class="titleBlock">
+          <h1>Buctril Super Farmer Education Drive</h1>
+          <div class="sub">Donut navigation (Cities → Spots) + Pivot charts + Session story media</div>
+        </div>
+
+        <div class="rightBlock">
+          <div class="logos">
+            <div class="logo"><img src="Bayer.jpg" alt="Bayer" onerror="this.parentElement.style.display='none'"></div>
+            <div class="logo"><img src="Buctril.jpg" alt="Buctril" onerror="this.parentElement.style.display='none'"></div>
+            <div class="logo"><img src="Interact.gif" alt="Interact" onerror="this.parentElement.style.display='none'"></div>
           </div>
-          <div>
-            <div class="title">Buctril Super Farmer Education Drive</div>
-            <div class="subtitle">Donut navigation (Cities → Spots) + Pivot insights + Session story media</div>
+          <div class="meta">
+            <div class="big">Campaign Days: <span id="metric-days">–</span></div>
+            <div class="small" id="metric-daterange">–</div>
           </div>
         </div>
-        <div class="campDays" id="campaignDays">Campaign Days: —</div>
       </div>
 
-      <div class="chips">
-        <div class="chip"><span class="dot"></span>Outer donut = Cities (multi-color)</div>
-        <div class="chip"><span class="dot"></span>Inner donut = Spots (drilldown)</div>
-        <div class="chip"><span class="dot"></span>Click a city segment to filter</div>
-        <div class="chip"><button id="btnClear">Clear filter</button></div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="secTitle">
-        <h2>Filters</h2>
-        <p>Filter charts + KPIs by City/Spot or search</p>
+      <div class="kpis">
+        <div class="kpi"><span id="hero-farmers">–</span><small>FARMERS ENGAGED</small></div>
+        <div class="kpi"><span id="hero-sessions">–</span><small>SESSIONS CONDUCTED</small></div>
       </div>
 
+      <div class="tags">
+        <span class="tag">Outer ring = Cities (multi-color)</span>
+        <span class="tag">Inner ring = Spots (drilldown)</span>
+        <span class="tag">Click donut segment to filter</span>
+        <span class="tag">Multan excluded</span>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="headerRow">
+        <div class="pill">Filters</div>
+        <div class="muted" id="dataStatus">–</div>
+      </div>
       <div class="filters">
-        <div class="fgroup">
-          <label for="citySel">City</label>
-          <select id="citySel"><option value="">All Cities</option></select>
-        </div>
-        <div class="fgroup">
-          <label for="spotSel">Spot</label>
-          <select id="spotSel"><option value="">All Spots</option></select>
-        </div>
-        <div class="fgroup">
-          <label for="q">Search</label>
-          <input id="q" placeholder="Search city, spot, host, dealer..." />
-        </div>
+        <label for="filter-city">City</label>
+        <select id="filter-city"><option value="">All Cities</option></select>
+
+        <label for="filter-spot">Spot</label>
+        <select id="filter-spot"><option value="">All Spots</option></select>
+
+        <label for="filter-search">Search</label>
+        <input id="filter-search" type="text" placeholder="Search city, spot, notes..." />
+
+        <button class="btn" id="btn-clear">Clear</button>
       </div>
 
-      <div class="row" style="margin-top:14px">
-        <div class="kpi">
-          <div class="k">Sessions</div>
-          <div class="v" id="kSessions">—</div>
-          <div class="s" id="kSessionsS">—</div>
-        </div>
-        <div class="kpi">
-          <div class="k">Farmers engaged</div>
-          <div class="v" id="kFarmers">—</div>
-          <div class="s" id="kFarmersS">—</div>
-        </div>
-        <div class="kpi">
-          <div class="k">Acres covered</div>
-          <div class="v" id="kAcres">—</div>
-          <div class="s" id="kAcresS">—</div>
-        </div>
-        <div class="kpi">
-          <div class="k">Cities visited</div>
-          <div class="v" id="kCities">—</div>
-          <div class="s" id="kCitiesS">—</div>
-        </div>
+      <div class="dq" id="dqBox"></div>
+    </section>
+
+    <section class="card">
+      <div class="headerRow">
+        <h2>Snapshot (Filtered)</h2>
+        <div class="muted">Quick rollups from the SUM sheet only (no tables).</div>
       </div>
 
-      <div class="statusLine" id="statusLine">Loading workbook…</div>
-    </div>
+      <div class="snap">
+        <div class="snapcard"><div class="lbl">Sessions</div><div class="val" id="metric-sessions">–</div></div>
+        <div class="snapcard"><div class="lbl">Farmers</div><div class="val" id="metric-farmers">–</div></div>
+        <div class="snapcard"><div class="lbl">Acres Covered</div><div class="val" id="metric-acres">–</div></div>
+        <div class="snapcard"><div class="lbl">Cities Visited</div><div class="val" id="metric-cities">–</div></div>
 
-    <div class="section">
-      <div class="secTitle">
-        <h2>Performance + Donut Navigation</h2>
-        <p>City ring (outer) → Spot ring (inner)</p>
-      </div>
-
-      <div class="grid2">
-        <div class="card">
-          <h3>Donut drilldown (Farmers engaged)</h3>
-          <div class="canvasWrap" style="position:relative;height:340px;"><canvas id="donutOuter" style="position:absolute;inset:0;"></canvas><canvas id="donutInner" style="position:absolute;inset:18% 18%;"></canvas></div>
-          <div class="hint" id="donutHint">Tip: click a city segment to drill into its spots.</div>
+        <div class="snapcard">
+          <div class="lbl">Avg Awareness</div><div class="val" id="metric-awareness">–</div>
+          <div class="bar"><div id="awareness-bar"></div></div>
         </div>
-
-        <div class="card">
-          <h3>Intent mix (Definite / Maybe / Not interested)</h3>
-          <div class="canvasWrap"><canvas id="donutIntent"></canvas></div>
-          <div class="hint">Derived from “Buctril Awareness &amp; Intent” in each session sheet.</div>
+        <div class="snapcard">
+          <div class="lbl">Avg Definite Use</div><div class="val" id="metric-definite">–</div>
+          <div class="bar"><div id="definite-bar" style="background:var(--accent)"></div></div>
         </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="secTitle">
-        <h2>Pivot insights</h2>
-        <p>Frequency-based (avoids wrong totals / phone-number sums)</p>
-      </div>
-
-      <div class="insightsGrid">
-        <div class="card">
-          <h3>Top reasons to USE (count across sessions)</h3>
-          <div class="canvasWrap"><canvas id="barUse"></canvas></div>
+        <div class="snapcard">
+          <div class="lbl">Avg Message Clarity</div><div class="val" id="metric-clarity">–</div>
+          <div class="bar"><div id="clarity-bar"></div></div>
         </div>
-        <div class="card">
-          <h3>Top reasons to NOT USE (count across sessions)</h3>
-          <div class="canvasWrap"><canvas id="barNotUse"></canvas></div>
+        <div class="snapcard">
+          <div class="lbl">Estimated Buctril Acres</div><div class="val" id="metric-buctril-acres">–</div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="section">
-      <div class="secTitle">
+    <section class="card">
+      <div class="headerRow">
+        <h2>Donut Navigation + Pivots (Filtered)</h2>
+        <div class="muted">Cities/Spots drilldown + intent + reasons pivots.</div>
+      </div>
+
+      <div class="grid">
+        <div class="c6">
+          <div class="chartWrap">
+            <div class="chartTitle">Activity drilldown donut</div>
+            <div class="chartHint">Outer ring = Cities. Inner ring = Spots within selected City (or top spots overall).</div>
+            <canvas id="drillDonut"></canvas>
+          </div>
+        </div>
+
+        <div class="c6">
+          <div class="chartWrap">
+            <div class="chartTitle">Intent donut</div>
+            <div class="chartHint">Definite vs Maybe vs Not interested (aggregated).</div>
+            <canvas id="intentDonut"></canvas>
+          </div>
+        </div>
+
+        <div class="c6">
+          <div class="chartWrap">
+            <div class="chartTitle">Top reasons to USE (pivot)</div>
+            <div class="chartHint">Summed counts from SUM sheet reason columns.</div>
+            <canvas id="useBar"></canvas>
+          </div>
+        </div>
+
+        <div class="c6">
+          <div class="chartWrap">
+            <div class="chartTitle">Top reasons NOT to use (pivot)</div>
+            <div class="chartHint">Summed counts from SUM sheet reason columns.</div>
+            <canvas id="notUseBar"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="headerRow">
         <h2>Session story media</h2>
-        <p>Loaded from media.json (or assets/gallery/media.json). Missing files will show a placeholder.</p>
+        <div class="muted">Loaded from <code>media.json</code> (or <code>assets/gallery/media.json</code>). Missing files show a placeholder.</div>
       </div>
-      <div class="mediaGrid" id="mediaGrid"></div>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+  </div>
+
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <div class="lbInner">
+      <div class="lbHead">
+        <div id="lbTitle">–</div>
+        <button id="lbClose" type="button">Close</button>
+      </div>
+      <div class="lbBody" id="lbBody"></div>
     </div>
   </div>
+
+  <!-- CDN libraries (UMD). App will also auto-load fallbacks if blocked. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <script src="data_processor.js"></script>
 </body>
