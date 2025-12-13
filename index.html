@@ -1,733 +1,339 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Buctril Super – Activations Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <base href="./">
+  <title>Buctril Super Farmer Education Drive</title>
 
   <!-- Libraries -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     :root{
-      --bg:#0b1020;
-      --card:#111a33;
-      --muted:#aab4d4;
-      --text:#eaf0ff;
-      --accent:#5dd6ff;
-      --accent2:#ffb86b;
-      --good:#56f1a6;
-      --warn:#ffd166;
-      --bad:#ff5d73;
-      --ring: rgba(93,214,255,.28);
-      --shadow: 0 14px 50px rgba(0,0,0,.35);
-      --radius: 18px;
+      --bg:#0b1220;
+      --panel:#0f1b2e;
+      --panel2:#111f35;
+      --muted:#9fb0c6;
+      --text:#e7eef9;
+      --accent:#5eead4;
+      --accent2:#60a5fa;
+      --danger:#fb7185;
+      --border: rgba(255,255,255,.08);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
       margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background: radial-gradient(1200px 700px at 20% 10%, rgba(93,214,255,.14), transparent 60%),
-                  radial-gradient(1000px 650px at 80% 0%, rgba(255,184,107,.12), transparent 55%),
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 800px at 15% 10%, rgba(96,165,250,.18), transparent 55%),
+                  radial-gradient(1000px 700px at 70% 20%, rgba(94,234,212,.12), transparent 55%),
                   var(--bg);
-      color:var(--text);
+      color: var(--text);
     }
-
     a{color:inherit}
-    .container{max-width:1180px; margin:0 auto; padding:18px 14px 40px}
-
-    /* Hero */
-    .hero{
-      position:relative;
-      border-radius: 24px;
-      overflow:hidden;
-      box-shadow: var(--shadow);
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(17,26,51,.55);
-    }
-    .heroMedia{
-      position:absolute; inset:0;
-      overflow:hidden;
-      background:#0a0f1e;
-    }
-    .heroMedia video{
-      width:100%; height:100%;
-      object-fit: cover;
-      transform: scale(1.05);
-      filter: saturate(1.05) contrast(1.05);
-      opacity:.35;
-    }
-    .heroOverlay{
-      position:absolute; inset:0;
-      background: linear-gradient(180deg, rgba(11,16,32,.25), rgba(11,16,32,.88));
-    }
-    .heroInner{
-      position:relative;
-      padding: 22px 18px 20px;
-    }
-    .titleRow{
-      display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
-    }
-    .hTitle{
-      display:flex; flex-direction:column; gap:6px;
-    }
-    h1{
-      font-size: 22px;
-      line-height: 1.1;
-      margin:0;
-      letter-spacing:.2px;
-    }
-    .sub{
-      margin:0;
-      color: var(--muted);
-      font-size: 13px;
-      max-width: 70ch;
-    }
-    .pills{
-      display:flex; gap:10px; flex-wrap:wrap;
-      align-items:center;
-      justify-content:flex-end;
-    }
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding: 8px 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.10);
-      color: var(--muted);
-      font-size: 12px;
-      white-space:nowrap;
-    }
-    .dot{
-      width:8px; height:8px; border-radius:50%;
-      background: var(--accent);
-      box-shadow: 0 0 0 6px rgba(93,214,255,.14);
-    }
-
-    /* Layout grid */
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 14px;
-      margin-top: 14px;
-    }
-    .card{
-      background: rgba(17,26,51,.70);
-      border: 1px solid rgba(255,255,255,.08);
+    .container{max-width:1200px;margin:0 auto;padding:18px 16px 64px}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      background: linear-gradient(135deg, rgba(17,31,53,.92), rgba(15,27,46,.92));
+      border:1px solid var(--border);
       border-radius: var(--radius);
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      box-shadow: var(--shadow);
+      padding:14px 14px;
+      position: sticky; top: 10px; z-index: 5;
+      backdrop-filter: blur(10px);
+    }
+    .brand{
+      display:flex;align-items:center;gap:12px;min-width: 240px;
+    }
+    .brand img{height:40px;width:auto;object-fit:contain;filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));}
+    .titleblock{flex:1;min-width:220px}
+    .titleblock h1{margin:0;font-size:18px;letter-spacing:.2px}
+    .titleblock p{margin:2px 0 0;color:var(--muted);font-size:12px}
+    .rightbrand{display:flex;align-items:center;gap:10px;min-width: 240px;justify-content:flex-end}
+    .rightbrand img{height:38px;width:auto;object-fit:contain}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 10px;border-radius:999px;border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--muted); font-size: 12px;
+    }
+
+    .grid{display:grid;gap:14px}
+    .grid.cols-2{grid-template-columns: 1fr 1fr}
+    .grid.cols-3{grid-template-columns: 1fr 1fr 1fr}
+    .grid.cols-4{grid-template-columns: repeat(4,1fr)}
+    @media (max-width:980px){
+      .grid.cols-4{grid-template-columns: repeat(2,1fr)}
+      .grid.cols-3{grid-template-columns: 1fr}
+      .grid.cols-2{grid-template-columns: 1fr}
+      .brand,.rightbrand{min-width:unset}
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(17,31,53,.88), rgba(15,27,46,.88));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:14px;
       overflow:hidden;
     }
-    .cardHeader{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:10px;
-      padding: 14px 14px 10px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
-    }
-    .cardHeader h2{
-      font-size: 14px;
-      margin:0;
-      letter-spacing:.2px;
-    }
-    .cardHeader .small{
-      font-size:12px; color: var(--muted);
-    }
-    .cardBody{padding: 12px 14px 14px}
+    .card h2{margin:0 0 8px;font-size:14px}
     .muted{color:var(--muted)}
-
-    /* Column spans */
-    .c12{grid-column: span 12}
-    .c8{grid-column: span 8}
-    .c7{grid-column: span 7}
-    .c6{grid-column: span 6}
-    .c5{grid-column: span 5}
-    .c4{grid-column: span 4}
-
-    /* KPIs */
-    .kpis{
-      display:grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-    }
     .kpi{
-      padding: 12px 12px;
-      border-radius: 16px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.08);
-      position:relative;
-      overflow:hidden;
+      padding:12px;border-radius:14px;
+      background: rgba(255,255,255,.04);
+      border:1px solid var(--border);
     }
-    .kpi::after{
-      content:"";
-      position:absolute; inset:auto -40px -40px auto;
-      width:140px; height:140px;
-      background: radial-gradient(circle at 30% 30%, rgba(93,214,255,.24), transparent 60%);
-      transform: rotate(10deg);
-      pointer-events:none;
-    }
-    .kpi .label{font-size:12px; color:var(--muted); margin:0 0 6px}
-    .kpi .value{font-size:22px; font-weight:700; margin:0}
-    .kpi .hint{font-size:11px; color:var(--muted); margin-top:6px}
-
-    .bar{
-      margin-top:10px;
-      height:10px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius:999px;
-      overflow:hidden;
-    }
-    .bar > div{
-      height:100%;
-      width:0%;
-      background: linear-gradient(90deg, rgba(93,214,255,.9), rgba(255,184,107,.9));
-      border-radius:999px;
-      transition: width .4s ease;
-    }
-
-    /* Filters */
+    .kpi .label{font-size:12px;color:var(--muted)}
+    .kpi .value{font-size:22px;font-weight:700;margin-top:4px}
+    .kpi .sub{font-size:12px;color:var(--muted);margin-top:2px}
     .filters{
-      display:grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
+      display:flex; flex-wrap:wrap; gap:10px; align-items:end;
     }
-    label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px}
-    select, input{
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    select,input{
       width:100%;
-      padding:10px 10px;
-      border-radius: 12px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(8,12,26,.55);
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
       color: var(--text);
-      outline:none;
+      border-radius: 12px;
+      padding: 10px 10px;
+      outline: none;
     }
-    select:focus, input:focus{box-shadow: 0 0 0 5px var(--ring); border-color: rgba(93,214,255,.55)}
-    .btnRow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
-    button{
-      padding:10px 12px;
-      border-radius: 12px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.08);
+    .field{min-width: 190px; flex: 1}
+    .btn{
+      background: rgba(94,234,212,.12);
+      border:1px solid rgba(94,234,212,.35);
       color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
       cursor:pointer;
       font-weight:600;
     }
-    button:hover{background: rgba(255,255,255,.11)}
-    button:focus{outline:none; box-shadow:0 0 0 5px var(--ring)}
+    .btn:hover{background: rgba(94,234,212,.18)}
+    .status{
+      margin-top:10px;
+      padding:10px 12px;border-radius:12px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      font-size:12px;
+    }
+    .status.error{
+      border-color: rgba(251,113,133,.45);
+      background: rgba(251,113,133,.08);
+      color: #ffd0d7;
+    }
 
-    /* Charts */
-    .chartWrap{position:relative; height:320px}
-    .chartWrap.sm{height:260px}
+    .chartwrap{height:310px}
     canvas{max-width:100%}
 
-    /* Table */
-    .tableWrap{overflow:auto; max-height: 420px}
-    table{
-      width:100%;
-      border-collapse: collapse;
-      min-width: 720px;
-    }
-    thead th{
-      text-align:left;
-      font-size:12px;
-      padding: 10px 10px;
-      color: var(--muted);
-      border-bottom: 1px solid rgba(255,255,255,.10);
-      position: sticky;
-      top: 0;
-      background: rgba(17,26,51,.88);
-      backdrop-filter: blur(8px);
-      z-index: 2;
-    }
-    tbody td{
-      padding: 10px 10px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
-      font-size: 13px;
-      vertical-align: top;
-    }
-    tbody tr:hover{background: rgba(255,255,255,.04)}
-    .tag{
-      display:inline-flex;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      color: var(--muted);
-      font-size: 12px;
-      white-space:nowrap;
-    }
-
-    /* Map */
-    #map{height: 380px; border-radius: 16px; overflow:hidden; border:1px solid rgba(255,255,255,.10)}
-
-    /* Action list */
-    .actions{
-      display:flex; flex-direction:column; gap:10px;
-    }
-    .action{
-      padding: 12px 12px;
-      border-radius: 16px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.08);
-    }
-    .action .head{display:flex; align-items:center; justify-content:space-between; gap:10px}
-    .sev{
-      font-size: 12px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.12);
-    }
-    .sev.good{background: rgba(86,241,166,.12); color: var(--good)}
-    .sev.warn{background: rgba(255,209,102,.10); color: var(--warn)}
-    .sev.bad{background: rgba(255,93,115,.12); color: var(--bad)}
-    .action p{margin:8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.35}
-
-    /* Media gallery + Lightbox */
-    .galleryGrid{
+    /* Media gallery */
+    .gallery{
       display:grid;
-      grid-template-columns: repeat(6, minmax(0,1fr));
-      gap:10px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
     }
-    .thumb{
+    @media (max-width:980px){ .gallery{grid-template-columns: repeat(2,1fr)} }
+    @media (max-width:560px){ .gallery{grid-template-columns: 1fr} }
+    .mediaCard{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
       border-radius: 14px;
       overflow:hidden;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.04);
       cursor:pointer;
-      position:relative;
-      aspect-ratio: 4 / 3;
-      display:flex;
-      align-items:center;
-      justify-content:center;
     }
-    .thumb img, .thumb video{
-      width:100%; height:100%;
-      object-fit: cover;
+    .mediaCard .thumb{
+      width:100%;
+      height: 160px;
       display:block;
+      background: rgba(255,255,255,.02);
+      object-fit: cover;
     }
-    .thumb .play{
-      position:absolute;
-      width:44px; height:44px;
-      border-radius: 999px;
-      background: rgba(11,16,32,.72);
-      border: 1px solid rgba(255,255,255,.18);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight:900;
+    .mediaCard .cap{
+      padding:10px 10px 11px;
+      font-size:12px;
+      color: var(--muted);
+      line-height:1.35;
     }
-    .thumb:focus{outline:none; box-shadow:0 0 0 6px var(--ring)}
-    .lb{
-      position:fixed;
-      inset:0;
-      display:none;
-      align-items:center;
-      justify-content:center;
-      background: rgba(0,0,0,.72);
-      z-index: 9999;
+
+    /* Lightbox */
+    .lightbox{
+      position:fixed;inset:0;
+      display:none; align-items:center; justify-content:center;
+      background: rgba(0,0,0,.75);
+      z-index: 50;
       padding: 18px;
     }
-    .lb[aria-hidden="false"]{display:flex}
-    .lbPanel{
-      width:min(980px, 100%);
-      background: rgba(17,26,51,.92);
-      border: 1px solid rgba(255,255,255,.14);
+    .lightbox.open{display:flex}
+    .lightboxInner{
+      width:min(980px, 98vw);
+      background: rgba(15,27,46,.95);
+      border:1px solid var(--border);
       border-radius: 18px;
       box-shadow: var(--shadow);
       overflow:hidden;
     }
-    .lbTop{
-      display:flex; align-items:center; justify-content:space-between;
+    .lightboxHead{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
       padding: 10px 12px;
-      border-bottom: 1px solid rgba(255,255,255,.10);
-      gap:10px;
+      border-bottom:1px solid var(--border);
     }
-    .lbTop .cap{font-size: 13px; color: var(--muted); overflow:hidden; text-overflow: ellipsis; white-space: nowrap}
-    .lbBtns{display:flex; gap:8px}
-    .iconBtn{
-      padding:8px 10px;
-      border-radius: 12px;
-      border:1px solid rgba(255,255,255,.14);
+    .lightboxHead .t{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .lightboxHead button{
       background: rgba(255,255,255,.06);
+      border:1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
       cursor:pointer;
-      font-weight:800;
     }
-    .lbBody{
-      padding: 12px;
-      display:flex;
-      flex-direction:column;
-      gap: 10px;
-    }
-    .lbMedia{
+    .lightboxBody{padding: 12px}
+    .lightboxBody img, .lightboxBody video{
       width:100%;
+      height:auto;
+      max-height: 74vh;
       border-radius: 14px;
-      overflow:hidden;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.25);
+      background: rgba(255,255,255,.02);
     }
-    .lbMedia img, .lbMedia video{
-      width:100%;
-      height: min(62vh, 520px);
-      object-fit: contain;
-      background: rgba(0,0,0,.35);
-      display:block;
-    }
-    .lbTranscript{
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.35;
-      padding: 10px 10px;
-      border-radius: 14px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.05);
-    }
-
-    /* Infinite loop carousel */
-    .marquee{
-      overflow:hidden;
-      border-radius: 16px;
-      border:1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.04);
-    }
-    .marqueeTrack{
-      display:flex;
-      gap:10px;
-      padding: 12px;
-      width:max-content;
-      animation: scroll 30s linear infinite;
-    }
-    .marquee:hover .marqueeTrack{animation-play-state: paused}
-    @keyframes scroll{
-      from{transform: translateX(0)}
-      to{transform: translateX(-50%)}
-    }
-    .mCard{
-      width: 260px;
-      flex: 0 0 auto;
-      padding: 12px;
-      border-radius: 16px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(17,26,51,.70);
-    }
-    .mCard h3{margin:0 0 6px; font-size: 14px}
-    .mCard p{margin:0; color: var(--muted); font-size: 12px; line-height: 1.35}
-
-    /* Responsive */
-    @media (max-width: 980px){
-      .kpis{grid-template-columns: repeat(2, minmax(0,1fr))}
-      .filters{grid-template-columns: repeat(2, minmax(0,1fr))}
-      .galleryGrid{grid-template-columns: repeat(3, minmax(0,1fr))}
-      .c8,.c7,.c6,.c5,.c4{grid-column: span 12}
-      #map{height: 340px}
-    }
-    @media (max-width: 520px){
-      .galleryGrid{grid-template-columns: repeat(2, minmax(0,1fr))}
-      .pill{font-size: 11px}
-      h1{font-size: 20px}
-      .chartWrap{height: 280px}
-      .chartWrap.sm{height: 240px}
-    }
-
-    /* Accessibility helpers */
-    .srOnly{
-      position:absolute!important;
-      width:1px!important; height:1px!important;
-      padding:0!important; margin:-1px!important;
-      overflow:hidden!important;
-      clip:rect(0,0,0,0)!important;
-      white-space:nowrap!important;
-      border:0!important;
-    }
-    .notice{
-      padding: 10px 12px;
-      border-radius: 16px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.35;
-    }
-    .notice strong{color: var(--text)}
   </style>
 </head>
-
 <body>
   <div class="container">
-
-    <section class="hero" aria-label="Dashboard hero">
-      <div class="heroMedia" aria-hidden="true">
-        <!-- Put your background video at: assets/bg.mp4 -->
-        <video id="bgVideo" autoplay muted loop playsinline preload="metadata">
-          <source src="assets/bg.mp4" type="video/mp4" />
-        </video>
+    <div class="topbar">
+      <div class="brand">
+        <img id="logoBayer" src="Bayer.jpg" alt="Bayer">
+        <span class="pill" id="dataMode">Loading…</span>
       </div>
-      <div class="heroOverlay" aria-hidden="true"></div>
-      <div class="heroInner">
-        <div class="titleRow">
-          <div class="hTitle">
-            <h1>Buctril Super Farmer Education Drive – Dashboard</h1>
-            <p class="sub">
-              KPIs from <strong>sum_sheet.csv</strong> plus Backchecker insights from <strong>Buctril_Super_Activations.xlsx</strong> (D1S1…DnSn sheets).
-              Includes responsive charts, map, session table, and accessible media gallery.
-            </p>
-          </div>
-          <div class="pills" role="list" aria-label="Data sources status">
-            <div class="pill" role="listitem"><span class="dot"></span> <span id="status-csv">CSV: loading…</span></div>
-            <div class="pill" role="listitem"><span class="dot" style="background: var(--accent2)"></span> <span id="status-xlsx">XLSX: loading…</span></div>
-          </div>
-        </div>
 
-        <div class="grid" style="margin-top:14px">
-          <div class="card c12">
-            <div class="cardBody">
-              <div class="kpis" aria-label="Key performance indicators">
-                <div class="kpi">
-                  <p class="label">Sessions (CSV)</p>
-                  <p class="value" id="kpi-sessions">–</p>
-                  <div class="bar" aria-hidden="true"><div id="bar-sessions"></div></div>
-                  <div class="hint muted">Rows where Farmers/Acres exist.</div>
-                </div>
-                <div class="kpi">
-                  <p class="label">Farmers Engaged</p>
-                  <p class="value" id="kpi-farmers">–</p>
-                  <div class="bar" aria-hidden="true"><div id="bar-farmers"></div></div>
-                  <div class="hint muted">Sum of Total Farmers across sessions.</div>
-                </div>
-                <div class="kpi">
-                  <p class="label">Acres Impacted</p>
-                  <p class="value" id="kpi-acres">–</p>
-                  <div class="bar" aria-hidden="true"><div id="bar-acres"></div></div>
-                  <div class="hint muted">Estimated Buctril Acres (pref).</div>
-                </div>
-                <div class="kpi">
-                  <p class="label">Backchecker: Demo Plot Desire (Avg)</p>
-                  <p class="value" id="kpi-demo">–</p>
-                  <div class="bar" aria-hidden="true"><div id="bar-demo"></div></div>
-                  <div class="hint muted">From last rows in D* sheets (XLSX).</div>
-                </div>
-              </div>
-
-              <div class="marquee" style="margin-top:12px" aria-label="Auto-scrolling highlights carousel">
-                <div class="marqueeTrack" id="highlightsTrack">
-                  <!-- JS duplicates cards for infinite loop -->
-                </div>
-              </div>
-
-              <div class="notice" style="margin-top:12px" id="noticeBox" role="status" aria-live="polite">
-                <strong>How to use:</strong> Put <code>sum_sheet.csv</code> and <code>Buctril_Super_Activations.xlsx</code> in the same folder as this page.
-                Optional media goes in <code>assets/</code>. The dashboard will work with CSV-only, but Backchecker charts require XLSX.
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div class="titleblock">
+        <h1>Buctril Super Farmer Education Drive</h1>
+        <p class="muted">Drilldown donuts (Cities → Spots) + pivot insights + session story media</p>
       </div>
-    </section>
 
-    <section class="grid">
-      <div class="card c12">
-        <div class="cardHeader">
-          <h2>Filters</h2>
-          <div class="small">Filters apply to CSV sessions (map, charts, table). Backchecker insights remain overall unless you later map D* sheets to spots.</div>
+      <div class="rightbrand">
+        <img id="logoInteract" src="Interact.gif" alt="Interact">
+        <img id="logoBuctril" src="Buctril.jpg" alt="Buctril">
+      </div>
+    </div>
+
+    <div class="status" id="status">Preparing dashboard…</div>
+
+    <div style="height:14px"></div>
+
+    <div class="card">
+      <h2>Filters</h2>
+      <div class="filters">
+        <div class="field">
+          <label for="fCity">City / District</label>
+          <select id="fCity"></select>
         </div>
-        <div class="cardBody">
-          <div class="filters" role="group" aria-label="Data filters">
-            <div>
-              <label for="filter-city">City</label>
-              <select id="filter-city"></select>
-            </div>
-            <div>
-              <label for="filter-district">District/Tehsil</label>
-              <select id="filter-district"></select>
-            </div>
-            <div>
-              <label for="filter-date-from">Date From</label>
-              <input id="filter-date-from" type="date" />
-            </div>
-            <div>
-              <label for="filter-date-to">Date To</label>
-              <input id="filter-date-to" type="date" />
-            </div>
-          </div>
+        <div class="field">
+          <label for="fSpot">Spot</label>
+          <select id="fSpot"></select>
+        </div>
+        <div class="field" style="min-width:240px">
+          <label for="fSearch">Search</label>
+          <input id="fSearch" placeholder="Search village, host, contact, notes…" />
+        </div>
+        <div class="field" style="min-width:120px;flex:0">
+          <button class="btn" id="btnClear">Clear</button>
+        </div>
+      </div>
+    </div>
 
-          <div class="btnRow">
-            <button id="btn-reset" type="button">Reset Filters</button>
-            <button id="btn-export" type="button">Export Filtered CSV (JSON)</button>
-          </div>
+    <div style="height:14px"></div>
 
-          <div class="notice" style="margin-top:12px">
-            <strong>Backchecker observation focus:</strong> “Prior Event” questions and “Post Event” findings are extracted from last rows/sections of each D* sheet using keyword matching.
-            If a sheet’s structure differs, it will be flagged in Diagnostics.
-          </div>
+    <div class="grid cols-4" id="kpiGrid">
+      <div class="kpi">
+        <div class="label">Sessions (parsed)</div>
+        <div class="value" id="kSessions">–</div>
+        <div class="sub" id="kSessionsSub">–</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Wheat farmers</div>
+        <div class="value" id="kWheatFarmers">–</div>
+        <div class="sub" id="kWheatFarmersSub">–</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Wheat acres</div>
+        <div class="value" id="kAcres">–</div>
+        <div class="sub" id="kAcresSub">–</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Estimated Buctril acres</div>
+        <div class="value" id="kBuctrilAcres">–</div>
+        <div class="sub" id="kBuctrilAcresSub">–</div>
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>Donut navigation</h2>
+        <div class="muted">Click a city segment to drill down spots.</div>
+        <div style="height:10px"></div>
+        <div class="grid cols-2">
+          <div class="chartwrap"><canvas id="cityDonut"></canvas></div>
+          <div class="chartwrap"><canvas id="spotDonut"></canvas></div>
         </div>
       </div>
 
-      <div class="card c6">
-        <div class="cardHeader">
-          <h2>Intent Mix</h2>
-          <div class="small">Definite / Maybe / Not</div>
+      <div class="card">
+        <h2>Intent + quality summary</h2>
+        <div class="muted">No tables here: only pivots/donuts + clean diagnostics.</div>
+        <div style="height:10px"></div>
+        <div class="grid cols-2">
+          <div class="chartwrap"><canvas id="intentDonut"></canvas></div>
+          <div class="chartwrap"><canvas id="demoDonut"></canvas></div>
         </div>
-        <div class="cardBody">
-          <div class="chartWrap sm"><canvas id="chartIntent" aria-label="Intent donut chart" role="img"></canvas></div>
-        </div>
+        <div style="height:10px"></div>
+        <div class="status" id="dqBox">Data quality: –</div>
       </div>
+    </div>
 
-      <div class="card c6">
-        <div class="cardHeader">
-          <h2>Performance Averages</h2>
-          <div class="small">Clarity / Awareness / Definite</div>
-        </div>
-        <div class="cardBody">
-          <div class="chartWrap sm"><canvas id="chartPerf" aria-label="Performance bar chart" role="img"></canvas></div>
-        </div>
+    <div style="height:14px"></div>
+
+    <div class="card">
+      <h2>Pivot insights</h2>
+      <div class="muted">Top reasons to use / not use (derived from filled quick reports).</div>
+      <div style="height:10px"></div>
+      <div class="chartwrap" style="height:340px"><canvas id="reasonsBar"></canvas></div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="card">
+      <h2>Session story media</h2>
+      <div class="muted">Loaded from <code>media.json</code> (or <code>assets/gallery/media.json</code>).</div>
+      <div style="height:10px"></div>
+      <div class="gallery" id="gallery"></div>
+    </div>
+
+  </div>
+
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <div class="lightboxInner">
+      <div class="lightboxHead">
+        <div class="t" id="lbTitle">–</div>
+        <button id="lbClose">Close</button>
       </div>
-
-      <div class="card c7">
-        <div class="cardHeader">
-          <h2>Top Cities by Farmers</h2>
-          <div class="small">Filtered CSV sessions</div>
-        </div>
-        <div class="cardBody">
-          <div class="chartWrap"><canvas id="chartCities" aria-label="Top cities chart" role="img"></canvas></div>
-        </div>
-      </div>
-
-      <div class="card c5">
-        <div class="cardHeader">
-          <h2>Farmers Trend by Day</h2>
-          <div class="small">Filtered CSV sessions</div>
-        </div>
-        <div class="cardBody">
-          <div class="chartWrap"><canvas id="chartTrend" aria-label="Trend chart" role="img"></canvas></div>
-        </div>
-      </div>
-
-      <div class="card c12">
-        <div class="cardHeader">
-          <h2>Map</h2>
-          <div class="small">Markers from Spot Coordinates (supports DMS + decimal)</div>
-        </div>
-        <div class="cardBody">
-          <div id="map" role="application" aria-label="Map of activation spots"></div>
-        </div>
-      </div>
-
-      <div class="card c7">
-        <div class="cardHeader">
-          <h2>Session Details (CSV)</h2>
-          <div class="small">Includes last 3 sessions by date at the top</div>
-        </div>
-        <div class="cardBody">
-          <div class="tableWrap">
-            <table aria-label="Session table">
-              <thead>
-                <tr>
-                  <th>ID</th><th>Date</th><th>District</th><th>City</th><th>Spot</th>
-                  <th>Farmers</th><th>Acres</th><th>Def%</th><th>Aware%</th><th>Clarity%</th>
-                </tr>
-              </thead>
-              <tbody id="tblSessions"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card c5">
-        <div class="cardHeader">
-          <h2>Action Points</h2>
-          <div class="small">Threshold-driven recommendations</div>
-        </div>
-        <div class="cardBody">
-          <div class="actions" id="actionList" aria-label="Action points list"></div>
-          <div class="notice" style="margin-top:12px">
-            <strong>Note:</strong> “Price too high” and other objections use CSV “Reason Not to Use” totals (if present). Backchecker items (demo plot desire, repeat activation, engagement benefit) are from XLSX.
-          </div>
-        </div>
-      </div>
-
-      <div class="card c12">
-        <div class="cardHeader">
-          <h2>Backchecker Insights (XLSX: D* sheets)</h2>
-          <div class="small">Last-row metrics + qualitative engagement benefit mix</div>
-        </div>
-        <div class="cardBody">
-          <div class="grid" style="margin-top:0">
-            <div class="card c6" style="background: transparent; border:none; box-shadow:none">
-              <div class="cardBody" style="padding:0">
-                <div class="chartWrap"><canvas id="chartBackchecker" aria-label="Backchecker averages chart" role="img"></canvas></div>
-              </div>
-            </div>
-            <div class="card c6" style="background: transparent; border:none; box-shadow:none">
-              <div class="cardBody" style="padding:0">
-                <div class="chartWrap"><canvas id="chartBenefit" aria-label="Engagement benefit chart" role="img"></canvas></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="tableWrap" style="margin-top:14px">
-            <table aria-label="Backchecker extraction table">
-              <thead>
-                <tr>
-                  <th>Sheet</th><th>Demo Plot %</th><th>Repeat Activations %</th><th>Top Benefit</th>
-                  <th>Post: Def%</th><th>Post: Aware%</th><th>Post: Clarity%</th><th>Expected Sales ↑</th><th>Notes</th>
-                </tr>
-              </thead>
-              <tbody id="tblBackchecker"></tbody>
-            </table>
-          </div>
-
-          <div class="notice" style="margin-top:12px" id="diagBox">
-            <strong>Diagnostics:</strong> If a D* sheet does not match expected labels/sections, it will appear here so you can adjust keywords or layout parsing.
-          </div>
-        </div>
-      </div>
-
-      <div class="card c12">
-        <div class="cardHeader">
-          <h2>Media Gallery</h2>
-          <div class="small">Lazy-loaded thumbnails + Lightbox (keyboard accessible)</div>
-        </div>
-        <div class="cardBody">
-          <p class="muted" style="margin-top:0">
-            Put images/videos under <code>assets/gallery/</code>. Add captions in <code>assets/gallery/media.json</code>.
-            Thumbnails are auto-generated as a grid; click to open the modal.
-          </p>
-
-          <div class="galleryGrid" id="galleryGrid" aria-label="Media thumbnails grid"></div>
-
-          <div class="lb" id="lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Media lightbox">
-            <div class="lbPanel">
-              <div class="lbTop">
-                <div class="cap" id="lbCaption">–</div>
-                <div class="lbBtns">
-                  <button class="iconBtn" id="lbPrev" type="button" aria-label="Previous media">◀</button>
-                  <button class="iconBtn" id="lbNext" type="button" aria-label="Next media">▶</button>
-                  <button class="iconBtn" id="lbClose" type="button" aria-label="Close lightbox">✕</button>
-                </div>
-              </div>
-              <div class="lbBody">
-                <div class="lbMedia" id="lbMedia"></div>
-                <div class="lbTranscript" id="lbTranscript">
-                  <strong>Accessibility:</strong> Provide captions (<code>.vtt</code>) for videos and a short transcript here via <code>media.json</code>.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <p class="srOnly" id="kbdHelp">
-            Lightbox keyboard: Escape to close, Left/Right arrows to navigate.
-          </p>
-        </div>
-      </div>
-
-    </section>
+      <div class="lightboxBody" id="lbBody"></div>
+    </div>
   </div>
 
   <script src="data_processor.js"></script>
+  <script>
+    window.addEventListener("DOMContentLoaded", function(){
+      if(window.BUCTRIL_APP && typeof window.BUCTRIL_APP.init === "function"){
+        window.BUCTRIL_APP.init();
+      }
+    });
+  </script>
 </body>
 </html>
