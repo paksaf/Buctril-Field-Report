@@ -1,1054 +1,866 @@
-/* Buctril Super Farmer Education Drive – Dashboard Processor
-   - Green theme + donut navigation (Cities → Spots) + pivot charts.
-   - Reads Buctril_Super_Activations.xlsx (SUM sheet) in-browser (XLSX).
-   - No tables; focuses on charts + map + media gallery.
-
-   Files expected in repo root:
-     - index.html
-     - data_processor.js
-     - Buctril_Super_Activations.xlsx
-     - media.json
-     - Bayer.jpg, Buctril.jpg, Interact.gif
-     - (optional) assets/bg.mp4
+/* Buctril Super Dashboard (Rev2)
+   - Reads per-session Quick Report sheets: D#S#
+   - Builds city → spot donut navigation + pivot insights (frequency-based)
+   - Media gallery loads media.json with robust fallbacks
+   - Background video: assets/bg.mp4 or bg.mp4 (optional)
 */
 
-(function(){
-  "use strict";
+(() => {
+  'use strict';
 
-  // --------------------------
-  // DOM helpers
-  // --------------------------
-  function $(id){ return document.getElementById(id); }
-
-  function safeText(v){
-    if(v === null || v === undefined) return "";
-    var s = String(v);
-    if(s === "undefined" || s === "null") return "";
-    return s;
-  }
-
-  function norm(s){
-    return safeText(s).trim().toLowerCase();
-  }
-
-  function toNumber(v){
-    var s = safeText(v).replace(/,/g,"").trim();
-    if(!s) return 0;
-    var n = Number(s);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
-
-  function toPercent(v){
-    // Accept 0–1 or 0–100 or strings like "76%" etc.
-    var s = safeText(v).trim();
-    if(!s) return null;
-    s = s.replace("%","").replace(/,/g,"").trim();
-    var n = Number(s);
-    if(!Number.isFinite(n)) return null;
-    if(n <= 1) n = n * 100;
-    // protect against 10000% issues
-    if(n > 200) return null;
-    return n;
-  }
-
-  function formatInt(n){
-    n = Math.round(Number(n)||0);
-    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  }
-
-  function format1(n){
-    n = Number(n);
-    if(!Number.isFinite(n)) return "–";
-    return (Math.round(n*10)/10).toFixed(1);
-  }
-
-  function formatPct(n){
-    n = Number(n);
-    if(!Number.isFinite(n)) return "–";
-    return Math.round(n) + "%";
-  }
-
-  function baseUrl(){
-    // Works whether the page is opened with or without trailing slash.
-    return new URL(".", window.location.href).toString();
-  }
-
-  // --------------------------
-  // Colors (multi-color donut segments)
-  // --------------------------
-  var PALETTE = [
-    "#1b5e20","#2e7d32","#388e3c","#43a047","#66bb6a","#81c784",
-    "#ff7043","#fb8c00","#fdd835","#26a69a","#1e88e5","#5e35b1",
-    "#8e24aa","#6d4c41","#546e7a","#00acc1","#7cb342","#c0ca33"
+  const FILE_XLSX_CANDIDATES = [
+    'Buctril_Super_Activations.xlsx',
+    'Buctril_Super_Activations.XLSX'
   ];
 
-  function colorForKey(key){
-    var h = 0;
-    var s = safeText(key);
-    for(var i=0;i<s.length;i++){
-      h = (h*31 + s.charCodeAt(i)) >>> 0;
-    }
-    return PALETTE[h % PALETTE.length];
-  }
+  const MEDIA_JSON_CANDIDATES = [
+    'assets/gallery/media.json',
+    'media.json',
+    'assets/media.json'
+  ];
 
-  function lighten(hex, amt){
-    // amt: 0..1 (towards white)
-    var h = hex.replace("#","");
-    if(h.length !== 6) return hex;
-    var r = parseInt(h.slice(0,2),16),
-        g = parseInt(h.slice(2,4),16),
-        b = parseInt(h.slice(4,6),16);
-    r = Math.round(r + (255-r)*amt);
-    g = Math.round(g + (255-g)*amt);
-    b = Math.round(b + (255-b)*amt);
-    return "#" + [r,g,b].map(function(x){ return x.toString(16).padStart(2,"0"); }).join("");
-  }
+  const BG_VIDEO_CANDIDATES = [
+    'assets/bg.mp4',
+    'bg.mp4'
+  ];
 
-  // --------------------------
-  // Coordinate parsing (DMS → decimal)
-  // --------------------------
-  function dmsToDecimal(deg, min, sec, hemi){
-    var d = Number(deg) + Number(min)/60 + Number(sec)/3600;
-    if(hemi === "S" || hemi === "W") d = -d;
-    return d;
-  }
-
-  function parseDMSPair(s){
-    // Handles variants like:
-    // 28°09'13.2"N 69°48'59.7"E
-    // 30°11'52"N, 71°28'11"E
-    // 28°09'13.2"N,69°48'59.7"E
-    var t = safeText(s).replace(/,/g," ").replace(/\s+/g," ").trim();
-    if(!t) return null;
-
-    var re = /(\d{1,3})\D+(\d{1,2})\D+(\d{1,2}(?:\.\d+)?)\D*([NSEW])/gi;
-    var m, parts=[];
-    while((m=re.exec(t)) !== null){
-      parts.push({deg:m[1],min:m[2],sec:m[3],hemi:m[4].toUpperCase()});
-    }
-    if(parts.length < 2) return null;
-
-    var latPart = parts.find(function(p){ return p.hemi==="N" || p.hemi==="S"; });
-    var lngPart = parts.find(function(p){ return p.hemi==="E" || p.hemi==="W"; });
-    if(!latPart || !lngPart) return null;
-
-    return {
-      lat: dmsToDecimal(latPart.deg, latPart.min, latPart.sec, latPart.hemi),
-      lng: dmsToDecimal(lngPart.deg, lngPart.min, lngPart.sec, lngPart.hemi)
-    };
-  }
-
-  // --------------------------
-  // App state
-  // --------------------------
-  var ALL = [];       // all session-rows (expanded)
-  var FILTERED = [];  // filtered session-rows
-
-  var state = {
-    city: "",
-    spot: "",
-    q: ""
+  const LOGO_CANDIDATES = {
+    bayer: ['Bayer.jpg', 'Bayer.JPG', 'bayer.jpg', 'bayer.JPG', 'Bayer.png', 'bayer.png'],
+    buctril: ['Buctril.jpg', 'Buctril.JPG', 'buctril.jpg', 'buctril.JPG', 'Buctril.png', 'buctril.png'],
+    interact: ['Interact.gif', 'Interact.GIF', 'interact.gif', 'interact.GIF', 'Interact.png', 'interact.png']
   };
 
-  // Charts
-  var charts = {
-    awarenessDonut: null,
-    definiteDonut: null,
-    drillDonut: null,
-    pivotSessionsByCity: null,
-    pivotFarmersByCity: null,
-    pivotAcresByCity: null,
-    pivotRatesByCity: null
+  const state = {
+    sessions: [],
+    filtered: [],
+    selectedCity: '',
+    selectedSpot: '',
+    query: ''
   };
 
-  // Map
-  var map = null;
-  var mapLayer = null;
+  const charts = {
+    donutOuter: null,
+    donutInner: null,
+    donutIntent: null,
+    barUse: null,
+    barNotUse: null
+  };
 
-  // --------------------------
-  // Error modal
-  // --------------------------
-  function showError(msg){
-    try{
-      var modal = document.createElement("div");
-      modal.className = "error-modal";
-      modal.innerHTML = '<p>' + msg.replace(/</g,"&lt;") + '</p><button>Close</button>';
-      modal.querySelector("button").addEventListener("click", function(){ modal.remove(); });
-      document.body.appendChild(modal);
-    }catch(e){}
+  const $ = (id) => document.getElementById(id);
+
+  function baseUrl() {
+    // Ensure relative fetches always work even if URL is opened without trailing slash.
+    return new URL('.', window.location.href).toString();
   }
 
-  function setDiagnostics(html, show){
-    var el = $("diagnostics");
-    if(!el) return;
-    el.innerHTML = html || "";
-    el.style.display = show ? "block" : "none";
+  function absUrl(rel) {
+    return new URL(rel, baseUrl()).toString();
   }
 
-  // --------------------------
-  // Load XLSX (SUM sheet)
-  // --------------------------
-  function findHeaderRow(rows){
-    // find row containing SN, City, Session Location
-    for(var i=0;i<rows.length;i++){
-      var r = rows[i] || [];
-      var a = norm(r[0]);
-      if(a !== "sn") continue;
-      var hasCity = r.some(function(c){ return norm(c) === "city"; });
-      var hasLoc = r.some(function(c){ return norm(c) === "session location"; });
-      if(hasCity && hasLoc) return i;
+  function fmtInt(x) {
+    if (!isFinite(x)) return '—';
+    return Math.round(x).toLocaleString();
+  }
+
+  function clampNonNeg(n) {
+    const x = Number(n);
+    return isFinite(x) && x > 0 ? x : 0;
+  }
+
+  function normalizeStr(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).trim();
+  }
+
+  function lower(s) { return normalizeStr(s).toLowerCase(); }
+
+  function isLikelyPhoneNumber(n) {
+    // Defensive: avoid accidentally aggregating phone numbers as "metrics".
+    const s = normalizeStr(n);
+    const digits = s.replace(/[^\d]/g, '');
+    return digits.length >= 9 && digits.length <= 14;
+  }
+
+  function makePalette(n, opts = {}) {
+    // Multi-color palette (stable) + green-forward look
+    const sat = opts.sat ?? 70;
+    const light = opts.light ?? 55;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const hue = (i * 360 / Math.max(1, n)) % 360;
+      out.push(`hsl(${hue}, ${sat}%, ${light}%)`);
+    }
+    return out;
+  }
+
+  async function fetchFirstOk(candidates, as = 'arrayBuffer') {
+    for (const rel of candidates) {
+      try {
+        const res = await fetch(absUrl(rel), { cache: 'no-store' });
+        if (!res.ok) continue;
+        if (as === 'json') return await res.json();
+        if (as === 'text') return await res.text();
+        return await res.arrayBuffer();
+      } catch (e) {
+        // try next
+      }
+    }
+    throw new Error(`Could not fetch any of: ${candidates.join(', ')}`);
+  }
+
+  function setStatus(msg) {
+    const el = $('statusLine');
+    if (el) el.textContent = msg;
+  }
+
+  // ---------- Excel parsing (D#S# quick reports) ----------
+
+  function sheetToRows(wb, name) {
+    const ws = wb.Sheets[name];
+    if (!ws) return [];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
+    return rows || [];
+  }
+
+  function findRowIndex(rows, predicate, maxRows = 60) {
+    const lim = Math.min(rows.length, maxRows);
+    for (let r = 0; r < lim; r++) {
+      const row = rows[r] || [];
+      for (let c = 0; c < row.length; c++) {
+        if (predicate(row[c], r, c, row)) return r;
+      }
     }
     return -1;
   }
 
-  function rowEmpty(r){
-    for(var i=0;i<r.length;i++){
-      if(safeText(r[i]).trim() !== "") return false;
+  function findValueAfterLabel(rows, labelRegex, opts = {}) {
+    const maxR = opts.maxR ?? 60;
+    const maxC = opts.maxC ?? 16;
+
+    for (let r = 0; r < Math.min(rows.length, maxR); r++) {
+      const row = rows[r] || [];
+      for (let c = 0; c < Math.min(row.length, maxC); c++) {
+        const v = row[c];
+        if (typeof v === 'string' && labelRegex.test(v)) {
+          // Search right
+          for (let cc = c + 1; cc < Math.min(row.length, maxC); cc++) {
+            const cand = row[cc];
+            if (typeof cand === 'number' && isFinite(cand)) return cand;
+            if (typeof cand === 'string' && cand && !isLikelyPhoneNumber(cand)) {
+              const num = Number(cand.replace(/,/g, ''));
+              if (isFinite(num)) return num;
+            }
+          }
+          // Search down (same column)
+          for (let rr = r + 1; rr < Math.min(rows.length, r + 6); rr++) {
+            const cand = (rows[rr] || [])[c];
+            if (typeof cand === 'number' && isFinite(cand)) return cand;
+            if (typeof cand === 'string' && cand && !isLikelyPhoneNumber(cand)) {
+              const num = Number(cand.replace(/,/g, ''));
+              if (isFinite(num)) return num;
+            }
+          }
+        }
+      }
     }
-    return true;
+    return null;
   }
 
-  function readSumSheet(workbook){
-    var sheet = workbook.Sheets["SUM"];
-    if(!sheet) throw new Error("Sheet 'SUM' not found in XLSX.");
-    var rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:false, defval:"" });
-    var hIdx = findHeaderRow(rows);
-    if(hIdx < 0) throw new Error("Could not locate header row in SUM sheet.");
-    var header = rows[hIdx].map(function(x){ return safeText(x).trim(); });
+  function extractMessageClarity(rows) {
+    // Find the "Message Understanding" header row, then read next row numeric scores (usually 5 values)
+    const headerR = findRowIndex(rows, (cell) => typeof cell === 'string' && /message understanding/i.test(cell), 50);
+    if (headerR < 0) return null;
 
-    function idxOf(name){
-      var target = norm(name);
-      for(var i=0;i<header.length;i++){
-        if(norm(header[i]) === target) return i;
+    // Look for the row that contains the message statements; next row contains scores.
+    const msgR = findRowIndex(rows.slice(headerR, headerR + 12), (cell) => typeof cell === 'string' && /weeds can reduce/i.test(cell), 12);
+    if (msgR < 0) return null;
+
+    const scoreRow = rows[headerR + msgR + 1] || [];
+    const scores = scoreRow
+      .map(v => (typeof v === 'number' && isFinite(v) ? v : null))
+      .filter(v => v !== null);
+
+    if (!scores.length) return null;
+    const take = scores.slice(0, 5);
+    const avg = take.reduce((a, b) => a + b, 0) / take.length;
+    return avg;
+  }
+
+  function extractReasons(rows) {
+    // Returns { use: [{reason,count}], notUse: [...] }
+    const out = { use: [], notUse: [] };
+
+    const startR = findRowIndex(rows, (cell) => typeof cell === 'string' && /reasons to use/i.test(cell), 80);
+    if (startR < 0) return out;
+
+    // Find header row with "Reason" and "Count"
+    let hdrR = -1;
+    for (let r = startR; r < Math.min(rows.length, startR + 12); r++) {
+      const row = rows[r] || [];
+      const reasons = row.map(v => (typeof v === 'string' ? v.trim() : '')).filter(Boolean);
+      if (reasons.some(s => /^Reason$/i.test(s)) && reasons.some(s => /^Count$/i.test(s))) {
+        hdrR = r;
+        break;
       }
-      return -1;
+    }
+    if (hdrR < 0) return out;
+
+    const hdr = rows[hdrR] || [];
+    const idxReason = [];
+    const idxCount = [];
+    for (let c = 0; c < hdr.length; c++) {
+      const v = hdr[c];
+      if (typeof v === 'string' && /^Reason$/i.test(v.trim())) idxReason.push(c);
+      if (typeof v === 'string' && /^Count$/i.test(v.trim())) idxCount.push(c);
     }
 
-    var I = {
-      SN: idxOf("SN"),
-      FromCity: idxOf("From City"),
-      City: idxOf("City"),
-      Date: idxOf("Date"),
-      Day: idxOf("Day"),
-      Location: idxOf("Session Location"),
-      Coords: idxOf("Spot Coordinates"),
-      Farmers: idxOf("Total Farmers"),
-      WheatFarmers: idxOf("Total Wheat Farmers"),
-      Acres: idxOf("Total Wheat Acres"),
-      Awareness: idxOf("Awareness Rate"),
-      DefiniteRate: idxOf("Definite Use Rate"),
-      WillDefinitelyUse: idxOf("Will Definitely Use"),
-      Understanding: idxOf("Average Understanding Score"),
-      Influencers: idxOf("No. of Key Influencers (Names Highlighted)"),
-      TopUse: idxOf("Top Reason to Use (session)"),
-      TopNot: idxOf("Top Reason Not to Use (session)"),
-      Competitors: idxOf("Competitor Brands Mentioned (Key Influencers)")
+    // Expect two pairs: (reason,count) for USE and (reason,count) for NOT USE.
+    const useReasonCol = idxReason[0] ?? 1;
+    const useCountCol  = idxCount[0] ?? 3;
+    const notReasonCol = idxReason[1] ?? 4;
+    const notCountCol  = idxCount[1] ?? 7;
+
+    for (let r = hdrR + 1; r < Math.min(rows.length, hdrR + 18); r++) {
+      const row = rows[r] || [];
+      // Stop if next section starts
+      const rowText = row.map(v => (typeof v === 'string' ? v : '')).join(' ');
+      if (/key influencers/i.test(rowText) || /^5\./.test(rowText.trim())) break;
+
+      const ur = normalizeStr(row[useReasonCol]);
+      const uc = row[useCountCol];
+      const nr = normalizeStr(row[notReasonCol]);
+      const nc = row[notCountCol];
+
+      if (ur) {
+        const c = (typeof uc === 'number' && isFinite(uc)) ? uc : Number(String(uc || '').replace(/,/g, ''));
+        if (isFinite(c) && c > 0 && c < 5000) out.use.push({ reason: ur, count: c });
+      }
+      if (nr) {
+        const c = (typeof nc === 'number' && isFinite(nc)) ? nc : Number(String(nc || '').replace(/,/g, ''));
+        if (isFinite(c) && c > 0 && c < 5000) out.notUse.push({ reason: nr, count: c });
+      }
+    }
+
+    return out;
+  }
+
+  function extractSessionSummary(rows) {
+    // Locate row with "Village / Mauza" and read next row
+    const hdrR = findRowIndex(rows, (cell) => typeof cell === 'string' && /village\s*\/\s*mauza/i.test(cell), 20);
+    if (hdrR < 0) return null;
+    const dataRow = rows[hdrR + 1] || [];
+    const village = normalizeStr(dataRow[1]);
+    const city = normalizeStr(dataRow[2]);
+    const host = normalizeStr(dataRow[3]);
+    const contact = normalizeStr(dataRow[4]);
+    const spotType = normalizeStr(dataRow[5]);
+    const dealer = normalizeStr(dataRow[6]);
+    const dealerContact = normalizeStr(dataRow[7]);
+    const coord = normalizeStr(dataRow[8]);
+
+    return { village, city, host, contact, spotType, dealer, dealerContact, coord };
+  }
+
+  function parseSessionSheet(sheetName, rows) {
+    const m = sheetName.match(/^D(\d+)S(\d+)$/i);
+    const day = m ? Number(m[1]) : null;
+    const sessionNo = m ? Number(m[2]) : null;
+
+    const summary = extractSessionSummary(rows);
+    if (!summary) return null;
+
+    const totalFarmers = clampNonNeg(findValueAfterLabel(rows, /total farmers present/i));
+    const wheatFarmers = clampNonNeg(findValueAfterLabel(rows, /total wheat farmers/i));
+    const acres = clampNonNeg(findValueAfterLabel(rows, /total wheat acres represented/i));
+    const know = clampNonNeg(findValueAfterLabel(rows, /already know buctril/i));
+    const usedLastYear = clampNonNeg(findValueAfterLabel(rows, /used buctril.*last year/i));
+    const definite = clampNonNeg(findValueAfterLabel(rows, /will definitely use/i));
+    const maybe = clampNonNeg(findValueAfterLabel(rows, /maybe.*will think/i));
+    const estAcres = clampNonNeg(findValueAfterLabel(rows, /estimated acres to be sprayed/i));
+    const clarity = extractMessageClarity(rows);
+
+    const reasons = extractReasons(rows);
+
+    const hasSignal = summary.city || summary.village || totalFarmers || acres || definite || maybe;
+    if (!hasSignal) return null;
+
+    const safeTotal = totalFarmers || (definite + maybe);
+    const other = Math.max(0, safeTotal - definite - maybe);
+
+    return {
+      sheet: sheetName,
+      day,
+      sessionNo,
+      ...summary,
+      totalFarmers,
+      wheatFarmers,
+      acres,
+      know,
+      usedLastYear,
+      definite,
+      maybe,
+      other,
+      estAcres,
+      clarity,
+      reasonsUse: reasons.use,
+      reasonsNotUse: reasons.notUse
     };
+  }
 
-    var out = [];
-    var cur = { sn:"", fromCity:"", city:"", date:"", day:"" };
+  async function loadSessionsFromWorkbook() {
+    setStatus('Loading workbook…');
+    const buf = await fetchFirstOk(FILE_XLSX_CANDIDATES, 'arrayBuffer');
+    const wb = XLSX.read(buf, { type: 'array' });
 
-    for(var r=hIdx+1; r<rows.length; r++){
-      var row = rows[r];
-      if(!row || rowEmpty(row)) continue;
+    const sheetNames = wb.SheetNames || [];
+    const dSheets = sheetNames.filter(n => /^D\d+S\d+$/i.test(n));
 
-      var sn = safeText(row[I.SN]).trim();
-      var fromCity = safeText(row[I.FromCity]).trim();
-      var city = safeText(row[I.City]).trim();
-      var date = safeText(row[I.Date]).trim();
-      var day = safeText(row[I.Day]).trim();
-
-      if(sn){
-        cur.sn = sn;
-        if(fromCity) cur.fromCity = fromCity;
-        if(city) cur.city = city;
-        if(date) cur.date = date;
-        if(day) cur.day = day;
-      } else {
-        // forward fill
-        sn = cur.sn;
-        fromCity = fromCity || cur.fromCity;
-        city = city || cur.city;
-        date = date || cur.date;
-        day = day || cur.day;
-      }
-
-      var location = safeText(row[I.Location]).trim();
-      var coordsRaw = safeText(row[I.Coords]).trim();
-
-      // ignore Multan (explicit requirement)
-      if(norm(city) === "multan") continue;
-
-      // minimal signal check
-      var farmers = toNumber(row[I.Farmers]) || toNumber(row[I.WheatFarmers]);
-      var acres = toNumber(row[I.Acres]);
-      var awareness = toPercent(row[I.Awareness]);
-      var definite = toPercent(row[I.DefiniteRate]);
-      var understanding = toPercent(row[I.Understanding]);
-      var influencers = toNumber(row[I.Influencers]);
-
-      if(!location && !coordsRaw && farmers===0 && acres===0 && awareness===null && definite===null && understanding===null){
-        continue;
-      }
-
-      // derive definite if missing
-      if(definite === null){
-        var wd = toNumber(row[I.WillDefinitelyUse]);
-        if(wd > 0 && farmers > 0) definite = (wd / farmers) * 100;
-      }
-
-      if(location === "") location = "(Unlabeled spot)";
-
-      // normalize date: keep as ISO if parseable
-      var dateISO = "";
-      try{
-        var d = new Date(date);
-        if(!isNaN(d.getTime())) dateISO = d.toISOString().slice(0,10);
-      }catch(e){}
-
-      out.push({
-        sn: sn,
-        fromCity: fromCity,
-        city: city,
-        date: dateISO || date,
-        day: day,
-        spot: location,
-        coordsRaw: coordsRaw,
-        coords: parseDMSPair(coordsRaw),
-        farmers: farmers,
-        acres: acres,
-        awareness: awareness,
-        definite: definite,
-        understanding: understanding,
-        influencers: influencers,
-        topUse: safeText(row[I.TopUse]).trim(),
-        topNot: safeText(row[I.TopNot]).trim(),
-        competitors: safeText(row[I.Competitors]).trim()
-      });
+    const sessions = [];
+    for (const name of dSheets) {
+      const rows = sheetToRows(wb, name);
+      const s = parseSessionSheet(name, rows);
+      if (s) sessions.push(s);
     }
 
-    return out;
+    // Campaign days from max day number in sheet names
+    const maxDay = sessions.reduce((mx, s) => (s.day ? Math.max(mx, s.day) : mx), 0);
+    $('campaignDays').textContent = `Campaign Days: ${maxDay || '—'}`;
+
+    return sessions;
   }
 
-  function fetchXlsx(){
-    var url = baseUrl() + "Buctril_Super_Activations.xlsx";
-    return fetch(url).then(function(res){
-      if(!res.ok) throw new Error("XLSX not found at: " + url);
-      return res.arrayBuffer();
-    }).then(function(buf){
-      var wb = XLSX.read(buf, { type:"array" });
-      return readSumSheet(wb);
-    });
-  }
+  // ---------- Filtering ----------
 
-  // --------------------------
-  // Filters
-  // --------------------------
-  function setSelectOptions(selectEl, values, placeholder){
-    var cur = selectEl.value;
-    selectEl.innerHTML = "";
-    var opt0 = document.createElement("option");
-    opt0.value = "";
-    opt0.textContent = placeholder || "All";
-    selectEl.appendChild(opt0);
+  function applyFilters() {
+    const city = state.selectedCity;
+    const spot = state.selectedSpot;
+    const q = lower(state.query);
 
-    values.forEach(function(v){
-      var o = document.createElement("option");
-      o.value = v;
-      o.textContent = v;
-      selectEl.appendChild(o);
-    });
-
-    // preserve selection if possible
-    if(cur && values.indexOf(cur) >= 0) selectEl.value = cur;
-  }
-
-  function uniq(arr){
-    var m = Object.create(null);
-    var out = [];
-    arr.forEach(function(v){
-      v = safeText(v).trim();
-      if(!v) return;
-      var k = v.toLowerCase();
-      if(m[k]) return;
-      m[k] = true;
-      out.push(v);
-    });
-    return out;
-  }
-
-  function rebuildFilterOptions(){
-    var citySel = $("filter-city");
-    var spotSel = $("filter-spot");
-
-    var cities = uniq(ALL.map(function(r){ return r.city; }))
-      .sort(function(a,b){ return a.localeCompare(b); });
-
-    setSelectOptions(citySel, cities, "All Cities");
-
-    var base = ALL;
-    var city = citySel.value || state.city;
-    if(city) base = base.filter(function(r){ return r.city === city; });
-
-    var spots = uniq(base.map(function(r){ return r.spot; }))
-      .sort(function(a,b){ return a.localeCompare(b); });
-
-    setSelectOptions(spotSel, spots, "All Spots");
-  }
-
-  function applyFilters(){
-    var city = $("filter-city").value || "";
-    var spot = $("filter-spot").value || "";
-    var q = $("filter-search").value || "";
-
-    state.city = city;
-    state.spot = spot;
-    state.q = q;
-
-    FILTERED = ALL.filter(function(r){
-      if(city && r.city !== city) return false;
-      if(spot && r.spot !== spot) return false;
-
-      if(q){
-        var s = (r.city + " " + r.spot + " " + r.topUse + " " + r.topNot + " " + r.competitors).toLowerCase();
-        if(s.indexOf(q.toLowerCase()) < 0) return false;
+    const filtered = state.sessions.filter(s => {
+      if (city && lower(s.city) !== lower(city)) return false;
+      if (spot && lower(s.village) !== lower(spot)) return false;
+      if (q) {
+        const hay = `${s.city} ${s.village} ${s.host} ${s.dealer} ${s.spotType}`.toLowerCase();
+        if (!hay.includes(q)) return false;
       }
       return true;
     });
 
-    // keep spot options aligned to selected city
-    rebuildFilterOptions();
-
-    renderAll();
+    state.filtered = filtered;
   }
 
-  function clearFilters(){
-    $("filter-city").value = "";
-    $("filter-spot").value = "";
-    $("filter-search").value = "";
-    state.city = state.spot = state.q = "";
-    rebuildFilterOptions();
-    applyFilters();
+  function uniqueSorted(arr) {
+    return [...new Set(arr.filter(Boolean).map(s => s.trim()))].sort((a,b) => a.localeCompare(b));
   }
 
-  // --------------------------
-  // Aggregations
-  // --------------------------
-  function sum(arr, fn){
-    var t = 0;
-    for(var i=0;i<arr.length;i++) t += (fn(arr[i])||0);
-    return t;
+  function refreshFiltersUI() {
+    const citySel = $('citySel');
+    const spotSel = $('spotSel');
+
+    const cities = uniqueSorted(state.sessions.map(s => s.city).filter(Boolean));
+    citySel.innerHTML = `<option value="">All Cities</option>` + cities.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    citySel.value = state.selectedCity || '';
+
+    const spotSource = state.selectedCity
+      ? state.sessions.filter(s => lower(s.city) === lower(state.selectedCity))
+      : state.sessions;
+
+    const spots = uniqueSorted(spotSource.map(s => s.village).filter(Boolean));
+    spotSel.innerHTML = `<option value="">All Spots</option>` + spots.map(sp => `<option value="${escapeHtml(sp)}">${escapeHtml(sp)}</option>`).join('');
+    spotSel.value = state.selectedSpot || '';
   }
 
-  function avg(arr, fn){
-    var vals = [];
-    for(var i=0;i<arr.length;i++){
-      var v = fn(arr[i]);
-      if(v === null || v === undefined) continue;
-      if(!Number.isFinite(v)) continue;
-      vals.push(v);
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+  }
+
+  // ---------- Aggregations ----------
+
+  function sum(arr, fn) { return arr.reduce((a, x) => a + (fn(x) || 0), 0); }
+
+  function groupBy(arr, keyFn) {
+    const m = new Map();
+    for (const x of arr) {
+      const k = keyFn(x);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(x);
     }
-    if(!vals.length) return null;
-    return vals.reduce(function(a,b){ return a+b; },0) / vals.length;
-  }
-
-  function groupBy(arr, keyFn){
-    var m = Object.create(null);
-    arr.forEach(function(r){
-      var k = keyFn(r);
-      if(!k) k = "(Unknown)";
-      if(!m[k]) m[k] = [];
-      m[k].push(r);
-    });
     return m;
   }
 
-  // --------------------------
-  // Charts helpers
-  // --------------------------
-  function destroyChart(c){
-    try{ if(c) c.destroy(); }catch(e){}
+  function computeKpis(rows) {
+    const sessions = rows.length;
+    const farmers = sum(rows, r => r.totalFarmers);
+    const acres = sum(rows, r => r.acres);
+    const cities = new Set(rows.map(r => normalizeStr(r.city)).filter(Boolean)).size;
+
+    const definite = sum(rows, r => r.definite);
+    const maybe = sum(rows, r => r.maybe);
+    const other = Math.max(0, farmers - definite - maybe);
+
+    // Clarity: average of session clarity averages
+    const clarityVals = rows.map(r => r.clarity).filter(v => typeof v === 'number' && isFinite(v));
+    const clarityAvg = clarityVals.length ? (clarityVals.reduce((a,b)=>a+b,0) / clarityVals.length) : null;
+
+    return { sessions, farmers, acres, cities, definite, maybe, other, clarityAvg };
   }
 
-  function ensureGaugeDonut(canvasId, color){
-    var ctx = document.getElementById(canvasId).getContext("2d");
-    return new Chart(ctx, {
-      type: "doughnut",
+  function aggReasons(rows, kind) {
+    // kind = 'reasonsUse' | 'reasonsNotUse'
+    const m = new Map();
+    for (const s of rows) {
+      const list = s[kind] || [];
+      for (const it of list) {
+        const key = normalizeStr(it.reason);
+        const val = Number(it.count);
+        if (!key || !isFinite(val)) continue;
+        m.set(key, (m.get(key) || 0) + val);
+      }
+    }
+    // sort desc
+    const out = [...m.entries()].map(([reason,count]) => ({reason, count}))
+      .sort((a,b) => b.count - a.count)
+      .slice(0, 12);
+    return out;
+  }
+
+  // ---------- Charts ----------
+
+  function destroyChart(ch) { try { ch && ch.destroy(); } catch(e) {} }
+
+  function render() {
+    applyFilters();
+
+    refreshFiltersUI();
+    const rows = state.filtered;
+
+    // Status
+    const missingCity = rows.filter(r => !normalizeStr(r.city)).length;
+    const missingSpot = rows.filter(r => !normalizeStr(r.village)).length;
+    setStatus(`Loaded ${state.sessions.length} session sheets. Filtered: ${rows.length}. Missing city: ${missingCity}. Missing spot: ${missingSpot}.`);
+
+    // KPIs
+    const k = computeKpis(rows);
+    $('kSessions').textContent = fmtInt(k.sessions);
+    $('kFarmers').textContent = fmtInt(k.farmers);
+    $('kAcres').textContent = fmtInt(k.acres);
+    $('kCities').textContent = fmtInt(k.cities);
+    $('kSessionsS').textContent = state.selectedCity ? `City: ${state.selectedCity}` : 'All cities';
+    $('kFarmersS').textContent = k.clarityAvg ? `Avg clarity: ${k.clarityAvg.toFixed(2)} / 3` : 'Avg clarity: —';
+    $('kAcresS').textContent = 'Wheat acres represented';
+    $('kCitiesS').textContent = state.selectedSpot ? `Spot: ${state.selectedSpot}` : 'Unique cities in filter';
+
+    // Donut outer (cities by farmers)
+    const cityGroups = groupBy(rows.filter(r => normalizeStr(r.city)), r => normalizeStr(r.city));
+    const cityLabels = [...cityGroups.keys()].sort((a,b)=>a.localeCompare(b));
+    const cityValues = cityLabels.map(c => sum(cityGroups.get(c), s => s.totalFarmers));
+
+    const cityColors = makePalette(cityLabels.length, { sat: 72, light: 56 });
+
+    destroyChart(charts.donutOuter);
+    charts.donutOuter = new Chart($('donutOuter'), {
+      type: 'doughnut',
       data: {
-        labels: ["Value","Remainder"],
+        labels: cityLabels,
         datasets: [{
-          data: [0, 100],
-          backgroundColor: [color, "#e6e6e6"],
-          borderWidth: 0,
-          hoverOffset: 2
+          data: cityValues,
+          backgroundColor: cityColors,
+          borderColor: 'rgba(255,255,255,.20)',
+          borderWidth: 1,
+          hoverOffset: 6
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: "72%",
-        plugins: { legend: { display:false }, tooltip: { enabled:false } }
+        cutout: '60%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.label}: ${fmtInt(ctx.raw)} farmers`
+            }
+          }
+        },
+        onClick: (evt, els) => {
+          if (!els || !els.length) return;
+          const idx = els[0].index;
+          const city = cityLabels[idx];
+          state.selectedCity = city;
+          state.selectedSpot = '';
+          $('citySel').value = city;
+          $('spotSel').value = '';
+          render();
+        }
       }
     });
-  }
 
-  function setGauge(chart, pct){
-    var v = Number(pct);
-    if(!Number.isFinite(v)) v = 0;
-    v = Math.max(0, Math.min(100, v));
-    chart.data.datasets[0].data = [v, 100-v];
-    chart.update();
-  }
+    // Donut inner (spots within selected city)
+    const spotBase = state.selectedCity
+      ? rows.filter(r => lower(r.city) === lower(state.selectedCity))
+      : rows;
 
-  function ensureBar(canvasId, title){
-    var ctx = document.getElementById(canvasId).getContext("2d");
-    return new Chart(ctx, {
-      type: "bar",
-      data: { labels: [], datasets: [{ label: title, data: [] }] },
+    const spotGroups = groupBy(spotBase.filter(r => normalizeStr(r.village)), r => normalizeStr(r.village));
+    let spotLabels = [...spotGroups.keys()].sort((a,b)=>a.localeCompare(b));
+    // Keep inner donut readable: top 12 spots
+    spotLabels = spotLabels.slice(0, 12);
+    const spotValues = spotLabels.map(sp => sum(spotGroups.get(sp), s => s.totalFarmers));
+    const spotColors = makePalette(spotLabels.length, { sat: 55, light: 48 });
+
+    const donutHint = $('donutHint');
+    if (donutHint) {
+      donutHint.textContent = state.selectedCity
+        ? `Showing spots for city: ${state.selectedCity}. Click “Clear filter” to return.`
+        : `No city selected. Inner donut shows top spots overall.`;
+    }
+
+    destroyChart(charts.donutInner);
+    charts.donutInner = new Chart($('donutInner'), {
+      type: 'doughnut',
+      data: {
+        labels: spotLabels,
+        datasets: [{
+          data: spotValues,
+          backgroundColor: spotColors,
+          borderColor: 'rgba(255,255,255,.18)',
+          borderWidth: 1,
+          hoverOffset: 4
+        }]
+      },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display:false } },
+        cutout: '55%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: (ctx) => `${ctx.label}: ${fmtInt(ctx.raw)} farmers` }
+          }
+        },
+        onClick: (evt, els) => {
+          if (!els || !els.length) return;
+          const idx = els[0].index;
+          const spot = spotLabels[idx];
+          state.selectedSpot = spot;
+          $('spotSel').value = spot;
+          render();
+        }
+      }
+    });
+
+    // Intent donut (Definite / Maybe / Other)
+    destroyChart(charts.donutIntent);
+    const intentLabels = ['Definite', 'Maybe', 'Other'];
+    const intentValues = [k.definite, k.maybe, k.other];
+    charts.donutIntent = new Chart($('donutIntent'), {
+      type: 'doughnut',
+      data: {
+        labels: intentLabels,
+        datasets: [{
+          data: intentValues,
+          backgroundColor: ['rgba(43,182,115,.95)', 'rgba(43,182,115,.55)', 'rgba(255,255,255,.22)'],
+          borderColor: 'rgba(255,255,255,.18)',
+          borderWidth: 1,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: 'rgba(234,242,255,.85)', boxWidth: 14 } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${fmtInt(ctx.raw)}` } }
+        }
+      }
+    });
+
+    // Bar charts (reasons)
+    const use = aggReasons(rows, 'reasonsUse');
+    const notUse = aggReasons(rows, 'reasonsNotUse');
+
+    destroyChart(charts.barUse);
+    charts.barUse = new Chart($('barUse'), {
+      type: 'bar',
+      data: {
+        labels: use.map(x => x.reason),
+        datasets: [{
+          label: 'Count',
+          data: use.map(x => x.count),
+          backgroundColor: 'rgba(43,182,115,.55)',
+          borderColor: 'rgba(43,182,115,.95)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `Count: ${fmtInt(ctx.raw)}` } }
+        },
         scales: {
-          x: { ticks: { maxRotation: 0, autoSkip: true } },
-          y: { beginAtZero: true }
+          x: { ticks: { color: 'rgba(234,242,255,.75)', maxRotation: 20, minRotation: 20 }, grid: { color: 'rgba(255,255,255,.06)' } },
+          y: { ticks: { color: 'rgba(234,242,255,.75)' }, grid: { color: 'rgba(255,255,255,.06)' } }
+        }
+      }
+    });
+
+    destroyChart(charts.barNotUse);
+    charts.barNotUse = new Chart($('barNotUse'), {
+      type: 'bar',
+      data: {
+        labels: notUse.map(x => x.reason),
+        datasets: [{
+          label: 'Count',
+          data: notUse.map(x => x.count),
+          backgroundColor: 'rgba(43,182,115,.35)',
+          borderColor: 'rgba(43,182,115,.95)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `Count: ${fmtInt(ctx.raw)}` } }
+        },
+        scales: {
+          x: { ticks: { color: 'rgba(234,242,255,.75)', maxRotation: 20, minRotation: 20 }, grid: { color: 'rgba(255,255,255,.06)' } },
+          y: { ticks: { color: 'rgba(234,242,255,.75)' }, grid: { color: 'rgba(255,255,255,.06)' } }
         }
       }
     });
   }
 
-  // --------------------------
-  // Render
-  // --------------------------
-  function setProgress(id, pct){
-    var el = $(id);
-    if(!el) return;
-    var v = Number(pct);
-    if(!Number.isFinite(v)) v = 0;
-    v = Math.max(0, Math.min(100, v));
-    el.style.width = v + "%";
+  // ---------- Media ----------
+
+  function mediaCandidates(src) {
+    const s = normalizeStr(src);
+    if (!s) return [];
+    const out = new Set();
+
+    const add = (x) => { if (x) out.add(x); };
+
+    add(s);
+
+    // Common extension fixes
+    if (s.toLowerCase().endsWith('.jpeg')) add(s.slice(0, -5) + '.jpg');
+    if (s.toLowerCase().endsWith('.jpg')) add(s.slice(0, -4) + '.jpeg');
+
+    // If path is assets/gallery/... also try root path
+    if (s.startsWith('assets/gallery/')) add(s.replace(/^assets\/gallery\//, ''));
+    if (s.startsWith('./')) add(s.replace(/^\.\//, ''));
+
+    // Try case variations for assets folder
+    add(s.replace(/Assets\//, 'assets/'));
+
+    return [...out];
   }
 
-  function renderSnapshot(){
-    var sessions = FILTERED.length;
-    var farmers = sum(FILTERED, function(r){ return r.farmers; });
-    var acres = sum(FILTERED, function(r){ return r.acres; });
-
-    var cities = uniq(FILTERED.map(function(r){ return r.city; })).length;
-
-    $("metric-sessions").textContent = formatInt(sessions);
-    $("metric-farmers").textContent = formatInt(farmers);
-    $("metric-acres").textContent = formatInt(acres);
-    $("metric-cities").textContent = formatInt(cities);
+  function mountMissing(el, original) {
+    const box = document.createElement('div');
+    box.className = 'missing';
+    box.textContent = `Missing file: ${original}`;
+    el.replaceWith(box);
   }
 
-  function renderHero(){
-    var sessions = ALL.length;
-    var farmers = sum(ALL, function(r){ return r.farmers; });
-    var days = uniq(ALL.map(function(r){ return r.date; })).filter(Boolean).length;
-
-    $("hero-sessions").textContent = formatInt(sessions);
-    $("hero-farmers").textContent = formatInt(farmers);
-    $("metric-days").textContent = days ? formatInt(days) : "–";
+  function attachFallbackMedia(el, candidates, original) {
+    let i = 0;
+    const tryNext = () => {
+      i++;
+      if (i >= candidates.length) return mountMissing(el, original);
+      el.src = absUrl(candidates[i]);
+    };
+    el.addEventListener('error', tryNext, { once: false });
+    el.src = absUrl(candidates[0]);
   }
 
-  function renderPerformance(){
-    var a = avg(FILTERED, function(r){ return r.awareness; });
-    var d = avg(FILTERED, function(r){ return r.definite; });
-    var u = avg(FILTERED, function(r){ return r.understanding; });
-    var inf = sum(FILTERED, function(r){ return r.influencers; });
+  async function loadMedia() {
+    const grid = $('mediaGrid');
+    if (!grid) return;
 
-    $("metric-awareness").textContent = a===null ? "–" : formatPct(a);
-    $("metric-definite").textContent = d===null ? "–" : formatPct(d);
-    $("metric-understanding").textContent = u===null ? "–" : formatPct(u);
-    $("metric-influencers").textContent = formatInt(inf);
-
-    setProgress("awareness-progress", a||0);
-    setProgress("definite-progress", d||0);
-    setProgress("understanding-progress", u||0);
-    setProgress("influencers-progress", Math.min(100, FILTERED.length ? (inf / (FILTERED.length*5))*100 : 0));
-
-    $("awareness-main").textContent = a===null ? "–" : formatPct(a);
-    $("definite-main").textContent = d===null ? "–" : formatPct(d);
-
-    if(charts.awarenessDonut) setGauge(charts.awarenessDonut, a||0);
-    if(charts.definiteDonut) setGauge(charts.definiteDonut, d||0);
-
-    // Adoption estimate
-    var est = sum(FILTERED, function(r){
-      var pct = (r.definite===null ? 0 : r.definite) / 100;
-      return r.farmers * clamp01(pct);
-    });
-    $("adoption-text").textContent = "Estimated definite-use farmers: " + formatInt(est);
-  }
-
-  function renderDrillDonut(){
-    var cityGroups = groupBy(FILTERED, function(r){ return r.city; });
-    var cityLabels = Object.keys(cityGroups).sort(function(a,b){
-      return cityGroups[b].length - cityGroups[a].length;
-    });
-    var cityCounts = cityLabels.map(function(c){ return cityGroups[c].length; });
-    var cityColors = cityLabels.map(function(c){ return colorForKey(c); });
-
-    // Spots depend on selected city if any (prefer state.city from dropdown)
-    var base = FILTERED;
-    var selectedCity = $("filter-city").value || "";
-    if(selectedCity){
-      base = base.filter(function(r){ return r.city === selectedCity; });
+    let media = [];
+    try {
+      media = await fetchFirstOk(MEDIA_JSON_CANDIDATES, 'json');
+    } catch (e) {
+      grid.innerHTML = `<div class="missing" style="grid-column:1/-1">media.json not found. Add media.json (or assets/gallery/media.json) to enable gallery.</div>`;
+      return;
     }
 
-    var spotGroups = groupBy(base, function(r){ return r.spot; });
-    var spotLabels = Object.keys(spotGroups).sort(function(a,b){
-      return spotGroups[b].length - spotGroups[a].length;
-    }).slice(0, 12); // keep donut readable
-    var spotCounts = spotLabels.map(function(s){ return spotGroups[s].length; });
-
-    var baseColor = selectedCity ? colorForKey(selectedCity) : "#2e7d32";
-    var spotColors = spotLabels.map(function(_,i){
-      return lighten(baseColor, Math.min(0.7, 0.12 + i*0.05));
-    });
-
-    $("drill-main").textContent = formatInt(FILTERED.length);
-    $("drill-sub").textContent = selectedCity ? ("Spots in " + selectedCity) : "Cities (outer) → Spots (inner)";
-
-    if(!charts.drillDonut){
-      var ctx = document.getElementById("drillDonut").getContext("2d");
-      charts.drillDonut = new Chart(ctx, {
-        type: "doughnut",
-        data: {
-          labels: [], // per-dataset
-          datasets: [
-            {
-              label: "Spots",
-              data: [],
-              backgroundColor: [],
-              borderWidth: 0,
-              hoverOffset: 4
-            },
-            {
-              label: "Cities",
-              data: [],
-              backgroundColor: [],
-              borderWidth: 0,
-              hoverOffset: 4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: "45%",
-          plugins: {
-            legend: { position: "bottom" }
-          },
-          onClick: function(evt){
-            var points = charts.drillDonut.getElementsAtEventForMode(evt, "nearest", { intersect:true }, true);
-            if(!points || !points.length) return;
-            var p = points[0];
-            var ds = p.datasetIndex;
-            var idx = p.index;
-
-            if(ds === 1){
-              // City ring (outer)
-              var city = cityLabels[idx];
-              $("filter-city").value = city;
-              $("filter-spot").value = "";
-              $("filter-search").value = $("filter-search").value || "";
-              applyFilters();
-            } else if(ds === 0){
-              // Spot ring (inner)
-              var spot = spotLabels[idx];
-              $("filter-spot").value = spot;
-              applyFilters();
-            }
-          }
-        }
-      });
+    if (!Array.isArray(media) || !media.length) {
+      grid.innerHTML = `<div class="missing" style="grid-column:1/-1">media.json loaded but empty.</div>`;
+      return;
     }
 
-    charts.drillDonut.data.datasets[1].data = cityCounts;
-    charts.drillDonut.data.datasets[1].backgroundColor = cityColors;
-    charts.drillDonut.data.datasets[1].labels = cityLabels;
+    grid.innerHTML = '';
+    const maxItems = Math.min(media.length, 24); // keep page light
+    for (let idx = 0; idx < maxItems; idx++) {
+      const it = media[idx] || {};
+      const type = normalizeStr(it.type).toLowerCase();
+      const src = normalizeStr(it.src);
+      const title = normalizeStr(it.alt || it.caption || `Media ${idx + 1}`);
+      const caption = normalizeStr(it.caption || '');
 
-    charts.drillDonut.data.datasets[0].data = spotCounts;
-    charts.drillDonut.data.datasets[0].backgroundColor = spotColors;
-    charts.drillDonut.data.datasets[0].labels = spotLabels;
+      const card = document.createElement('div');
+      card.className = 'mcard';
 
-    // Chart.js legend uses overall labels; we keep it clean by setting labels to cities only.
-    charts.drillDonut.data.labels = cityLabels;
+      const head = document.createElement('div');
+      head.className = 'mhead';
+      head.textContent = title;
 
-    charts.drillDonut.update();
-  }
+      const foot = document.createElement('div');
+      foot.className = 'mfoot';
+      foot.textContent = caption || src || '';
 
-  function renderPivots(){
-    var g = groupBy(FILTERED, function(r){ return r.city; });
-    var labels = Object.keys(g).sort(function(a,b){ return g[b].length - g[a].length; });
+      const body = document.createElement('div');
+      body.className = 'mbody';
 
-    // sessions
-    var sessionsByCity = labels.map(function(c){ return g[c].length; });
+      card.appendChild(head);
+      card.appendChild(body);
+      card.appendChild(foot);
 
-    // farmers
-    var farmersByCity = labels.map(function(c){
-      return sum(g[c], function(r){ return r.farmers; });
-    });
+      const candidates = mediaCandidates(src);
+      if (!candidates.length) {
+        const miss = document.createElement('div');
+        miss.className = 'missing';
+        miss.textContent = 'Missing src in media.json';
+        body.appendChild(miss);
+        grid.appendChild(card);
+        continue;
+      }
 
-    // acres
-    var acresByCity = labels.map(function(c){
-      return sum(g[c], function(r){ return r.acres; });
-    });
+      if (type === 'video') {
+        const v = document.createElement('video');
+        v.controls = true;
+        v.preload = 'metadata';
+        v.playsInline = true;
+        v.muted = true;
+        attachFallbackMedia(v, candidates, src);
+        body.appendChild(v);
+      } else {
+        const img = document.createElement('img');
+        img.alt = title;
+        img.loading = 'lazy';
+        attachFallbackMedia(img, candidates, src);
+        body.appendChild(img);
+      }
 
-    // rates: show two datasets (awareness & definite) as grouped bar
-    var awarenessByCity = labels.map(function(c){ return avg(g[c], function(r){ return r.awareness; }) || 0; });
-    var definiteByCity = labels.map(function(c){ return avg(g[c], function(r){ return r.definite; }) || 0; });
-
-    if(!charts.pivotSessionsByCity) charts.pivotSessionsByCity = ensureBar("pivotSessionsByCity", "Sessions by City");
-    if(!charts.pivotFarmersByCity) charts.pivotFarmersByCity = ensureBar("pivotFarmersByCity", "Farmers by City");
-    if(!charts.pivotAcresByCity) charts.pivotAcresByCity = ensureBar("pivotAcresByCity", "Acres by City");
-
-    // Sessions by city
-    charts.pivotSessionsByCity.data.labels = labels;
-    charts.pivotSessionsByCity.data.datasets[0].data = sessionsByCity;
-    charts.pivotSessionsByCity.data.datasets[0].backgroundColor = labels.map(colorForKey);
-    charts.pivotSessionsByCity.update();
-
-    // Farmers by city
-    charts.pivotFarmersByCity.data.labels = labels;
-    charts.pivotFarmersByCity.data.datasets[0].data = farmersByCity;
-    charts.pivotFarmersByCity.data.datasets[0].backgroundColor = labels.map(colorForKey);
-    charts.pivotFarmersByCity.update();
-
-    // Acres by city
-    charts.pivotAcresByCity.data.labels = labels;
-    charts.pivotAcresByCity.data.datasets[0].data = acresByCity;
-    charts.pivotAcresByCity.data.datasets[0].backgroundColor = labels.map(colorForKey);
-    charts.pivotAcresByCity.update();
-
-    // Rates grouped
-    if(!charts.pivotRatesByCity){
-      var ctx = document.getElementById("pivotRatesByCity").getContext("2d");
-      charts.pivotRatesByCity = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: [],
-          datasets: [
-            { label: "Awareness %", data: [] },
-            { label: "Definite %", data: [] }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero:true, max:100 } }
-        }
-      });
+      grid.appendChild(card);
     }
-    charts.pivotRatesByCity.data.labels = labels;
-    charts.pivotRatesByCity.data.datasets[0].data = awarenessByCity;
-    charts.pivotRatesByCity.data.datasets[1].data = definiteByCity;
-    charts.pivotRatesByCity.update();
 
-    // data quality
-    var withCoords = FILTERED.filter(function(r){ return r.coords && Number.isFinite(r.coords.lat) && Number.isFinite(r.coords.lng); }).length;
-    $("data-quality").textContent = "Data quality: " + formatInt(FILTERED.length) + " sessions parsed; " + formatInt(withCoords) + " have coordinates.";
-  }
-
-  // --------------------------
-  // Map
-  // --------------------------
-  function initMap(){
-    if(map) return;
-    map = L.map("route-map", { scrollWheelZoom:false });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
-    mapLayer = L.layerGroup().addTo(map);
-    map.setView([28.0, 69.5], 7);
-  }
-
-  function renderMap(){
-    initMap();
-    mapLayer.clearLayers();
-
-    var pts = [];
-    FILTERED.forEach(function(r){
-      if(!r.coords) return;
-      var lat = r.coords.lat, lng = r.coords.lng;
-      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-      pts.push([lat,lng]);
-
-      var popup = "<strong>" + (r.city||"") + "</strong><br/>" +
-                  safeText(r.spot).replace(/</g,"&lt;") + "<br/>" +
-                  "<span style='color:#666;font-weight:700'>" + safeText(r.date) + "</span><br/>" +
-                  "Farmers: " + formatInt(r.farmers) + " &nbsp; Acres: " + formatInt(r.acres);
-
-      L.circleMarker([lat,lng], {
-        radius: 6,
-        color: colorForKey(r.city),
-        weight: 2,
-        fillColor: colorForKey(r.city),
-        fillOpacity: 0.85
-      }).bindPopup(popup).addTo(mapLayer);
-    });
-
-    if(pts.length >= 2){
-      L.polyline(pts, { color:"#1b5e20", weight:3, opacity:0.7 }).addTo(mapLayer);
-      try{
-        map.fitBounds(pts, { padding:[18,18] });
-      }catch(e){}
-    } else if(pts.length === 1){
-      map.setView(pts[0], 11);
+    if (media.length > maxItems) {
+      const more = document.createElement('div');
+      more.className = 'missing';
+      more.style.gridColumn = '1/-1';
+      more.textContent = `Showing first ${maxItems} items (of ${media.length}).`;
+      grid.appendChild(more);
     }
   }
 
-  // --------------------------
-  // Media gallery
-  // --------------------------
-  function groupIdFromSrc(src){
-    var name = safeText(src).split("/").pop() || "";
-    name = name.split("?")[0];
-    var base = name.replace(/\.[^.]+$/,""); // remove extension
-    var m = base.match(/^(\d+)/);
-    return m ? m[1] : "misc";
+  // ---------- Background + Logos ----------
+
+  function attachFallbackSrc(imgEl, candidates) {
+    let i = 0;
+    const tryNext = () => {
+      i++;
+      if (i >= candidates.length) return;
+      imgEl.src = absUrl(candidates[i]);
+    };
+    imgEl.addEventListener('error', tryNext);
+    imgEl.src = absUrl(candidates[0]);
   }
 
-  function safeFetchJson(url){
-    return fetch(url).then(function(res){
-      if(!res.ok) throw new Error("Not found: " + url);
-      return res.json();
-    });
+  function initLogos() {
+    const b = $('logoBayer');
+    const bu = $('logoBuctril');
+    const inx = $('logoInteract');
+    if (b) attachFallbackSrc(b, LOGO_CANDIDATES.bayer);
+    if (bu) attachFallbackSrc(bu, LOGO_CANDIDATES.buctril);
+    if (inx) attachFallbackSrc(inx, LOGO_CANDIDATES.interact);
   }
 
-  function buildMediaTile(item){
-    var tile = document.createElement("div");
-    tile.className = "tile";
+  function initBackgroundVideo() {
+    const v = $('bgVideo');
+    if (!v) return;
 
-    var thumb = document.createElement("div");
-    thumb.className = "thumb";
-
-    var badge = document.createElement("div");
-    badge.className = "badge";
-    badge.textContent = item.type === "video" ? "VIDEO" : "PHOTO";
-
-    if(item.type === "video"){
-      var img = document.createElement("img");
-      img.alt = safeText(item.alt) || "Video";
-      img.src = "Buctril.jpg"; // placeholder thumb
-      thumb.appendChild(img);
-
-      var vid = document.createElement("video");
-      vid.src = item.src;
-      vid.muted = true;
-      vid.loop = true;
-      vid.playsInline = true;
-      vid.preload = "metadata";
-      thumb.appendChild(vid);
-    } else {
-      var im = document.createElement("img");
-      im.alt = safeText(item.alt) || "Image";
-      im.src = item.src;
-      thumb.appendChild(im);
-    }
-
-    thumb.appendChild(badge);
-
-    var cap = document.createElement("div");
-    cap.className = "cap";
-    cap.innerHTML = '<div class="t">' + (safeText(item.caption)||"") + '</div>' +
-                    '<div class="s">' + (safeText(item.transcript)||"") + '</div>';
-
-    tile.appendChild(thumb);
-    tile.appendChild(cap);
-
-    tile.addEventListener("click", function(){
-      openLightbox(item);
-    });
-
-    return tile;
-  }
-
-  function openLightbox(item){
-    var lb = $("lightbox");
-    var img = $("lb-img");
-    var vid = $("lb-video");
-    lb.classList.add("active");
-
-    img.style.display = "none";
-    vid.style.display = "none";
-
-    if(item.type === "video"){
-      vid.src = item.src;
-      vid.style.display = "block";
-      vid.play().catch(function(){});
-    } else {
-      img.src = item.src;
-      img.style.display = "block";
-    }
-  }
-
-  function closeLightbox(){
-    var lb = $("lightbox");
-    var vid = $("lb-video");
-    lb.classList.remove("active");
-    try{ vid.pause(); }catch(e){}
-    vid.removeAttribute("src");
-    vid.load();
-  }
-
-  function renderMedia(){
-    var container = $("media-gallery");
-    if(!container) return;
-    container.innerHTML = "";
-
-    var url = baseUrl() + "media.json";
-    safeFetchJson(url).then(function(items){
-      if(!Array.isArray(items) || !items.length){
-        container.innerHTML = '<div class="muted" style="font-weight:900">No media items found in media.json.</div>';
+    let i = 0;
+    const tryNext = () => {
+      i++;
+      if (i >= BG_VIDEO_CANDIDATES.length) {
+        v.removeAttribute('src');
+        v.style.display = 'none';
         return;
       }
-
-      // Fix common extension issue: if src endswith .jpeg but actual is .jpg, replace.
-      items.forEach(function(it){
-        if(it && typeof it.src === "string"){
-          it.src = it.src.replace(/\.jpeg(\?|$)/i, ".jpg$1");
-        }
-      });
-
-      var groups = groupBy(items, function(it){ return groupIdFromSrc(it.src); });
-      var keys = Object.keys(groups).sort(function(a,b){
-        var na = Number(a), nb = Number(b);
-        if(Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-        return a.localeCompare(b);
-      });
-
-      keys.forEach(function(k){
-        var block = document.createElement("div");
-        block.className = "sessionBlock";
-        block.style.marginBottom = "12px";
-
-        var head = document.createElement("div");
-        head.className = "sessionHead";
-        head.innerHTML = '<div><strong>Media Group ' + k + '</strong></div>' +
-                         '<div class="sessionMeta">' + groups[k].length + ' items</div>';
-
-        var reel = document.createElement("div");
-        reel.className = "reel";
-        groups[k].forEach(function(item){
-          reel.appendChild(buildMediaTile(item));
-        });
-
-        block.appendChild(head);
-        block.appendChild(reel);
-        container.appendChild(block);
-      });
-    }).catch(function(){
-      container.innerHTML = '<div class="muted" style="font-weight:900">media.json not found (or invalid JSON). Place it in repo root.</div>';
-    });
-  }
-
-  // --------------------------
-  // Logos + background video resilience
-  // --------------------------
-  function tryAltFilenames(imgEl, candidates){
-    var i = 0;
-    function next(){
-      if(i >= candidates.length) return;
-      imgEl.src = candidates[i++];
-    }
-    imgEl.onerror = next;
-    next();
-  }
-
-  function fixHeaderAssets(){
-    tryAltFilenames($("logoBayer"), ["Bayer.jpg", "bayer.jpg", "BAYER.jpg"]);
-    tryAltFilenames($("logoBuctril"), ["Buctril.jpg", "buctril.jpg", "BUCTRIL.jpg"]);
-    tryAltFilenames($("logoInteract"), ["Interact.gif", "interact.gif", "INTERACT.gif"]);
-
-    var v = $("bgVideo");
-    if(!v) return;
-    // Show the video only if it loads.
-    v.onloadeddata = function(){ v.style.display = "block"; };
-    v.onerror = function(){
-      // Hide if missing.
-      v.style.display = "none";
+      v.src = absUrl(BG_VIDEO_CANDIDATES[i]);
+      v.load();
+      v.play().catch(() => {});
     };
+
+    v.addEventListener('error', tryNext);
+    v.src = absUrl(BG_VIDEO_CANDIDATES[i]);
+    v.load();
+    v.play().catch(() => {});
   }
 
-  // --------------------------
-  // Render orchestration
-  // --------------------------
-  function renderAll(){
-    renderSnapshot();
-    renderPerformance();
-    renderDrillDonut();
-    renderPivots();
-    renderMap();
-  }
+  // ---------- Events ----------
 
-  function initCharts(){
-    destroyChart(charts.awarenessDonut);
-    destroyChart(charts.definiteDonut);
-
-    charts.awarenessDonut = ensureGaugeDonut("awarenessDonut", "#2e7d32");
-    charts.definiteDonut = ensureGaugeDonut("definiteDonut", "#ff7043");
-  }
-
-  function initUI(){
-    fixHeaderAssets();
-
-    $("filter-city").addEventListener("change", function(){
-      // reset spot when city changes
-      $("filter-spot").value = "";
-      applyFilters();
+  function bindEvents() {
+    $('citySel').addEventListener('change', (e) => {
+      state.selectedCity = e.target.value || '';
+      state.selectedSpot = '';
+      $('spotSel').value = '';
+      render();
     });
-    $("filter-spot").addEventListener("change", applyFilters);
-    $("filter-search").addEventListener("input", function(){
-      // debounce-ish
-      window.clearTimeout(initUI._t);
-      initUI._t = window.setTimeout(applyFilters, 150);
+    $('spotSel').addEventListener('change', (e) => {
+      state.selectedSpot = e.target.value || '';
+      render();
     });
-    $("btn-clear").addEventListener("click", clearFilters);
-
-    $("lb-close").addEventListener("click", closeLightbox);
-    $("lightbox").addEventListener("click", function(e){
-      if(e.target && e.target.id === "lightbox") closeLightbox();
+    $('q').addEventListener('input', (e) => {
+      state.query = e.target.value || '';
+      render();
     });
-    document.addEventListener("keydown", function(e){
-      if(e.key === "Escape") closeLightbox();
-    });
-
-    initCharts();
-    rebuildFilterOptions();
-    applyFilters();
-    renderMedia();
-  }
-
-  // --------------------------
-  // Boot
-  // --------------------------
-  function boot(){
-    setDiagnostics("", false);
-
-    fetchXlsx().then(function(rows){
-      ALL = rows;
-      FILTERED = rows.slice();
-      renderHero();
-
-      $("loading").style.display = "none";
-      initUI();
-    }).catch(function(err){
-      $("loading").style.display = "none";
-      showError("Error loading XLSX data: " + safeText(err && err.message ? err.message : err));
-      setDiagnostics(
-        "Could not load <code>Buctril_Super_Activations.xlsx</code> or parse the <code>SUM</code> sheet. " +
-        "Confirm the XLSX is in repo root and the GitHub Pages URL ends with a trailing slash.",
-        true
-      );
+    $('btnClear').addEventListener('click', () => {
+      state.selectedCity = '';
+      state.selectedSpot = '';
+      state.query = '';
+      $('citySel').value = '';
+      $('spotSel').value = '';
+      $('q').value = '';
+      render();
     });
   }
 
-  boot();
+  // ---------- Boot ----------
+
+  async function boot() {
+    initLogos();
+    initBackgroundVideo();
+    bindEvents();
+
+    try {
+      const sessions = await loadSessionsFromWorkbook();
+      state.sessions = sessions;
+
+      // Initial UI selections
+      state.selectedCity = '';
+      state.selectedSpot = '';
+      state.query = '';
+
+      // Default: exclude fully-empty city rows from city filter options, but keep them in dataset for KPIs if needed.
+      state.filtered = [...sessions];
+
+      // Build UI + charts
+      render();
+      loadMedia();
+    } catch (e) {
+      console.error(e);
+      setStatus(`Error: ${e.message}. Ensure Buctril_Super_Activations.xlsx is in repo root and GitHub Pages is serving it.`);
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', boot);
 })();

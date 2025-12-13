@@ -1,297 +1,376 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Buctril Super Farmer Education Drive – Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Buctril Super Farmer Education Drive</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- SheetJS (XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
 
-  <!-- Green theme extracted from your earlier dashboard -->
   <style>
     :root{
-      --bg:#f5f5f5;
-      --card:#fff;
-      --p:#1b5e20;     /* primary green */
-      --s:#ff7043;     /* secondary orange */
-      --muted:#6f6f6f;
-      --r:14px;
-      --sh:0 8px 18px rgba(0,0,0,.08);
-      --sh2:0 1px 5px rgba(0,0,0,.08);
+      --bg0:#061326;
+      --bg1:#071a2e;
+      --card:rgba(255,255,255,.06);
+      --card2:rgba(255,255,255,.08);
+      --stroke:rgba(255,255,255,.10);
+      --text:#eaf2ff;
+      --muted:rgba(234,242,255,.70);
+      --green:#2bb673;
+      --green2:#19a463;
+      --shadow: 0 16px 50px rgba(0,0,0,.35);
+      --r:18px;
     }
+
     *{box-sizing:border-box}
-    body{margin:0;font-family:Roboto,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#222;line-height:1.5}
-    .container{max-width:1360px;margin:18px auto;padding:0 14px}
-
-    .hero{
-      position:relative;border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);
-      background:linear-gradient(135deg,#e8f5e9 0%,#a5d6a7 100%);min-height:190px;margin-bottom:16px
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 20% 0%, rgba(43,182,115,.18), transparent 60%),
+        radial-gradient(900px 600px at 90% 10%, rgba(43,182,115,.12), transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
+      overflow-x:hidden;
     }
-    .hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.14;display:none}
-    .hero-inner{position:relative;padding:20px}
-    h1{margin:0;color:var(--p);font-size:26px;font-weight:900}
-    h2{margin:0;color:var(--p);font-size:18px;font-weight:900}
-    .sub{margin-top:6px;color:var(--muted);font-weight:700}
-    .kpis{display:flex;gap:26px;flex-wrap:wrap;margin-top:14px}
-    .kpi{font-size:34px;font-weight:900;color:var(--s)}
-    .kpi small{display:block;font-size:12px;font-weight:900;color:var(--p);letter-spacing:.06em;margin-top:-4px}
-    .tags{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
-    .tag{background:rgba(27,94,32,.08);color:var(--p);padding:4px 10px;border-radius:999px;font-weight:900;font-size:12px}
-    .muted{color:var(--muted)}
 
-    .brandRow{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
-    .brandRow img{height:34px;max-width:160px;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(0,0,0,.08))}
-    .brandRow img.badgeGif{height:34px}
-    .brandRow .spacer{width:8px}
-    .brandRow .mini{font-weight:1000;color:var(--muted);white-space:nowrap}
+    /* Background video */
+    .bgwrap{
+      position:fixed; inset:0; z-index:-2; overflow:hidden;
+      background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55));
+    }
+    #bgVideo{
+      position:absolute; inset:-10%;
+      width:120%; height:120%;
+      object-fit:cover;
+      filter: blur(0px);
+      opacity:.20;
+      transform: scale(1.05);
+    }
+    .bgshade{position:absolute; inset:0; background:linear-gradient(180deg, rgba(6,19,38,.35), rgba(6,19,38,.92)); z-index:1}
 
-    .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:18px;overflow:hidden}
-    .card + .card{margin-top:16px}
-    .header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eee}
-    .pill{background:var(--p);color:#fff;border-radius:999px;padding:8px 12px;font-size:14px}
+    .container{max-width:1200px; margin:0 auto; padding:22px 18px 44px}
+    .hero{
+      position:relative;
+      padding:18px 18px 16px;
+      border-radius:24px;
+      background: linear-gradient(135deg, rgba(43,182,115,.22), rgba(43,182,115,.08));
+      border:1px solid rgba(43,182,115,.22);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .hero:before{
+      content:"";
+      position:absolute; inset:-1px;
+      background: radial-gradient(800px 260px at 20% 0%, rgba(43,182,115,.35), transparent 70%);
+      pointer-events:none;
+    }
+    .toprow{display:flex; align-items:center; justify-content:space-between; gap:14px; position:relative}
+    .brand{display:flex; align-items:center; gap:12px}
+    .logos{display:flex; align-items:center; gap:10px}
+    .logos img{height:32px; width:auto; object-fit:contain; filter: drop-shadow(0 8px 12px rgba(0,0,0,.22))}
+    .title{font-weight:800; letter-spacing:.2px; font-size:28px; margin:6px 0 0}
+    .subtitle{margin:2px 0 0; color:var(--muted); font-weight:600}
+    .campDays{
+      color:rgba(234,242,255,.86);
+      font-weight:700;
+      padding:10px 12px;
+      border-radius:14px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.10);
+      min-width: 190px;
+      text-align:right;
+    }
+    .chips{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; position:relative}
+    .chip{
+      display:inline-flex; gap:8px; align-items:center;
+      padding:8px 10px;
+      border-radius:999px;
+      background:rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.10);
+      color:rgba(234,242,255,.86);
+      font-weight:700;
+      font-size:13px;
+    }
+    .chip .dot{width:8px; height:8px; border-radius:999px; background:var(--green)}
+    .chip button{
+      appearance:none; border:none; background:transparent; color:inherit; font-weight:800; cursor:pointer
+    }
 
-    .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    label{font-weight:900;color:var(--p);font-size:13px}
-    select,input[type="text"]{padding:9px 10px;border:1px solid #ccc;border-radius:12px;font-size:14px;min-width:170px;background:#fff}
-    .btn{border:none;border-radius:12px;padding:9px 12px;font-weight:900;cursor:pointer;background:#eef5ee;color:var(--p)}
-    .btn:hover{filter:brightness(.98)}
+    .section{
+      margin-top:18px;
+      padding:16px;
+      border-radius:22px;
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.05);
+      box-shadow: var(--shadow);
+    }
 
-    .snap{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-    .snapcard{border:1px solid #e6e6e6;border-radius:14px;padding:12px;background:#fafafa;text-align:center}
-    .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:900}
-    .val{font-size:22px;font-weight:1000;color:var(--p);margin-top:3px}
-    .bar{height:7px;background:#e6e6e6;border-radius:999px;overflow:hidden;margin-top:8px}
-    .bar>div{height:100%;width:0%;background:#66bb6a;transition:width .35s ease}
+    .secTitle{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px}
+    .secTitle h2{margin:0; font-size:18px; letter-spacing:.2px}
+    .secTitle p{margin:0; color:var(--muted); font-weight:600}
 
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-    .c4{grid-column:span 4}
-    .c6{grid-column:span 6}
-    .c12{grid-column:span 12}
-    @media (max-width:980px){.c4,.c6{grid-column:span 12}}
+    .filters{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1.4fr;
+      gap:12px;
+    }
+    .fgroup{display:flex; flex-direction:column; gap:6px}
+    label{color:rgba(234,242,255,.80); font-weight:800; font-size:12px; letter-spacing:.35px; text-transform:uppercase}
+    select,input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.22);
+      color:var(--text);
+      outline:none;
+    }
+    input::placeholder{color:rgba(234,242,255,.45)}
+    .row{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:12px;
+      margin-top:12px;
+    }
+    .kpi{
+      padding:14px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+    }
+    .kpi .k{color:rgba(234,242,255,.70); font-weight:900; font-size:12px; letter-spacing:.35px; text-transform:uppercase}
+    .kpi .v{font-size:26px; font-weight:900; margin-top:6px}
+    .kpi .s{color:rgba(234,242,255,.70); font-weight:700; margin-top:4px; font-size:12px}
 
-    .donutBox{position:relative;height:310px}
-    .donutCenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
-    .donutCenter .big{font-size:32px;font-weight:1000;color:var(--p);line-height:1}
-    .donutCenter .small{font-size:12px;font-weight:1000;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;text-align:center;padding:0 10px}
-    .hint{margin-top:10px;color:var(--muted);font-weight:800}
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .card{
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      padding:14px;
+      overflow:hidden;
+    }
+    .card h3{margin:0 0 8px; font-size:14px; color:rgba(234,242,255,.90); letter-spacing:.2px}
+    .hint{color:var(--muted); font-weight:650; font-size:13px; margin-top:8px}
+    .canvasWrap{height:340px}
+    canvas{width:100% !important; height:100% !important}
 
-    .chartBox{height:320px}
-    #route-map{height:420px;border-radius:14px}
+    .insightsGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
 
-    .diag{border:1px dashed #ff9800;background:#fff7e6;border-radius:14px;padding:12px;font-weight:900;color:#8a4b00}
-    .diag code{font-weight:1000}
+    .mediaGrid{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:12px;
+    }
+    .mcard{
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      overflow:hidden;
+      position:relative;
+      min-height:165px;
+    }
+    .mhead{
+      position:absolute; inset:0 0 auto 0;
+      padding:10px 10px 8px;
+      background: linear-gradient(180deg, rgba(0,0,0,.55), transparent);
+      font-weight:900; letter-spacing:.2px;
+      font-size:14px;
+      z-index:2;
+    }
+    .mfoot{
+      position:absolute; inset:auto 0 0 0;
+      padding:8px 10px;
+      background: linear-gradient(0deg, rgba(0,0,0,.65), transparent);
+      color:rgba(234,242,255,.85);
+      font-weight:750;
+      font-size:12px;
+      z-index:2;
+    }
+    .mbody{position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
+    .mcard img,.mcard video{
+      width:100%; height:100%; object-fit:cover; display:block;
+      filter:saturate(1.05);
+    }
+    .missing{
+      width:100%; height:100%;
+      display:flex; align-items:center; justify-content:center;
+      text-align:center;
+      padding:10px;
+      color:rgba(234,242,255,.65);
+      font-weight:800;
+      font-size:12px;
+      background: linear-gradient(135deg, rgba(43,182,115,.10), rgba(255,255,255,.02));
+    }
 
-    .sessionBlock{border:1px solid #eee;border-radius:14px;padding:12px;background:#fff;box-shadow:var(--sh2)}
-    .sessionHead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-    .sessionHead strong{color:var(--p)}
-    .sessionMeta{color:var(--muted);font-weight:900;font-size:12px}
-    .reel{display:flex;gap:10px;overflow:auto;padding-bottom:6px}
-    .tile{flex:0 0 220px;border-radius:12px;overflow:hidden;box-shadow:var(--sh2);background:#fff;cursor:pointer;transition:transform .12s ease}
-    .tile:hover{transform:translateY(-2px)}
-    .thumb{position:relative;width:100%;padding-top:56.25%;background:#f0f0f0}
-    .thumb img,.thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-    .thumb video{display:none}
-    .tile:hover video{display:block}
-    .tile:hover img{display:none}
-    .badge{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:1000}
-    .cap{padding:10px}
-    .cap .t{font-weight:1000;color:var(--p);font-size:13px}
-    .cap .s{color:var(--muted);font-size:12px;margin-top:2px;font-weight:900}
+    .statusLine{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      color:rgba(234,242,255,.80);
+      font-weight:750;
+      font-size:13px;
+    }
 
-    #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(6px)}
-    #lightbox.active{display:flex}
-    .lbInner{position:relative;max-width:92vw;max-height:92vh}
-    #lb-img,#lb-video{max-width:92vw;max-height:92vh;display:none}
-    #lb-close{position:absolute;top:-46px;right:0;color:#fff;font-size:30px;cursor:pointer;opacity:.9}
-    #lb-close:hover{opacity:1}
-
-    #loading{padding:22px;text-align:center;font-weight:1000;color:var(--p)}
-    .error-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff0f0;border:2px solid #ff3b30;
-      padding:16px;border-radius:12px;box-shadow:var(--sh);z-index:10000;max-width:640px}
-    .error-modal p{margin:0 0 10px 0;color:#b00020;font-weight:1000}
-    .error-modal button{background:#ff3b30;color:#fff;border:none;border-radius:12px;padding:8px 12px;font-weight:1000;cursor:pointer}
+    @media(max-width:1100px){
+      .mediaGrid{grid-template-columns: repeat(3, 1fr);}
+    }
+    @media(max-width:900px){
+      .row{grid-template-columns: 1fr 1fr;}
+      .grid2{grid-template-columns:1fr}
+      .insightsGrid{grid-template-columns:1fr}
+      .filters{grid-template-columns:1fr}
+      .mediaGrid{grid-template-columns: repeat(2, 1fr);}
+      .campDays{min-width:auto; text-align:left}
+      .toprow{flex-direction:column; align-items:flex-start}
+    }
+    @media(max-width:520px){
+      .mediaGrid{grid-template-columns: 1fr;}
+    }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <div id="loading">Loading data…</div>
-
-    <header class="hero">
-      <video id="bgVideo" autoplay muted loop playsinline preload="metadata">
-        <source src="assets/bg.mp4" type="video/mp4" />
-      </video>
-
-      <div class="hero-inner">
-        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end">
-          <div>
-            <h1>Buctril Super Farmer Education Drive</h1>
-            <div class="sub">Donut navigation (Cities → Spots) + Pivot charts + Session story media</div>
-          </div>
-
-          <div class="brandRow">
-            <img id="logoBayer" src="Bayer.jpg" alt="Bayer" />
-            <img id="logoBuctril" src="Buctril.jpg" alt="Buctril" />
-            <img id="logoInteract" class="badgeGif" src="Interact.gif" alt="Interact" />
-            <div class="spacer"></div>
-            <div class="mini">Campaign Days: <span id="metric-days">–</span></div>
-          </div>
-        </div>
-
-        <div class="kpis">
-          <div class="kpi"><span id="hero-farmers">–</span><small>FARMERS ENGAGED</small></div>
-          <div class="kpi"><span id="hero-sessions">–</span><small>SESSIONS CONDUCTED</small></div>
-        </div>
-
-        <div class="tags">
-          <span class="tag">Outer donut = Cities (multi-color)</span>
-          <span class="tag">Inner donut = Spots (drilldown)</span>
-          <span class="tag">Click segment to filter</span>
-          <span class="tag">Multan excluded</span>
-        </div>
-      </div>
-    </header>
-
-    <section class="card">
-      <div class="header">
-        <div class="pill"><i class="fas fa-filter"></i></div>
-        <h2>Filters</h2>
-      </div>
-      <div class="filters">
-        <label for="filter-city"><i class="fas fa-city"></i> City:</label>
-        <select id="filter-city"><option value="">All Cities</option></select>
-
-        <label for="filter-spot"><i class="fas fa-location-dot"></i> Spot:</label>
-        <select id="filter-spot"><option value="">All Spots</option></select>
-
-        <label for="filter-search"><i class="fas fa-search"></i> Search:</label>
-        <input id="filter-search" type="text" placeholder="Search city, spot, notes…" />
-
-        <button class="btn" id="btn-clear"><i class="fas fa-eraser"></i> Clear</button>
-      </div>
-
-      <div id="diagnostics" style="margin-top:12px;display:none" class="diag"></div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-chart-simple"></i></div><h2>Snapshot (Filtered)</h2></div>
-      <div class="snap">
-        <div class="snapcard"><div class="lbl">Sessions</div><div class="val" id="metric-sessions">–</div></div>
-        <div class="snapcard"><div class="lbl">Farmers</div><div class="val" id="metric-farmers">–</div></div>
-        <div class="snapcard"><div class="lbl">Acres Covered</div><div class="val" id="metric-acres">–</div></div>
-        <div class="snapcard"><div class="lbl">Cities Visited</div><div class="val" id="metric-cities">–</div></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-gauge-high"></i></div><h2>Performance + Donut Navigation (Filtered)</h2></div>
-
-      <div class="snap">
-        <div class="snapcard">
-          <div class="lbl">Avg Awareness</div><div class="val" id="metric-awareness">–</div>
-          <div class="bar"><div id="awareness-progress"></div></div>
-        </div>
-        <div class="snapcard">
-          <div class="lbl">Avg Definite Use</div><div class="val" id="metric-definite">–</div>
-          <div class="bar"><div id="definite-progress" style="background:#ff7043"></div></div>
-        </div>
-        <div class="snapcard">
-          <div class="lbl">Avg Understanding (Clarity)</div><div class="val" id="metric-understanding">–</div>
-          <div class="bar"><div id="understanding-progress"></div></div>
-        </div>
-        <div class="snapcard">
-          <div class="lbl">Influencers</div><div class="val" id="metric-influencers">–</div>
-          <div class="bar"><div id="influencers-progress"></div></div>
-        </div>
-      </div>
-
-      <div class="grid" style="margin-top:16px">
-        <div class="c4">
-          <div class="donutBox">
-            <canvas id="awarenessDonut"></canvas>
-            <div class="donutCenter">
-              <div class="big" id="awareness-main">–</div>
-              <div class="small">Avg awareness</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="c4">
-          <div class="donutBox">
-            <canvas id="definiteDonut"></canvas>
-            <div class="donutCenter">
-              <div class="big" id="definite-main">–</div>
-              <div class="small">Avg definite</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="c4">
-          <div class="donutBox">
-            <canvas id="drillDonut"></canvas>
-            <div class="donutCenter">
-              <div class="big" id="drill-main">–</div>
-              <div class="small" id="drill-sub">Cities (outer) → Spots (inner)</div>
-            </div>
-          </div>
-          <div class="hint">Click outer ring to filter City, click inner ring to filter Spot.</div>
-        </div>
-      </div>
-
-      <div class="muted" style="font-weight:1000;margin-top:10px" id="adoption-text">Estimated definite-use farmers: –</div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-chart-column"></i></div><h2>Pivots (Filtered)</h2></div>
-
-      <div class="grid">
-        <div class="c6">
-          <div class="chartBox"><canvas id="pivotSessionsByCity"></canvas></div>
-        </div>
-        <div class="c6">
-          <div class="chartBox"><canvas id="pivotFarmersByCity"></canvas></div>
-        </div>
-        <div class="c6">
-          <div class="chartBox"><canvas id="pivotAcresByCity"></canvas></div>
-        </div>
-        <div class="c6">
-          <div class="chartBox"><canvas id="pivotRatesByCity"></canvas></div>
-        </div>
-      </div>
-
-      <div class="muted" style="font-weight:900;margin-top:8px" id="data-quality">Data quality: –</div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-map-marked-alt"></i></div><h2>Route Map (Filtered)</h2></div>
-      <div id="route-map"></div>
-      <div class="muted" style="font-weight:900;margin-top:8px">Markers come from “Spot Coordinates” in the SUM sheet. Rows without coordinates are ignored.</div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-camera"></i></div><h2>Session Story (Media)</h2></div>
-      <div class="muted" style="font-weight:1000;margin-bottom:10px">
-        Media is loaded from <code>media.json</code>. Missing files are ignored.
-      </div>
-      <div id="media-gallery"></div>
-    </section>
+  <div class="bgwrap" aria-hidden="true">
+    <video id="bgVideo" autoplay muted loop playsinline></video>
+    <div class="bgshade"></div>
   </div>
 
-  <div id="lightbox">
-    <div class="lbInner">
-      <div id="lb-close"><i class="fas fa-times-circle"></i></div>
-      <img id="lb-img" alt="Media" />
-      <video id="lb-video" controls autoplay loop playsinline></video>
+  <div class="container">
+    <div class="hero">
+      <div class="toprow">
+        <div class="brand">
+          <div class="logos" aria-label="Logos">
+            <img id="logoBayer" alt="Bayer" />
+            <img id="logoBuctril" alt="Buctril" />
+            <img id="logoInteract" alt="Interact" />
+          </div>
+          <div>
+            <div class="title">Buctril Super Farmer Education Drive</div>
+            <div class="subtitle">Donut navigation (Cities → Spots) + Pivot insights + Session story media</div>
+          </div>
+        </div>
+        <div class="campDays" id="campaignDays">Campaign Days: —</div>
+      </div>
+
+      <div class="chips">
+        <div class="chip"><span class="dot"></span>Outer donut = Cities (multi-color)</div>
+        <div class="chip"><span class="dot"></span>Inner donut = Spots (drilldown)</div>
+        <div class="chip"><span class="dot"></span>Click a city segment to filter</div>
+        <div class="chip"><button id="btnClear">Clear filter</button></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="secTitle">
+        <h2>Filters</h2>
+        <p>Filter charts + KPIs by City/Spot or search</p>
+      </div>
+
+      <div class="filters">
+        <div class="fgroup">
+          <label for="citySel">City</label>
+          <select id="citySel"><option value="">All Cities</option></select>
+        </div>
+        <div class="fgroup">
+          <label for="spotSel">Spot</label>
+          <select id="spotSel"><option value="">All Spots</option></select>
+        </div>
+        <div class="fgroup">
+          <label for="q">Search</label>
+          <input id="q" placeholder="Search city, spot, host, dealer..." />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <div class="kpi">
+          <div class="k">Sessions</div>
+          <div class="v" id="kSessions">—</div>
+          <div class="s" id="kSessionsS">—</div>
+        </div>
+        <div class="kpi">
+          <div class="k">Farmers engaged</div>
+          <div class="v" id="kFarmers">—</div>
+          <div class="s" id="kFarmersS">—</div>
+        </div>
+        <div class="kpi">
+          <div class="k">Acres covered</div>
+          <div class="v" id="kAcres">—</div>
+          <div class="s" id="kAcresS">—</div>
+        </div>
+        <div class="kpi">
+          <div class="k">Cities visited</div>
+          <div class="v" id="kCities">—</div>
+          <div class="s" id="kCitiesS">—</div>
+        </div>
+      </div>
+
+      <div class="statusLine" id="statusLine">Loading workbook…</div>
+    </div>
+
+    <div class="section">
+      <div class="secTitle">
+        <h2>Performance + Donut Navigation</h2>
+        <p>City ring (outer) → Spot ring (inner)</p>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>Donut drilldown (Farmers engaged)</h3>
+          <div class="canvasWrap" style="position:relative;height:340px;"><canvas id="donutOuter" style="position:absolute;inset:0;"></canvas><canvas id="donutInner" style="position:absolute;inset:18% 18%;"></canvas></div>
+          <div class="hint" id="donutHint">Tip: click a city segment to drill into its spots.</div>
+        </div>
+
+        <div class="card">
+          <h3>Intent mix (Definite / Maybe / Not interested)</h3>
+          <div class="canvasWrap"><canvas id="donutIntent"></canvas></div>
+          <div class="hint">Derived from “Buctril Awareness &amp; Intent” in each session sheet.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="secTitle">
+        <h2>Pivot insights</h2>
+        <p>Frequency-based (avoids wrong totals / phone-number sums)</p>
+      </div>
+
+      <div class="insightsGrid">
+        <div class="card">
+          <h3>Top reasons to USE (count across sessions)</h3>
+          <div class="canvasWrap"><canvas id="barUse"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Top reasons to NOT USE (count across sessions)</h3>
+          <div class="canvasWrap"><canvas id="barNotUse"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="secTitle">
+        <h2>Session story media</h2>
+        <p>Loaded from media.json (or assets/gallery/media.json). Missing files will show a placeholder.</p>
+      </div>
+      <div class="mediaGrid" id="mediaGrid"></div>
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.3/dist/xlsx.full.min.js"></script>
-
-  <script src="data_processor.js?v=green_theme_donuts_pivots_v2"></script>
+  <script src="data_processor.js"></script>
 </body>
 </html>
