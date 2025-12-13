@@ -2,282 +2,732 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Buctril Super Farmer Education Drive – Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Buctril Super – Activations Dashboard</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     :root{
-      --bg:#f5f5f5;
-      --card:#fff;
-      --p:#1b5e20;
-      --s:#ff7043;
-      --muted:#6f6f6f;
-      --r:14px;
-      --sh:0 8px 18px rgba(0,0,0,.08);
-      --sh2:0 1px 5px rgba(0,0,0,.08);
+      --bg:#0b1020;
+      --card:#111a33;
+      --muted:#aab4d4;
+      --text:#eaf0ff;
+      --accent:#5dd6ff;
+      --accent2:#ffb86b;
+      --good:#56f1a6;
+      --warn:#ffd166;
+      --bad:#ff5d73;
+      --ring: rgba(93,214,255,.28);
+      --shadow: 0 14px 50px rgba(0,0,0,.35);
+      --radius: 18px;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Roboto,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#222;line-height:1.5}
-    .container{max-width:1360px;margin:18px auto;padding:0 14px}
-    .hero{
-      position:relative;border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);
-      background:linear-gradient(135deg,#e8f5e9 0%,#a5d6a7 100%);min-height:170px;margin-bottom:16px
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 700px at 20% 10%, rgba(93,214,255,.14), transparent 60%),
+                  radial-gradient(1000px 650px at 80% 0%, rgba(255,184,107,.12), transparent 55%),
+                  var(--bg);
+      color:var(--text);
     }
-    .hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.14}
-    .hero-inner{position:relative;padding:20px}
-    h1{margin:0;color:var(--p);font-size:26px;font-weight:900}
-    h2{margin:0;color:var(--p);font-size:18px;font-weight:900}
-    .sub{margin-top:6px;color:var(--muted);font-weight:700}
-    .kpis{display:flex;gap:26px;flex-wrap:wrap;margin-top:14px}
-    .kpi{font-size:34px;font-weight:900;color:var(--s)}
-    .kpi small{display:block;font-size:12px;font-weight:900;color:var(--p);letter-spacing:.06em;margin-top:-4px}
-    .tags{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
-    .tag{background:rgba(27,94,32,.08);color:var(--p);padding:4px 10px;border-radius:999px;font-weight:900;font-size:12px}
+
+    a{color:inherit}
+    .container{max-width:1180px; margin:0 auto; padding:18px 14px 40px}
+
+    /* Hero */
+    .hero{
+      position:relative;
+      border-radius: 24px;
+      overflow:hidden;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(17,26,51,.55);
+    }
+    .heroMedia{
+      position:absolute; inset:0;
+      overflow:hidden;
+      background:#0a0f1e;
+    }
+    .heroMedia video{
+      width:100%; height:100%;
+      object-fit: cover;
+      transform: scale(1.05);
+      filter: saturate(1.05) contrast(1.05);
+      opacity:.35;
+    }
+    .heroOverlay{
+      position:absolute; inset:0;
+      background: linear-gradient(180deg, rgba(11,16,32,.25), rgba(11,16,32,.88));
+    }
+    .heroInner{
+      position:relative;
+      padding: 22px 18px 20px;
+    }
+    .titleRow{
+      display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
+    }
+    .hTitle{
+      display:flex; flex-direction:column; gap:6px;
+    }
+    h1{
+      font-size: 22px;
+      line-height: 1.1;
+      margin:0;
+      letter-spacing:.2px;
+    }
+    .sub{
+      margin:0;
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 70ch;
+    }
+    .pills{
+      display:flex; gap:10px; flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.10);
+      color: var(--muted);
+      font-size: 12px;
+      white-space:nowrap;
+    }
+    .dot{
+      width:8px; height:8px; border-radius:50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 6px rgba(93,214,255,.14);
+    }
+
+    /* Layout grid */
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .card{
+      background: rgba(17,26,51,.70);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .cardHeader{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .cardHeader h2{
+      font-size: 14px;
+      margin:0;
+      letter-spacing:.2px;
+    }
+    .cardHeader .small{
+      font-size:12px; color: var(--muted);
+    }
+    .cardBody{padding: 12px 14px 14px}
     .muted{color:var(--muted)}
-    .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:18px;overflow:hidden}
-    .card + .card{margin-top:16px}
-    .header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eee}
-    .pill{background:var(--p);color:#fff;border-radius:999px;padding:8px 12px;font-size:14px}
-    .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    label{font-weight:900;color:var(--p);font-size:13px}
-    select,input[type="text"]{padding:9px 10px;border:1px solid #ccc;border-radius:12px;font-size:14px;min-width:170px;background:#fff}
-    .btn{border:none;border-radius:12px;padding:9px 12px;font-weight:900;cursor:pointer;background:#eef5ee;color:var(--p)}
-    .btn:hover{filter:brightness(.98)}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-    .c4{grid-column:span 4}
-    .c5{grid-column:span 5}
-    .c7{grid-column:span 7}
-    .c6{grid-column:span 6}
-    .c8{grid-column:span 8}
-    .c12{grid-column:span 12}
-    @media (max-width:980px){.c4,.c5,.c6,.c7,.c8{grid-column:span 12}}
 
-    .snap{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-    .snapcard{border:1px solid #e6e6e6;border-radius:14px;padding:12px;background:#fafafa;text-align:center}
-    .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:900}
-    .val{font-size:22px;font-weight:1000;color:var(--p);margin-top:3px}
-    .bar{height:7px;background:#e6e6e6;border-radius:999px;overflow:hidden;margin-top:8px}
-    .bar>div{height:100%;width:0%;background:#66bb6a;transition:width .35s ease}
-    .stars{font-size:12px;color:#ffc107;margin-top:4px;font-weight:900}
+    /* Column spans */
+    .c12{grid-column: span 12}
+    .c8{grid-column: span 8}
+    .c7{grid-column: span 7}
+    .c6{grid-column: span 6}
+    .c5{grid-column: span 5}
+    .c4{grid-column: span 4}
 
-    .donutBox{position:relative;height:310px}
-    .donutCenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
-    .donutCenter .big{font-size:32px;font-weight:1000;color:var(--p);line-height:1}
-    .donutCenter .small{font-size:12px;font-weight:1000;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;text-align:center;padding:0 10px}
-    .hint{margin-top:10px;color:var(--muted);font-weight:800}
+    /* KPIs */
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .kpi{
+      padding: 12px 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      position:relative;
+      overflow:hidden;
+    }
+    .kpi::after{
+      content:"";
+      position:absolute; inset:auto -40px -40px auto;
+      width:140px; height:140px;
+      background: radial-gradient(circle at 30% 30%, rgba(93,214,255,.24), transparent 60%);
+      transform: rotate(10deg);
+      pointer-events:none;
+    }
+    .kpi .label{font-size:12px; color:var(--muted); margin:0 0 6px}
+    .kpi .value{font-size:22px; font-weight:700; margin:0}
+    .kpi .hint{font-size:11px; color:var(--muted); margin-top:6px}
 
-    #route-map{height:420px;border-radius:14px}
+    .bar{
+      margin-top:10px;
+      height:10px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius:999px;
+      overflow:hidden;
+    }
+    .bar > div{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, rgba(93,214,255,.9), rgba(255,184,107,.9));
+      border-radius:999px;
+      transition: width .4s ease;
+    }
 
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
-    th{background:var(--p);color:#fff;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
-    tr:nth-child(even){background:#fafafa}
-    tr:hover{background:#f1f8e9}
+    /* Filters */
+    .filters{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px}
+    select, input{
+      width:100%;
+      padding:10px 10px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(8,12,26,.55);
+      color: var(--text);
+      outline:none;
+    }
+    select:focus, input:focus{box-shadow: 0 0 0 5px var(--ring); border-color: rgba(93,214,255,.55)}
+    .btnRow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
+    button{
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      cursor:pointer;
+      font-weight:600;
+    }
+    button:hover{background: rgba(255,255,255,.11)}
+    button:focus{outline:none; box-shadow:0 0 0 5px var(--ring)}
 
-    .sessionBlock{border:1px solid #eee;border-radius:14px;padding:12px;background:#fff;box-shadow:var(--sh2)}
-    .sessionHead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-    .sessionHead strong{color:var(--p)}
-    .sessionMeta{color:var(--muted);font-weight:900;font-size:12px}
-    .reel{display:flex;gap:10px;overflow:auto;padding-bottom:6px}
-    .tile{flex:0 0 220px;border-radius:12px;overflow:hidden;box-shadow:var(--sh2);background:#fff;cursor:pointer;transition:transform .12s ease}
-    .tile:hover{transform:translateY(-2px)}
-    .thumb{position:relative;width:100%;padding-top:56.25%;background:#f0f0f0}
-    .thumb img,.thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-    .thumb video{display:none}
-    .tile:hover video{display:block}
-    .tile:hover img{display:none}
-    .badge{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:1000}
-    .cap{padding:10px}
-    .cap .t{font-weight:1000;color:var(--p);font-size:13px}
-    .cap .s{color:var(--muted);font-size:12px;margin-top:2px;font-weight:900}
+    /* Charts */
+    .chartWrap{position:relative; height:320px}
+    .chartWrap.sm{height:260px}
+    canvas{max-width:100%}
 
-    .diag{border:1px dashed #ff9800;background:#fff7e6;border-radius:14px;padding:12px;font-weight:900;color:#8a4b00}
-    .diag code{font-weight:1000}
+    /* Table */
+    .tableWrap{overflow:auto; max-height: 420px}
+    table{
+      width:100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+    thead th{
+      text-align:left;
+      font-size:12px;
+      padding: 10px 10px;
+      color: var(--muted);
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      position: sticky;
+      top: 0;
+      background: rgba(17,26,51,.88);
+      backdrop-filter: blur(8px);
+      z-index: 2;
+    }
+    tbody td{
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      font-size: 13px;
+      vertical-align: top;
+    }
+    tbody tr:hover{background: rgba(255,255,255,.04)}
+    .tag{
+      display:inline-flex;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 12px;
+      white-space:nowrap;
+    }
 
-    #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(6px)}
-    #lightbox.active{display:flex}
-    .lbInner{position:relative;max-width:92vw;max-height:92vh}
-    #lb-img,#lb-video{max-width:92vw;max-height:92vh;display:none}
-    #lb-close{position:absolute;top:-46px;right:0;color:#fff;font-size:30px;cursor:pointer;opacity:.9}
-    #lb-close:hover{opacity:1}
+    /* Map */
+    #map{height: 380px; border-radius: 16px; overflow:hidden; border:1px solid rgba(255,255,255,.10)}
 
-    #loading{padding:22px;text-align:center;font-weight:1000;color:var(--p)}
-    .error-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff0f0;border:2px solid #ff3b30;
-      padding:16px;border-radius:12px;box-shadow:var(--sh);z-index:10000;max-width:640px}
-    .error-modal p{margin:0 0 10px 0;color:#b00020;font-weight:1000}
-    .error-modal button{background:#ff3b30;color:#fff;border:none;border-radius:12px;padding:8px 12px;font-weight:1000;cursor:pointer}
+    /* Action list */
+    .actions{
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .action{
+      padding: 12px 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .action .head{display:flex; align-items:center; justify-content:space-between; gap:10px}
+    .sev{
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .sev.good{background: rgba(86,241,166,.12); color: var(--good)}
+    .sev.warn{background: rgba(255,209,102,.10); color: var(--warn)}
+    .sev.bad{background: rgba(255,93,115,.12); color: var(--bad)}
+    .action p{margin:8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.35}
+
+    /* Media gallery + Lightbox */
+    .galleryGrid{
+      display:grid;
+      grid-template-columns: repeat(6, minmax(0,1fr));
+      gap:10px;
+    }
+    .thumb{
+      border-radius: 14px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      cursor:pointer;
+      position:relative;
+      aspect-ratio: 4 / 3;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .thumb img, .thumb video{
+      width:100%; height:100%;
+      object-fit: cover;
+      display:block;
+    }
+    .thumb .play{
+      position:absolute;
+      width:44px; height:44px;
+      border-radius: 999px;
+      background: rgba(11,16,32,.72);
+      border: 1px solid rgba(255,255,255,.18);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+    }
+    .thumb:focus{outline:none; box-shadow:0 0 0 6px var(--ring)}
+    .lb{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background: rgba(0,0,0,.72);
+      z-index: 9999;
+      padding: 18px;
+    }
+    .lb[aria-hidden="false"]{display:flex}
+    .lbPanel{
+      width:min(980px, 100%);
+      background: rgba(17,26,51,.92);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .lbTop{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      gap:10px;
+    }
+    .lbTop .cap{font-size: 13px; color: var(--muted); overflow:hidden; text-overflow: ellipsis; white-space: nowrap}
+    .lbBtns{display:flex; gap:8px}
+    .iconBtn{
+      padding:8px 10px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      cursor:pointer;
+      font-weight:800;
+    }
+    .lbBody{
+      padding: 12px;
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+    }
+    .lbMedia{
+      width:100%;
+      border-radius: 14px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.25);
+    }
+    .lbMedia img, .lbMedia video{
+      width:100%;
+      height: min(62vh, 520px);
+      object-fit: contain;
+      background: rgba(0,0,0,.35);
+      display:block;
+    }
+    .lbTranscript{
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.05);
+    }
+
+    /* Infinite loop carousel */
+    .marquee{
+      overflow:hidden;
+      border-radius: 16px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+    }
+    .marqueeTrack{
+      display:flex;
+      gap:10px;
+      padding: 12px;
+      width:max-content;
+      animation: scroll 30s linear infinite;
+    }
+    .marquee:hover .marqueeTrack{animation-play-state: paused}
+    @keyframes scroll{
+      from{transform: translateX(0)}
+      to{transform: translateX(-50%)}
+    }
+    .mCard{
+      width: 260px;
+      flex: 0 0 auto;
+      padding: 12px;
+      border-radius: 16px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(17,26,51,.70);
+    }
+    .mCard h3{margin:0 0 6px; font-size: 14px}
+    .mCard p{margin:0; color: var(--muted); font-size: 12px; line-height: 1.35}
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .kpis{grid-template-columns: repeat(2, minmax(0,1fr))}
+      .filters{grid-template-columns: repeat(2, minmax(0,1fr))}
+      .galleryGrid{grid-template-columns: repeat(3, minmax(0,1fr))}
+      .c8,.c7,.c6,.c5,.c4{grid-column: span 12}
+      #map{height: 340px}
+    }
+    @media (max-width: 520px){
+      .galleryGrid{grid-template-columns: repeat(2, minmax(0,1fr))}
+      .pill{font-size: 11px}
+      h1{font-size: 20px}
+      .chartWrap{height: 280px}
+      .chartWrap.sm{height: 240px}
+    }
+
+    /* Accessibility helpers */
+    .srOnly{
+      position:absolute!important;
+      width:1px!important; height:1px!important;
+      padding:0!important; margin:-1px!important;
+      overflow:hidden!important;
+      clip:rect(0,0,0,0)!important;
+      white-space:nowrap!important;
+      border:0!important;
+    }
+    .notice{
+      padding: 10px 12px;
+      border-radius: 16px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .notice strong{color: var(--text)}
   </style>
 </head>
+
 <body>
   <div class="container">
-    <div id="loading">Loading data…</div>
 
-    <header class="hero">
-      <video autoplay muted loop playsinline preload="metadata">
-        <source src="tmp.mp4" type="video/mp4" />
-      </video>
-      <div class="hero-inner">
-        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end">
-          <div>
-            <h1>Buctril Super Farmer Education Drive</h1>
-            <div class="sub">Drilldown donuts (Cities → Spots) + Session story media</div>
+    <section class="hero" aria-label="Dashboard hero">
+      <div class="heroMedia" aria-hidden="true">
+        <!-- Put your background video at: assets/bg.mp4 -->
+        <video id="bgVideo" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/bg.mp4" type="video/mp4" />
+        </video>
+      </div>
+      <div class="heroOverlay" aria-hidden="true"></div>
+      <div class="heroInner">
+        <div class="titleRow">
+          <div class="hTitle">
+            <h1>Buctril Super Farmer Education Drive – Dashboard</h1>
+            <p class="sub">
+              KPIs from <strong>sum_sheet.csv</strong> plus Backchecker insights from <strong>Buctril_Super_Activations.xlsx</strong> (D1S1…DnSn sheets).
+              Includes responsive charts, map, session table, and accessible media gallery.
+            </p>
           </div>
-          <div class="muted" style="font-weight:1000">Campaign Days: <span id="metric-days">–</span></div>
+          <div class="pills" role="list" aria-label="Data sources status">
+            <div class="pill" role="listitem"><span class="dot"></span> <span id="status-csv">CSV: loading…</span></div>
+            <div class="pill" role="listitem"><span class="dot" style="background: var(--accent2)"></span> <span id="status-xlsx">XLSX: loading…</span></div>
+          </div>
         </div>
 
-        <div class="kpis">
-          <div class="kpi"><span id="hero-farmers">–</span><small>FARMERS ENGAGED</small></div>
-          <div class="kpi"><span id="hero-sessions">–</span><small>SESSIONS CONDUCTED</small></div>
-        </div>
+        <div class="grid" style="margin-top:14px">
+          <div class="card c12">
+            <div class="cardBody">
+              <div class="kpis" aria-label="Key performance indicators">
+                <div class="kpi">
+                  <p class="label">Sessions (CSV)</p>
+                  <p class="value" id="kpi-sessions">–</p>
+                  <div class="bar" aria-hidden="true"><div id="bar-sessions"></div></div>
+                  <div class="hint muted">Rows where Farmers/Acres exist.</div>
+                </div>
+                <div class="kpi">
+                  <p class="label">Farmers Engaged</p>
+                  <p class="value" id="kpi-farmers">–</p>
+                  <div class="bar" aria-hidden="true"><div id="bar-farmers"></div></div>
+                  <div class="hint muted">Sum of Total Farmers across sessions.</div>
+                </div>
+                <div class="kpi">
+                  <p class="label">Acres Impacted</p>
+                  <p class="value" id="kpi-acres">–</p>
+                  <div class="bar" aria-hidden="true"><div id="bar-acres"></div></div>
+                  <div class="hint muted">Estimated Buctril Acres (pref).</div>
+                </div>
+                <div class="kpi">
+                  <p class="label">Backchecker: Demo Plot Desire (Avg)</p>
+                  <p class="value" id="kpi-demo">–</p>
+                  <div class="bar" aria-hidden="true"><div id="bar-demo"></div></div>
+                  <div class="hint muted">From last rows in D* sheets (XLSX).</div>
+                </div>
+              </div>
 
-        <div class="tags">
-          <span class="tag">Outer donut = Cities (multi-color)</span>
-          <span class="tag">Inner donut = Spots (drilldown)</span>
-          <span class="tag">Click segment to filter</span>
-          <span class="tag">Multan excluded</span>
-        </div>
-      </div>
-    </header>
+              <div class="marquee" style="margin-top:12px" aria-label="Auto-scrolling highlights carousel">
+                <div class="marqueeTrack" id="highlightsTrack">
+                  <!-- JS duplicates cards for infinite loop -->
+                </div>
+              </div>
 
-    <section class="card">
-      <div class="header">
-        <div class="pill"><i class="fas fa-filter"></i></div>
-        <h2>Filters</h2>
-      </div>
-      <div class="filters">
-        <label for="filter-rgn"><i class="fas fa-map"></i> RGN:</label>
-        <select id="filter-rgn"><option value="">All Regions</option></select>
-
-        <label for="filter-city"><i class="fas fa-city"></i> City:</label>
-        <select id="filter-city"><option value="">All Cities</option></select>
-
-        <label for="filter-spot"><i class="fas fa-location-dot"></i> Spot:</label>
-        <select id="filter-spot"><option value="">All Spots</option></select>
-
-        <label for="filter-search"><i class="fas fa-search"></i> Search:</label>
-        <input id="filter-search" type="text" placeholder="Search rgn, city, spot, from…" />
-
-        <button class="btn" id="btn-clear"><i class="fas fa-eraser"></i> Clear</button>
-      </div>
-
-      <div id="diagnostics" style="margin-top:12px;display:none" class="diag"></div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-chart-simple"></i></div><h2>Snapshot (Filtered)</h2></div>
-      <div class="snap">
-        <div class="snapcard"><div class="lbl">Sessions</div><div class="val" id="metric-sessions">–</div></div>
-        <div class="snapcard"><div class="lbl">Farmers</div><div class="val" id="metric-farmers">–</div></div>
-        <div class="snapcard"><div class="lbl">Acres Covered</div><div class="val" id="metric-acres">–</div></div>
-        <div class="snapcard"><div class="lbl">Cities Visited</div><div class="val" id="metric-cities">–</div></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-gauge-high"></i></div><h2>Performance + Donut Navigation (Filtered)</h2></div>
-
-      <div class="snap">
-        <div class="snapcard">
-          <div class="lbl">Avg. Message Clarity</div><div class="val" id="metric-clarity">–</div>
-          <div class="bar"><div id="clarity-progress"></div></div>
-          <div class="stars" id="clarity-stars"></div>
-        </div>
-        <div class="snapcard">
-          <div class="lbl">Avg. Definite Use</div><div class="val" id="metric-definite">–</div>
-          <div class="bar"><div id="definite-progress" style="background:#ff7043"></div></div>
-        </div>
-        <div class="snapcard">
-          <div class="lbl">Influencers</div><div class="val" id="metric-influencers">–</div>
-          <div class="bar"><div id="influencers-progress"></div></div>
-        </div>
-        <div class="snapcard">
-          <div class="lbl">Avg. Awareness</div><div class="val" id="metric-awareness">–</div>
-          <div class="bar"><div id="awareness-progress"></div></div>
-        </div>
-      </div>
-
-      <div class="grid" style="margin-top:16px">
-        <div class="c4">
-          <div class="donutBox">
-            <canvas id="clarityDonut"></canvas>
-            <div class="donutCenter">
-              <div class="big" id="clarity-main">–</div>
-              <div class="small">Avg clarity</div>
+              <div class="notice" style="margin-top:12px" id="noticeBox" role="status" aria-live="polite">
+                <strong>How to use:</strong> Put <code>sum_sheet.csv</code> and <code>Buctril_Super_Activations.xlsx</code> in the same folder as this page.
+                Optional media goes in <code>assets/</code>. The dashboard will work with CSV-only, but Backchecker charts require XLSX.
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="c4">
-          <div class="donutBox">
-            <canvas id="definiteDonut"></canvas>
-            <div class="donutCenter">
-              <div class="big" id="definite-main">–</div>
-              <div class="small">Avg definite</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="c4">
-          <div class="donutBox">
-            <canvas id="drillDonut"></canvas>
-            <div class="donutCenter">
-              <div class="big" id="drill-main">–</div>
-              <div class="small" id="drill-sub">Cities (outer) → Spots (inner)</div>
-            </div>
-          </div>
-          <div class="hint">Click outer ring to filter City, click inner ring to filter Spot.</div>
-        </div>
       </div>
-
-      <div class="muted" style="font-weight:1000;margin-top:8px" id="adoption-text">Estimated definite-use farmers: –</div>
     </section>
 
-    <div class="grid">
-      <section class="card c7">
-        <div class="header"><div class="pill"><i class="fas fa-map-marked-alt"></i></div><h2>Route Map</h2></div>
-        <div id="route-map"></div>
-      </section>
-
-      <section class="card c5">
-        <div class="header"><div class="pill"><i class="fas fa-table"></i></div><h2>Session Details</h2></div>
-        <div style="overflow:auto;max-height:420px">
-          <table>
-            <thead>
-              <tr><th>ID</th><th>Date</th><th>RGN</th><th>City</th><th>Spot</th><th>Farmers</th><th>Acres</th></tr>
-            </thead>
-            <tbody id="session-table-body"></tbody>
-          </table>
+    <section class="grid">
+      <div class="card c12">
+        <div class="cardHeader">
+          <h2>Filters</h2>
+          <div class="small">Filters apply to CSV sessions (map, charts, table). Backchecker insights remain overall unless you later map D* sheets to spots.</div>
         </div>
-      </section>
-    </div>
+        <div class="cardBody">
+          <div class="filters" role="group" aria-label="Data filters">
+            <div>
+              <label for="filter-city">City</label>
+              <select id="filter-city"></select>
+            </div>
+            <div>
+              <label for="filter-district">District/Tehsil</label>
+              <select id="filter-district"></select>
+            </div>
+            <div>
+              <label for="filter-date-from">Date From</label>
+              <input id="filter-date-from" type="date" />
+            </div>
+            <div>
+              <label for="filter-date-to">Date To</label>
+              <input id="filter-date-to" type="date" />
+            </div>
+          </div>
 
-    <section class="card">
-      <div class="header"><div class="pill"><i class="fas fa-camera"></i></div><h2>Session Story (Data + Media)</h2></div>
-      <div class="muted" style="font-weight:1000;margin-bottom:10px">
-        Each session is shown as a “story block”. Inside each block, media appears as a horizontal reel (hover previews video). Missing files are ignored.
+          <div class="btnRow">
+            <button id="btn-reset" type="button">Reset Filters</button>
+            <button id="btn-export" type="button">Export Filtered CSV (JSON)</button>
+          </div>
+
+          <div class="notice" style="margin-top:12px">
+            <strong>Backchecker observation focus:</strong> “Prior Event” questions and “Post Event” findings are extracted from last rows/sections of each D* sheet using keyword matching.
+            If a sheet’s structure differs, it will be flagged in Diagnostics.
+          </div>
+        </div>
       </div>
-      <div id="media-gallery"></div>
+
+      <div class="card c6">
+        <div class="cardHeader">
+          <h2>Intent Mix</h2>
+          <div class="small">Definite / Maybe / Not</div>
+        </div>
+        <div class="cardBody">
+          <div class="chartWrap sm"><canvas id="chartIntent" aria-label="Intent donut chart" role="img"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card c6">
+        <div class="cardHeader">
+          <h2>Performance Averages</h2>
+          <div class="small">Clarity / Awareness / Definite</div>
+        </div>
+        <div class="cardBody">
+          <div class="chartWrap sm"><canvas id="chartPerf" aria-label="Performance bar chart" role="img"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card c7">
+        <div class="cardHeader">
+          <h2>Top Cities by Farmers</h2>
+          <div class="small">Filtered CSV sessions</div>
+        </div>
+        <div class="cardBody">
+          <div class="chartWrap"><canvas id="chartCities" aria-label="Top cities chart" role="img"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card c5">
+        <div class="cardHeader">
+          <h2>Farmers Trend by Day</h2>
+          <div class="small">Filtered CSV sessions</div>
+        </div>
+        <div class="cardBody">
+          <div class="chartWrap"><canvas id="chartTrend" aria-label="Trend chart" role="img"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card c12">
+        <div class="cardHeader">
+          <h2>Map</h2>
+          <div class="small">Markers from Spot Coordinates (supports DMS + decimal)</div>
+        </div>
+        <div class="cardBody">
+          <div id="map" role="application" aria-label="Map of activation spots"></div>
+        </div>
+      </div>
+
+      <div class="card c7">
+        <div class="cardHeader">
+          <h2>Session Details (CSV)</h2>
+          <div class="small">Includes last 3 sessions by date at the top</div>
+        </div>
+        <div class="cardBody">
+          <div class="tableWrap">
+            <table aria-label="Session table">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Date</th><th>District</th><th>City</th><th>Spot</th>
+                  <th>Farmers</th><th>Acres</th><th>Def%</th><th>Aware%</th><th>Clarity%</th>
+                </tr>
+              </thead>
+              <tbody id="tblSessions"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card c5">
+        <div class="cardHeader">
+          <h2>Action Points</h2>
+          <div class="small">Threshold-driven recommendations</div>
+        </div>
+        <div class="cardBody">
+          <div class="actions" id="actionList" aria-label="Action points list"></div>
+          <div class="notice" style="margin-top:12px">
+            <strong>Note:</strong> “Price too high” and other objections use CSV “Reason Not to Use” totals (if present). Backchecker items (demo plot desire, repeat activation, engagement benefit) are from XLSX.
+          </div>
+        </div>
+      </div>
+
+      <div class="card c12">
+        <div class="cardHeader">
+          <h2>Backchecker Insights (XLSX: D* sheets)</h2>
+          <div class="small">Last-row metrics + qualitative engagement benefit mix</div>
+        </div>
+        <div class="cardBody">
+          <div class="grid" style="margin-top:0">
+            <div class="card c6" style="background: transparent; border:none; box-shadow:none">
+              <div class="cardBody" style="padding:0">
+                <div class="chartWrap"><canvas id="chartBackchecker" aria-label="Backchecker averages chart" role="img"></canvas></div>
+              </div>
+            </div>
+            <div class="card c6" style="background: transparent; border:none; box-shadow:none">
+              <div class="cardBody" style="padding:0">
+                <div class="chartWrap"><canvas id="chartBenefit" aria-label="Engagement benefit chart" role="img"></canvas></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tableWrap" style="margin-top:14px">
+            <table aria-label="Backchecker extraction table">
+              <thead>
+                <tr>
+                  <th>Sheet</th><th>Demo Plot %</th><th>Repeat Activations %</th><th>Top Benefit</th>
+                  <th>Post: Def%</th><th>Post: Aware%</th><th>Post: Clarity%</th><th>Expected Sales ↑</th><th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="tblBackchecker"></tbody>
+            </table>
+          </div>
+
+          <div class="notice" style="margin-top:12px" id="diagBox">
+            <strong>Diagnostics:</strong> If a D* sheet does not match expected labels/sections, it will appear here so you can adjust keywords or layout parsing.
+          </div>
+        </div>
+      </div>
+
+      <div class="card c12">
+        <div class="cardHeader">
+          <h2>Media Gallery</h2>
+          <div class="small">Lazy-loaded thumbnails + Lightbox (keyboard accessible)</div>
+        </div>
+        <div class="cardBody">
+          <p class="muted" style="margin-top:0">
+            Put images/videos under <code>assets/gallery/</code>. Add captions in <code>assets/gallery/media.json</code>.
+            Thumbnails are auto-generated as a grid; click to open the modal.
+          </p>
+
+          <div class="galleryGrid" id="galleryGrid" aria-label="Media thumbnails grid"></div>
+
+          <div class="lb" id="lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Media lightbox">
+            <div class="lbPanel">
+              <div class="lbTop">
+                <div class="cap" id="lbCaption">–</div>
+                <div class="lbBtns">
+                  <button class="iconBtn" id="lbPrev" type="button" aria-label="Previous media">◀</button>
+                  <button class="iconBtn" id="lbNext" type="button" aria-label="Next media">▶</button>
+                  <button class="iconBtn" id="lbClose" type="button" aria-label="Close lightbox">✕</button>
+                </div>
+              </div>
+              <div class="lbBody">
+                <div class="lbMedia" id="lbMedia"></div>
+                <div class="lbTranscript" id="lbTranscript">
+                  <strong>Accessibility:</strong> Provide captions (<code>.vtt</code>) for videos and a short transcript here via <code>media.json</code>.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="srOnly" id="kbdHelp">
+            Lightbox keyboard: Escape to close, Left/Right arrows to navigate.
+          </p>
+        </div>
+      </div>
+
     </section>
   </div>
 
-  <div id="lightbox">
-    <div class="lbInner">
-      <div id="lb-close"><i class="fas fa-times-circle"></i></div>
-      <img id="lb-img" alt="Media" />
-      <video id="lb-video" controls autoplay loop playsinline></video>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <script src="data_processor.js?v=map_fix_dms_v1"></script>
+  <script src="data_processor.js"></script>
 </body>
 </html>
