@@ -1,726 +1,1054 @@
-/* Buctril Dashboard – XLSX-first processor (GitHub Pages safe)
-   Fixes:
-   1) Removes the noisy "no matching labels detected" table and replaces it with donut/pivot summaries.
-   2) Reads Buctril_Super_Activations.xlsx directly (fallback if sum_sheet.csv is wrong/missing).
-   3) Loads media.json with .jpg paths; supports root OR assets/gallery path.
-   4) Makes relative paths stable by redirecting to trailing-slash URL when needed.
+/* Buctril Super Farmer Education Drive – Dashboard Processor
+   - Green theme + donut navigation (Cities → Spots) + pivot charts.
+   - Reads Buctril_Super_Activations.xlsx (SUM sheet) in-browser (XLSX).
+   - No tables; focuses on charts + map + media gallery.
+
+   Files expected in repo root:
+     - index.html
+     - data_processor.js
+     - Buctril_Super_Activations.xlsx
+     - media.json
+     - Bayer.jpg, Buctril.jpg, Interact.gif
+     - (optional) assets/bg.mp4
 */
 
 (function(){
   "use strict";
 
-  const APP = {};
-  window.BUCTRIL_APP = APP;
-
   // --------------------------
   // DOM helpers
   // --------------------------
-  const $ = (id) => document.getElementById(id);
+  function $(id){ return document.getElementById(id); }
 
-  function setStatus(msg, isError){
-    const el = $("status");
-    if(!el) return;
-    el.textContent = msg;
-    el.classList.toggle("error", !!isError);
+  function safeText(v){
+    if(v === null || v === undefined) return "";
+    var s = String(v);
+    if(s === "undefined" || s === "null") return "";
+    return s;
   }
 
-  function fmtInt(n){
-    const x = Number(n||0);
-    if(!isFinite(x)) return "–";
-    return x.toLocaleString();
-  }
-  function fmtPct(n){
-    const x = Number(n||0);
-    if(!isFinite(x)) return "–";
-    return x.toFixed(0) + "%";
+  function norm(s){
+    return safeText(s).trim().toLowerCase();
   }
 
-  function safeStr(v){
-    if(v===null || v===undefined) return "";
-    return String(v).trim();
+  function toNumber(v){
+    var s = safeText(v).replace(/,/g,"").trim();
+    if(!s) return 0;
+    var n = Number(s);
+    return Number.isFinite(n) ? n : 0;
   }
 
-  function toLower(v){ return safeStr(v).toLowerCase(); }
+  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
 
-  function baseHref(){
-    // Always produce a URL that ends with "/" for consistent relative fetches.
-    const u = new URL(window.location.href);
-    if(!u.pathname.endsWith("/") && !u.pathname.endsWith(".html")){
-      u.pathname = u.pathname + "/";
-    }
-    // If user opens repo without slash, this normalizes our internal base.
-    return u.href.replace(/[^\/]*$/, ""); // up to last slash
-  }
-
-  function ensureTrailingSlash(){
-    const p = window.location.pathname;
-    if(!p.endsWith("/") && !p.endsWith(".html")){
-      const target = p + "/" + window.location.search + window.location.hash;
-      window.location.replace(target);
-      return true;
-    }
-    return false;
-  }
-
-  async function fetchFirstOk(paths){
-    const base = baseHref();
-    for(const p of paths){
-      try{
-        const url = new URL(p, base).href;
-        const r = await fetch(url, {cache:"no-store"});
-        if(r.ok) return {url, resp:r};
-      }catch(e){}
-    }
-    return null;
-  }
-
-  // --------------------------
-  // XLSX parsing (SheetJS)
-  // --------------------------
-  function sheetToGrid(workbook, sheetName){
-    const ws = workbook.Sheets[sheetName];
-    if(!ws) return null;
-    // header:1 returns 2D array
-    return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
-  }
-
-  function findCell(grid, re){
-    if(!grid) return null;
-    for(let r=0;r<grid.length;r++){
-      const row = grid[r] || [];
-      for(let c=0;c<row.length;c++){
-        const v = row[c];
-        if(typeof v === "string" && re.test(v.trim())){
-          return {r,c,v:v.trim()};
-        }
-      }
-    }
-    return null;
-  }
-
-  function firstNonEmptyRight(grid, r, c, maxSteps=10){
-    const row = grid[r] || [];
-    for(let k=1;k<=maxSteps;k++){
-      const v = row[c+k];
-      if(v!==null && v!==undefined && String(v).trim()!==""){
-        return v;
-      }
-    }
-    return null;
-  }
-
-  function firstNonEmptyBelow(grid, r, c, maxSteps=10){
-    for(let k=1;k<=maxSteps;k++){
-      const row = grid[r+k] || [];
-      const v = row[c];
-      if(v!==null && v!==undefined && String(v).trim()!==""){
-        return v;
-      }
-    }
-    return null;
-  }
-
-  function num(v){
-    if(v===null || v===undefined) return 0;
-    if(typeof v === "number") return isFinite(v) ? v : 0;
-    const s = String(v).replace(/[, ]+/g,"").replace(/%/g,"").trim();
-    const x = Number(s);
-    return isFinite(x) ? x : 0;
-  }
-
-  function parseDMS(dms){
-    // Example: 30°01'07.0"N 71°07'10.7"E
-    const s = safeStr(dms);
+  function toPercent(v){
+    // Accept 0–1 or 0–100 or strings like "76%" etc.
+    var s = safeText(v).trim();
     if(!s) return null;
-    const re = /(\d{1,3})\D+(\d{1,2})\D+(\d{1,2}(?:\.\d+)?)\D*([NS])\D+(\d{1,3})\D+(\d{1,2})\D+(\d{1,2}(?:\.\d+)?)\D*([EW])/i;
-    const m = s.match(re);
-    if(!m) return null;
-    const degLat = Number(m[1]), minLat = Number(m[2]), secLat = Number(m[3]), hemLat = m[4].toUpperCase();
-    const degLon = Number(m[5]), minLon = Number(m[6]), secLon = Number(m[7]), hemLon = m[8].toUpperCase();
-    let lat = degLat + (minLat/60) + (secLat/3600);
-    let lon = degLon + (minLon/60) + (secLon/3600);
-    if(hemLat==="S") lat = -lat;
-    if(hemLon==="W") lon = -lon;
-    if(!isFinite(lat) || !isFinite(lon)) return null;
-    return {lat, lon};
+    s = s.replace("%","").replace(/,/g,"").trim();
+    var n = Number(s);
+    if(!Number.isFinite(n)) return null;
+    if(n <= 1) n = n * 100;
+    // protect against 10000% issues
+    if(n > 200) return null;
+    return n;
   }
 
-  function extractReasons(grid){
-    // Reads the "Reasons to USE" table: Reason text + Count
-    // Typical layout:
-    // Row with "Reasons to USE" then next rows include [#, Reason, , Count]
-    const reasons = [];
-    if(!grid) return reasons;
-
-    const anchor = findCell(grid, /reasons\s+to\s+use/i);
-    if(!anchor) return reasons;
-
-    // Scan next ~12 rows for "Reason" text + numeric count in same row
-    const start = anchor.r + 1;
-    for(let r=start; r<Math.min(grid.length, start+20); r++){
-      const row = grid[r] || [];
-      // detect a reason-like cell (usually col1 or col2) with a count (usually col3 or col4)
-      let reason = "";
-      let count = 0;
-
-      // choose longest string cell in row as reason candidate
-      for(let c=0;c<row.length;c++){
-        if(typeof row[c]==="string"){
-          const t = row[c].trim();
-          if(t.length >= 6 && !/^(reason|count|supervisor|don)/i.test(t)){
-            if(t.length > reason.length) reason = t;
-          }
-        }
-      }
-      // choose largest numeric cell in row as count
-      for(let c=0;c<row.length;c++){
-        const v = row[c];
-        if(typeof v === "number") count = Math.max(count, v);
-        else if(typeof v === "string" && v.trim() !== ""){
-          const x = num(v);
-          if(x>0) count = Math.max(count, x);
-        }
-      }
-
-      // heuristics: ignore header rows
-      if(reason && count > 0 && !/total/i.test(reason)){
-        reasons.push({reason, count});
-      }
-    }
-    return reasons;
+  function formatInt(n){
+    n = Math.round(Number(n)||0);
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
-  function extractSessionRecord(sheetName, grid){
-    // Skip empty/template sheets
-    const title = findCell(grid, /wheat\s+farmer\s+session\s+quick\s+report/i);
-    if(!title) return null;
+  function format1(n){
+    n = Number(n);
+    if(!Number.isFinite(n)) return "–";
+    return (Math.round(n*10)/10).toFixed(1);
+  }
 
-    // Date / Day
-    const dateCell = findCell(grid, /^date\b/i);
-    const dayCell  = findCell(grid, /^day:/i);
+  function formatPct(n){
+    n = Number(n);
+    if(!Number.isFinite(n)) return "–";
+    return Math.round(n) + "%";
+  }
 
-    const dateVal = dateCell ? firstNonEmptyRight(grid, dateCell.r, dateCell.c) : null;
-    const dayVal  = dayCell ? firstNonEmptyRight(grid, dayCell.r, dayCell.c) : null;
+  function baseUrl(){
+    // Works whether the page is opened with or without trailing slash.
+    return new URL(".", window.location.href).toString();
+  }
 
-    // Basic location fields from the first row of session table (usually row under "Sessopm/Session")
-    // Find header "Tehsil / District" then read below
-    const distHead = findCell(grid, /tehsil\s*\/\s*district/i);
-    const villageHead = findCell(grid, /village/i);
-    const coordHead = findCell(grid, /location\s*coordinate/i);
+  // --------------------------
+  // Colors (multi-color donut segments)
+  // --------------------------
+  var PALETTE = [
+    "#1b5e20","#2e7d32","#388e3c","#43a047","#66bb6a","#81c784",
+    "#ff7043","#fb8c00","#fdd835","#26a69a","#1e88e5","#5e35b1",
+    "#8e24aa","#6d4c41","#546e7a","#00acc1","#7cb342","#c0ca33"
+  ];
 
-    const district = distHead ? safeStr(firstNonEmptyBelow(grid, distHead.r, distHead.c)) : "";
-    const village  = villageHead ? safeStr(firstNonEmptyBelow(grid, villageHead.r, villageHead.c)) : "";
-    const coordStr = coordHead ? safeStr(firstNonEmptyBelow(grid, coordHead.r, coordHead.c)) : "";
-    const latlon = parseDMS(coordStr);
-
-    // Metrics by labels
-    const totalFarmersCell = findCell(grid, /total\s+farmers\s+present/i);
-    const wheatFarmersCell = findCell(grid, /total\s+wheat\s+farmers/i);
-    const acresCell = findCell(grid, /wheat\s+acres\s+represented/i);
-    const knowCell = findCell(grid, /already\s+know\b.*buctril/i);
-    const usedCell = findCell(grid, /used\b.*last\s+year/i);
-    const definiteCell = findCell(grid, /definitely\s+use/i);
-    const maybeCell = findCell(grid, /maybe\b/i);
-    const noCell = findCell(grid, /not\s+interested/i);
-    const estAcresCell = findCell(grid, /estimated\s+acres.*sprayed.*buctril/i);
-
-    const totalFarmers = totalFarmersCell ? num(firstNonEmptyRight(grid, totalFarmersCell.r, totalFarmersCell.c)) : 0;
-    const wheatFarmers = wheatFarmersCell ? num(firstNonEmptyRight(grid, wheatFarmersCell.r, wheatFarmersCell.c)) : 0;
-    const wheatAcres = acresCell ? num(firstNonEmptyRight(grid, acresCell.r, acresCell.c)) : 0;
-    const knowBuctril = knowCell ? num(firstNonEmptyRight(grid, knowCell.r, knowCell.c)) : 0;
-    const usedLastYear = usedCell ? num(firstNonEmptyRight(grid, usedCell.r, usedCell.c)) : 0;
-    const definite = definiteCell ? num(firstNonEmptyRight(grid, definiteCell.r, definiteCell.c)) : 0;
-    const maybe = maybeCell ? num(firstNonEmptyRight(grid, maybeCell.r, maybeCell.c)) : 0;
-    const notInterested = noCell ? num(firstNonEmptyRight(grid, noCell.r, noCell.c)) : 0;
-    const estBuctrilAcres = estAcresCell ? num(firstNonEmptyRight(grid, estAcresCell.r, estAcresCell.c)) : 0;
-
-    // Understanding score: find "Message Understanding" then next row with multiple 1–3 scores, avg them
-    let clarityPct = 0;
-    const mu = findCell(grid, /message\s+understanding/i);
-    if(mu){
-      for(let rr=mu.r+1; rr<Math.min(grid.length, mu.r+6); rr++){
-        const row = grid[rr] || [];
-        const scores = row.map(v => num(v)).filter(x => x>0 && x<=3.5);
-        if(scores.length >= 3){
-          const avg = scores.reduce((a,b)=>a+b,0) / scores.length;
-          clarityPct = (avg/3)*100;
-          break;
-        }
-      }
+  function colorForKey(key){
+    var h = 0;
+    var s = safeText(key);
+    for(var i=0;i<s.length;i++){
+      h = (h*31 + s.charCodeAt(i)) >>> 0;
     }
+    return PALETTE[h % PALETTE.length];
+  }
 
-    // Commercial intent section (repeat/new definite + committed acres)
-    const repeatCell = findCell(grid, /repeat\s+users\s+committing/i);
-    const newDefCell = findCell(grid, /new\s+farmers.*definitely\s+use/i);
-    const committedAcresCell = findCell(grid, /committed\s+acres/i);
+  function lighten(hex, amt){
+    // amt: 0..1 (towards white)
+    var h = hex.replace("#","");
+    if(h.length !== 6) return hex;
+    var r = parseInt(h.slice(0,2),16),
+        g = parseInt(h.slice(2,4),16),
+        b = parseInt(h.slice(4,6),16);
+    r = Math.round(r + (255-r)*amt);
+    g = Math.round(g + (255-g)*amt);
+    b = Math.round(b + (255-b)*amt);
+    return "#" + [r,g,b].map(function(x){ return x.toString(16).padStart(2,"0"); }).join("");
+  }
 
-    const repeatUsers = repeatCell ? num(firstNonEmptyRight(grid, repeatCell.r, repeatCell.c)) : 0;
-    const newDefiniteFarmers = newDefCell ? num(firstNonEmptyRight(grid, newDefCell.r, newDefCell.c)) : 0;
-    const committedAcres = committedAcresCell ? num(firstNonEmptyRight(grid, committedAcresCell.r, committedAcresCell.c)) : 0;
+  // --------------------------
+  // Coordinate parsing (DMS → decimal)
+  // --------------------------
+  function dmsToDecimal(deg, min, sec, hemi){
+    var d = Number(deg) + Number(min)/60 + Number(sec)/3600;
+    if(hemi === "S" || hemi === "W") d = -d;
+    return d;
+  }
 
-    // Demo plot mention (counts as "mentioned")
-    let demoMention = false;
-    for(let r=0;r<grid.length;r++){
-      const row = grid[r] || [];
-      for(let c=0;c<row.length;c++){
-        const v = row[c];
-        if(typeof v==="string" && /demo\s*plot/i.test(v)){
-          demoMention = true;
-        }
-      }
+  function parseDMSPair(s){
+    // Handles variants like:
+    // 28°09'13.2"N 69°48'59.7"E
+    // 30°11'52"N, 71°28'11"E
+    // 28°09'13.2"N,69°48'59.7"E
+    var t = safeText(s).replace(/,/g," ").replace(/\s+/g," ").trim();
+    if(!t) return null;
+
+    var re = /(\d{1,3})\D+(\d{1,2})\D+(\d{1,2}(?:\.\d+)?)\D*([NSEW])/gi;
+    var m, parts=[];
+    while((m=re.exec(t)) !== null){
+      parts.push({deg:m[1],min:m[2],sec:m[3],hemi:m[4].toUpperCase()});
     }
+    if(parts.length < 2) return null;
 
-    // "What worked best" (top benefit proxy)
-    const workedBestCell = findCell(grid, /what\s+worked\s+best/i);
-    const topBenefit = workedBestCell ? safeStr(firstNonEmptyRight(grid, workedBestCell.r, workedBestCell.c)) : "";
-
-    // Spot (sometimes filled) - try to locate "Spot:" row and read right value if present
-    let spot = "";
-    const spotCell = findCell(grid, /^spot:/i);
-    if(spotCell){
-      const v = firstNonEmptyRight(grid, spotCell.r, spotCell.c);
-      const s = safeStr(v);
-      if(s && /dealer|field|dera|other/i.test(s)) spot = s;
-    }
-    if(!spot) spot = "Unknown";
-
-    // Derived rates
-    const awarePct = totalFarmers>0 ? (knowBuctril/totalFarmers)*100 : 0;
-    const defPct = wheatFarmers>0 ? (definite/wheatFarmers)*100 : 0;
-
-    // Top reason to USE
-    const reasons = extractReasons(grid);
-    const topReason = reasons.length ? reasons.sort((a,b)=>b.count-a.count)[0].reason : "";
+    var latPart = parts.find(function(p){ return p.hemi==="N" || p.hemi==="S"; });
+    var lngPart = parts.find(function(p){ return p.hemi==="E" || p.hemi==="W"; });
+    if(!latPart || !lngPart) return null;
 
     return {
-      sheet: sheetName,
-      date: dateVal ? String(dateVal).slice(0,10) : "",
-      day: num(dayVal),
-      city: district || "Unknown",
-      spot,
-      village,
-      totalFarmers,
-      wheatFarmers,
-      wheatAcres,
-      estBuctrilAcres,
-      knowBuctril,
-      usedLastYear,
-      definite,
-      maybe,
-      notInterested,
-      awarePct,
-      defPct,
-      clarityPct,
-      repeatUsers,
-      newDefiniteFarmers,
-      committedAcres,
-      demoMention,
-      topBenefit: topBenefit || topReason || "—",
-      topReason,
-      lat: latlon ? latlon.lat : null,
-      lon: latlon ? latlon.lon : null,
-      reasonsUse: reasons
+      lat: dmsToDecimal(latPart.deg, latPart.min, latPart.sec, latPart.hemi),
+      lng: dmsToDecimal(lngPart.deg, lngPart.min, lngPart.sec, lngPart.hemi)
     };
   }
 
   // --------------------------
-  // Charts
+  // App state
   // --------------------------
-  let cityChart=null, spotChart=null, intentChart=null, demoChart=null, reasonsChart=null;
+  var ALL = [];       // all session-rows (expanded)
+  var FILTERED = [];  // filtered session-rows
 
-  function destroy(chart){
-    if(chart && typeof chart.destroy==="function"){
-      chart.destroy();
-    }
+  var state = {
+    city: "",
+    spot: "",
+    q: ""
+  };
+
+  // Charts
+  var charts = {
+    awarenessDonut: null,
+    definiteDonut: null,
+    drillDonut: null,
+    pivotSessionsByCity: null,
+    pivotFarmersByCity: null,
+    pivotAcresByCity: null,
+    pivotRatesByCity: null
+  };
+
+  // Map
+  var map = null;
+  var mapLayer = null;
+
+  // --------------------------
+  // Error modal
+  // --------------------------
+  function showError(msg){
+    try{
+      var modal = document.createElement("div");
+      modal.className = "error-modal";
+      modal.innerHTML = '<p>' + msg.replace(/</g,"&lt;") + '</p><button>Close</button>';
+      modal.querySelector("button").addEventListener("click", function(){ modal.remove(); });
+      document.body.appendChild(modal);
+    }catch(e){}
   }
 
-  function makeDonut(ctx, labels, values, onClick){
+  function setDiagnostics(html, show){
+    var el = $("diagnostics");
+    if(!el) return;
+    el.innerHTML = html || "";
+    el.style.display = show ? "block" : "none";
+  }
+
+  // --------------------------
+  // Load XLSX (SUM sheet)
+  // --------------------------
+  function findHeaderRow(rows){
+    // find row containing SN, City, Session Location
+    for(var i=0;i<rows.length;i++){
+      var r = rows[i] || [];
+      var a = norm(r[0]);
+      if(a !== "sn") continue;
+      var hasCity = r.some(function(c){ return norm(c) === "city"; });
+      var hasLoc = r.some(function(c){ return norm(c) === "session location"; });
+      if(hasCity && hasLoc) return i;
+    }
+    return -1;
+  }
+
+  function rowEmpty(r){
+    for(var i=0;i<r.length;i++){
+      if(safeText(r[i]).trim() !== "") return false;
+    }
+    return true;
+  }
+
+  function readSumSheet(workbook){
+    var sheet = workbook.Sheets["SUM"];
+    if(!sheet) throw new Error("Sheet 'SUM' not found in XLSX.");
+    var rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:false, defval:"" });
+    var hIdx = findHeaderRow(rows);
+    if(hIdx < 0) throw new Error("Could not locate header row in SUM sheet.");
+    var header = rows[hIdx].map(function(x){ return safeText(x).trim(); });
+
+    function idxOf(name){
+      var target = norm(name);
+      for(var i=0;i<header.length;i++){
+        if(norm(header[i]) === target) return i;
+      }
+      return -1;
+    }
+
+    var I = {
+      SN: idxOf("SN"),
+      FromCity: idxOf("From City"),
+      City: idxOf("City"),
+      Date: idxOf("Date"),
+      Day: idxOf("Day"),
+      Location: idxOf("Session Location"),
+      Coords: idxOf("Spot Coordinates"),
+      Farmers: idxOf("Total Farmers"),
+      WheatFarmers: idxOf("Total Wheat Farmers"),
+      Acres: idxOf("Total Wheat Acres"),
+      Awareness: idxOf("Awareness Rate"),
+      DefiniteRate: idxOf("Definite Use Rate"),
+      WillDefinitelyUse: idxOf("Will Definitely Use"),
+      Understanding: idxOf("Average Understanding Score"),
+      Influencers: idxOf("No. of Key Influencers (Names Highlighted)"),
+      TopUse: idxOf("Top Reason to Use (session)"),
+      TopNot: idxOf("Top Reason Not to Use (session)"),
+      Competitors: idxOf("Competitor Brands Mentioned (Key Influencers)")
+    };
+
+    var out = [];
+    var cur = { sn:"", fromCity:"", city:"", date:"", day:"" };
+
+    for(var r=hIdx+1; r<rows.length; r++){
+      var row = rows[r];
+      if(!row || rowEmpty(row)) continue;
+
+      var sn = safeText(row[I.SN]).trim();
+      var fromCity = safeText(row[I.FromCity]).trim();
+      var city = safeText(row[I.City]).trim();
+      var date = safeText(row[I.Date]).trim();
+      var day = safeText(row[I.Day]).trim();
+
+      if(sn){
+        cur.sn = sn;
+        if(fromCity) cur.fromCity = fromCity;
+        if(city) cur.city = city;
+        if(date) cur.date = date;
+        if(day) cur.day = day;
+      } else {
+        // forward fill
+        sn = cur.sn;
+        fromCity = fromCity || cur.fromCity;
+        city = city || cur.city;
+        date = date || cur.date;
+        day = day || cur.day;
+      }
+
+      var location = safeText(row[I.Location]).trim();
+      var coordsRaw = safeText(row[I.Coords]).trim();
+
+      // ignore Multan (explicit requirement)
+      if(norm(city) === "multan") continue;
+
+      // minimal signal check
+      var farmers = toNumber(row[I.Farmers]) || toNumber(row[I.WheatFarmers]);
+      var acres = toNumber(row[I.Acres]);
+      var awareness = toPercent(row[I.Awareness]);
+      var definite = toPercent(row[I.DefiniteRate]);
+      var understanding = toPercent(row[I.Understanding]);
+      var influencers = toNumber(row[I.Influencers]);
+
+      if(!location && !coordsRaw && farmers===0 && acres===0 && awareness===null && definite===null && understanding===null){
+        continue;
+      }
+
+      // derive definite if missing
+      if(definite === null){
+        var wd = toNumber(row[I.WillDefinitelyUse]);
+        if(wd > 0 && farmers > 0) definite = (wd / farmers) * 100;
+      }
+
+      if(location === "") location = "(Unlabeled spot)";
+
+      // normalize date: keep as ISO if parseable
+      var dateISO = "";
+      try{
+        var d = new Date(date);
+        if(!isNaN(d.getTime())) dateISO = d.toISOString().slice(0,10);
+      }catch(e){}
+
+      out.push({
+        sn: sn,
+        fromCity: fromCity,
+        city: city,
+        date: dateISO || date,
+        day: day,
+        spot: location,
+        coordsRaw: coordsRaw,
+        coords: parseDMSPair(coordsRaw),
+        farmers: farmers,
+        acres: acres,
+        awareness: awareness,
+        definite: definite,
+        understanding: understanding,
+        influencers: influencers,
+        topUse: safeText(row[I.TopUse]).trim(),
+        topNot: safeText(row[I.TopNot]).trim(),
+        competitors: safeText(row[I.Competitors]).trim()
+      });
+    }
+
+    return out;
+  }
+
+  function fetchXlsx(){
+    var url = baseUrl() + "Buctril_Super_Activations.xlsx";
+    return fetch(url).then(function(res){
+      if(!res.ok) throw new Error("XLSX not found at: " + url);
+      return res.arrayBuffer();
+    }).then(function(buf){
+      var wb = XLSX.read(buf, { type:"array" });
+      return readSumSheet(wb);
+    });
+  }
+
+  // --------------------------
+  // Filters
+  // --------------------------
+  function setSelectOptions(selectEl, values, placeholder){
+    var cur = selectEl.value;
+    selectEl.innerHTML = "";
+    var opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = placeholder || "All";
+    selectEl.appendChild(opt0);
+
+    values.forEach(function(v){
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v;
+      selectEl.appendChild(o);
+    });
+
+    // preserve selection if possible
+    if(cur && values.indexOf(cur) >= 0) selectEl.value = cur;
+  }
+
+  function uniq(arr){
+    var m = Object.create(null);
+    var out = [];
+    arr.forEach(function(v){
+      v = safeText(v).trim();
+      if(!v) return;
+      var k = v.toLowerCase();
+      if(m[k]) return;
+      m[k] = true;
+      out.push(v);
+    });
+    return out;
+  }
+
+  function rebuildFilterOptions(){
+    var citySel = $("filter-city");
+    var spotSel = $("filter-spot");
+
+    var cities = uniq(ALL.map(function(r){ return r.city; }))
+      .sort(function(a,b){ return a.localeCompare(b); });
+
+    setSelectOptions(citySel, cities, "All Cities");
+
+    var base = ALL;
+    var city = citySel.value || state.city;
+    if(city) base = base.filter(function(r){ return r.city === city; });
+
+    var spots = uniq(base.map(function(r){ return r.spot; }))
+      .sort(function(a,b){ return a.localeCompare(b); });
+
+    setSelectOptions(spotSel, spots, "All Spots");
+  }
+
+  function applyFilters(){
+    var city = $("filter-city").value || "";
+    var spot = $("filter-spot").value || "";
+    var q = $("filter-search").value || "";
+
+    state.city = city;
+    state.spot = spot;
+    state.q = q;
+
+    FILTERED = ALL.filter(function(r){
+      if(city && r.city !== city) return false;
+      if(spot && r.spot !== spot) return false;
+
+      if(q){
+        var s = (r.city + " " + r.spot + " " + r.topUse + " " + r.topNot + " " + r.competitors).toLowerCase();
+        if(s.indexOf(q.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+
+    // keep spot options aligned to selected city
+    rebuildFilterOptions();
+
+    renderAll();
+  }
+
+  function clearFilters(){
+    $("filter-city").value = "";
+    $("filter-spot").value = "";
+    $("filter-search").value = "";
+    state.city = state.spot = state.q = "";
+    rebuildFilterOptions();
+    applyFilters();
+  }
+
+  // --------------------------
+  // Aggregations
+  // --------------------------
+  function sum(arr, fn){
+    var t = 0;
+    for(var i=0;i<arr.length;i++) t += (fn(arr[i])||0);
+    return t;
+  }
+
+  function avg(arr, fn){
+    var vals = [];
+    for(var i=0;i<arr.length;i++){
+      var v = fn(arr[i]);
+      if(v === null || v === undefined) continue;
+      if(!Number.isFinite(v)) continue;
+      vals.push(v);
+    }
+    if(!vals.length) return null;
+    return vals.reduce(function(a,b){ return a+b; },0) / vals.length;
+  }
+
+  function groupBy(arr, keyFn){
+    var m = Object.create(null);
+    arr.forEach(function(r){
+      var k = keyFn(r);
+      if(!k) k = "(Unknown)";
+      if(!m[k]) m[k] = [];
+      m[k].push(r);
+    });
+    return m;
+  }
+
+  // --------------------------
+  // Charts helpers
+  // --------------------------
+  function destroyChart(c){
+    try{ if(c) c.destroy(); }catch(e){}
+  }
+
+  function ensureGaugeDonut(canvasId, color){
+    var ctx = document.getElementById(canvasId).getContext("2d");
     return new Chart(ctx, {
       type: "doughnut",
       data: {
-        labels,
-        datasets: [{ data: values, borderWidth: 0, hoverOffset: 8 }]
+        labels: ["Value","Remainder"],
+        datasets: [{
+          data: [0, 100],
+          backgroundColor: [color, "#e6e6e6"],
+          borderWidth: 0,
+          hoverOffset: 2
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "bottom", labels: { color: "#cfe0f5" } },
-          tooltip: { callbacks: { label: (t)=> `${t.label}: ${fmtInt(t.parsed)}` } }
-        },
-        onClick: onClick || undefined
+        cutout: "72%",
+        plugins: { legend: { display:false }, tooltip: { enabled:false } }
       }
     });
   }
 
-  function makeBar(ctx, labels, values){
+  function setGauge(chart, pct){
+    var v = Number(pct);
+    if(!Number.isFinite(v)) v = 0;
+    v = Math.max(0, Math.min(100, v));
+    chart.data.datasets[0].data = [v, 100-v];
+    chart.update();
+  }
+
+  function ensureBar(canvasId, title){
+    var ctx = document.getElementById(canvasId).getContext("2d");
     return new Chart(ctx, {
       type: "bar",
-      data: { labels, datasets: [{ label: "Count", data: values, borderWidth: 0 }] },
+      data: { labels: [], datasets: [{ label: title, data: [] }] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { display:false },
-          tooltip: { callbacks: { label: (t)=> `${fmtInt(t.parsed.y)}` } }
-        },
+        plugins: { legend: { display:false } },
         scales: {
-          x: { ticks: { color:"#cfe0f5" }, grid: { color:"rgba(255,255,255,.06)" } },
-          y: { ticks: { color:"#cfe0f5" }, grid: { color:"rgba(255,255,255,.06)" } }
+          x: { ticks: { maxRotation: 0, autoSkip: true } },
+          y: { beginAtZero: true }
         }
       }
     });
+  }
+
+  // --------------------------
+  // Render
+  // --------------------------
+  function setProgress(id, pct){
+    var el = $(id);
+    if(!el) return;
+    var v = Number(pct);
+    if(!Number.isFinite(v)) v = 0;
+    v = Math.max(0, Math.min(100, v));
+    el.style.width = v + "%";
+  }
+
+  function renderSnapshot(){
+    var sessions = FILTERED.length;
+    var farmers = sum(FILTERED, function(r){ return r.farmers; });
+    var acres = sum(FILTERED, function(r){ return r.acres; });
+
+    var cities = uniq(FILTERED.map(function(r){ return r.city; })).length;
+
+    $("metric-sessions").textContent = formatInt(sessions);
+    $("metric-farmers").textContent = formatInt(farmers);
+    $("metric-acres").textContent = formatInt(acres);
+    $("metric-cities").textContent = formatInt(cities);
+  }
+
+  function renderHero(){
+    var sessions = ALL.length;
+    var farmers = sum(ALL, function(r){ return r.farmers; });
+    var days = uniq(ALL.map(function(r){ return r.date; })).filter(Boolean).length;
+
+    $("hero-sessions").textContent = formatInt(sessions);
+    $("hero-farmers").textContent = formatInt(farmers);
+    $("metric-days").textContent = days ? formatInt(days) : "–";
+  }
+
+  function renderPerformance(){
+    var a = avg(FILTERED, function(r){ return r.awareness; });
+    var d = avg(FILTERED, function(r){ return r.definite; });
+    var u = avg(FILTERED, function(r){ return r.understanding; });
+    var inf = sum(FILTERED, function(r){ return r.influencers; });
+
+    $("metric-awareness").textContent = a===null ? "–" : formatPct(a);
+    $("metric-definite").textContent = d===null ? "–" : formatPct(d);
+    $("metric-understanding").textContent = u===null ? "–" : formatPct(u);
+    $("metric-influencers").textContent = formatInt(inf);
+
+    setProgress("awareness-progress", a||0);
+    setProgress("definite-progress", d||0);
+    setProgress("understanding-progress", u||0);
+    setProgress("influencers-progress", Math.min(100, FILTERED.length ? (inf / (FILTERED.length*5))*100 : 0));
+
+    $("awareness-main").textContent = a===null ? "–" : formatPct(a);
+    $("definite-main").textContent = d===null ? "–" : formatPct(d);
+
+    if(charts.awarenessDonut) setGauge(charts.awarenessDonut, a||0);
+    if(charts.definiteDonut) setGauge(charts.definiteDonut, d||0);
+
+    // Adoption estimate
+    var est = sum(FILTERED, function(r){
+      var pct = (r.definite===null ? 0 : r.definite) / 100;
+      return r.farmers * clamp01(pct);
+    });
+    $("adoption-text").textContent = "Estimated definite-use farmers: " + formatInt(est);
+  }
+
+  function renderDrillDonut(){
+    var cityGroups = groupBy(FILTERED, function(r){ return r.city; });
+    var cityLabels = Object.keys(cityGroups).sort(function(a,b){
+      return cityGroups[b].length - cityGroups[a].length;
+    });
+    var cityCounts = cityLabels.map(function(c){ return cityGroups[c].length; });
+    var cityColors = cityLabels.map(function(c){ return colorForKey(c); });
+
+    // Spots depend on selected city if any (prefer state.city from dropdown)
+    var base = FILTERED;
+    var selectedCity = $("filter-city").value || "";
+    if(selectedCity){
+      base = base.filter(function(r){ return r.city === selectedCity; });
+    }
+
+    var spotGroups = groupBy(base, function(r){ return r.spot; });
+    var spotLabels = Object.keys(spotGroups).sort(function(a,b){
+      return spotGroups[b].length - spotGroups[a].length;
+    }).slice(0, 12); // keep donut readable
+    var spotCounts = spotLabels.map(function(s){ return spotGroups[s].length; });
+
+    var baseColor = selectedCity ? colorForKey(selectedCity) : "#2e7d32";
+    var spotColors = spotLabels.map(function(_,i){
+      return lighten(baseColor, Math.min(0.7, 0.12 + i*0.05));
+    });
+
+    $("drill-main").textContent = formatInt(FILTERED.length);
+    $("drill-sub").textContent = selectedCity ? ("Spots in " + selectedCity) : "Cities (outer) → Spots (inner)";
+
+    if(!charts.drillDonut){
+      var ctx = document.getElementById("drillDonut").getContext("2d");
+      charts.drillDonut = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: [], // per-dataset
+          datasets: [
+            {
+              label: "Spots",
+              data: [],
+              backgroundColor: [],
+              borderWidth: 0,
+              hoverOffset: 4
+            },
+            {
+              label: "Cities",
+              data: [],
+              backgroundColor: [],
+              borderWidth: 0,
+              hoverOffset: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "45%",
+          plugins: {
+            legend: { position: "bottom" }
+          },
+          onClick: function(evt){
+            var points = charts.drillDonut.getElementsAtEventForMode(evt, "nearest", { intersect:true }, true);
+            if(!points || !points.length) return;
+            var p = points[0];
+            var ds = p.datasetIndex;
+            var idx = p.index;
+
+            if(ds === 1){
+              // City ring (outer)
+              var city = cityLabels[idx];
+              $("filter-city").value = city;
+              $("filter-spot").value = "";
+              $("filter-search").value = $("filter-search").value || "";
+              applyFilters();
+            } else if(ds === 0){
+              // Spot ring (inner)
+              var spot = spotLabels[idx];
+              $("filter-spot").value = spot;
+              applyFilters();
+            }
+          }
+        }
+      });
+    }
+
+    charts.drillDonut.data.datasets[1].data = cityCounts;
+    charts.drillDonut.data.datasets[1].backgroundColor = cityColors;
+    charts.drillDonut.data.datasets[1].labels = cityLabels;
+
+    charts.drillDonut.data.datasets[0].data = spotCounts;
+    charts.drillDonut.data.datasets[0].backgroundColor = spotColors;
+    charts.drillDonut.data.datasets[0].labels = spotLabels;
+
+    // Chart.js legend uses overall labels; we keep it clean by setting labels to cities only.
+    charts.drillDonut.data.labels = cityLabels;
+
+    charts.drillDonut.update();
+  }
+
+  function renderPivots(){
+    var g = groupBy(FILTERED, function(r){ return r.city; });
+    var labels = Object.keys(g).sort(function(a,b){ return g[b].length - g[a].length; });
+
+    // sessions
+    var sessionsByCity = labels.map(function(c){ return g[c].length; });
+
+    // farmers
+    var farmersByCity = labels.map(function(c){
+      return sum(g[c], function(r){ return r.farmers; });
+    });
+
+    // acres
+    var acresByCity = labels.map(function(c){
+      return sum(g[c], function(r){ return r.acres; });
+    });
+
+    // rates: show two datasets (awareness & definite) as grouped bar
+    var awarenessByCity = labels.map(function(c){ return avg(g[c], function(r){ return r.awareness; }) || 0; });
+    var definiteByCity = labels.map(function(c){ return avg(g[c], function(r){ return r.definite; }) || 0; });
+
+    if(!charts.pivotSessionsByCity) charts.pivotSessionsByCity = ensureBar("pivotSessionsByCity", "Sessions by City");
+    if(!charts.pivotFarmersByCity) charts.pivotFarmersByCity = ensureBar("pivotFarmersByCity", "Farmers by City");
+    if(!charts.pivotAcresByCity) charts.pivotAcresByCity = ensureBar("pivotAcresByCity", "Acres by City");
+
+    // Sessions by city
+    charts.pivotSessionsByCity.data.labels = labels;
+    charts.pivotSessionsByCity.data.datasets[0].data = sessionsByCity;
+    charts.pivotSessionsByCity.data.datasets[0].backgroundColor = labels.map(colorForKey);
+    charts.pivotSessionsByCity.update();
+
+    // Farmers by city
+    charts.pivotFarmersByCity.data.labels = labels;
+    charts.pivotFarmersByCity.data.datasets[0].data = farmersByCity;
+    charts.pivotFarmersByCity.data.datasets[0].backgroundColor = labels.map(colorForKey);
+    charts.pivotFarmersByCity.update();
+
+    // Acres by city
+    charts.pivotAcresByCity.data.labels = labels;
+    charts.pivotAcresByCity.data.datasets[0].data = acresByCity;
+    charts.pivotAcresByCity.data.datasets[0].backgroundColor = labels.map(colorForKey);
+    charts.pivotAcresByCity.update();
+
+    // Rates grouped
+    if(!charts.pivotRatesByCity){
+      var ctx = document.getElementById("pivotRatesByCity").getContext("2d");
+      charts.pivotRatesByCity = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "Awareness %", data: [] },
+            { label: "Definite %", data: [] }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero:true, max:100 } }
+        }
+      });
+    }
+    charts.pivotRatesByCity.data.labels = labels;
+    charts.pivotRatesByCity.data.datasets[0].data = awarenessByCity;
+    charts.pivotRatesByCity.data.datasets[1].data = definiteByCity;
+    charts.pivotRatesByCity.update();
+
+    // data quality
+    var withCoords = FILTERED.filter(function(r){ return r.coords && Number.isFinite(r.coords.lat) && Number.isFinite(r.coords.lng); }).length;
+    $("data-quality").textContent = "Data quality: " + formatInt(FILTERED.length) + " sessions parsed; " + formatInt(withCoords) + " have coordinates.";
+  }
+
+  // --------------------------
+  // Map
+  // --------------------------
+  function initMap(){
+    if(map) return;
+    map = L.map("route-map", { scrollWheelZoom:false });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+    mapLayer = L.layerGroup().addTo(map);
+    map.setView([28.0, 69.5], 7);
+  }
+
+  function renderMap(){
+    initMap();
+    mapLayer.clearLayers();
+
+    var pts = [];
+    FILTERED.forEach(function(r){
+      if(!r.coords) return;
+      var lat = r.coords.lat, lng = r.coords.lng;
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      pts.push([lat,lng]);
+
+      var popup = "<strong>" + (r.city||"") + "</strong><br/>" +
+                  safeText(r.spot).replace(/</g,"&lt;") + "<br/>" +
+                  "<span style='color:#666;font-weight:700'>" + safeText(r.date) + "</span><br/>" +
+                  "Farmers: " + formatInt(r.farmers) + " &nbsp; Acres: " + formatInt(r.acres);
+
+      L.circleMarker([lat,lng], {
+        radius: 6,
+        color: colorForKey(r.city),
+        weight: 2,
+        fillColor: colorForKey(r.city),
+        fillOpacity: 0.85
+      }).bindPopup(popup).addTo(mapLayer);
+    });
+
+    if(pts.length >= 2){
+      L.polyline(pts, { color:"#1b5e20", weight:3, opacity:0.7 }).addTo(mapLayer);
+      try{
+        map.fitBounds(pts, { padding:[18,18] });
+      }catch(e){}
+    } else if(pts.length === 1){
+      map.setView(pts[0], 11);
+    }
   }
 
   // --------------------------
   // Media gallery
   // --------------------------
-  function openLightbox(title, node){
-    $("lbTitle").textContent = title || "Media";
-    const body = $("lbBody");
-    body.innerHTML = "";
-    body.appendChild(node);
-    $("lightbox").classList.add("open");
-    $("lightbox").setAttribute("aria-hidden","false");
+  function groupIdFromSrc(src){
+    var name = safeText(src).split("/").pop() || "";
+    name = name.split("?")[0];
+    var base = name.replace(/\.[^.]+$/,""); // remove extension
+    var m = base.match(/^(\d+)/);
+    return m ? m[1] : "misc";
   }
+
+  function safeFetchJson(url){
+    return fetch(url).then(function(res){
+      if(!res.ok) throw new Error("Not found: " + url);
+      return res.json();
+    });
+  }
+
+  function buildMediaTile(item){
+    var tile = document.createElement("div");
+    tile.className = "tile";
+
+    var thumb = document.createElement("div");
+    thumb.className = "thumb";
+
+    var badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = item.type === "video" ? "VIDEO" : "PHOTO";
+
+    if(item.type === "video"){
+      var img = document.createElement("img");
+      img.alt = safeText(item.alt) || "Video";
+      img.src = "Buctril.jpg"; // placeholder thumb
+      thumb.appendChild(img);
+
+      var vid = document.createElement("video");
+      vid.src = item.src;
+      vid.muted = true;
+      vid.loop = true;
+      vid.playsInline = true;
+      vid.preload = "metadata";
+      thumb.appendChild(vid);
+    } else {
+      var im = document.createElement("img");
+      im.alt = safeText(item.alt) || "Image";
+      im.src = item.src;
+      thumb.appendChild(im);
+    }
+
+    thumb.appendChild(badge);
+
+    var cap = document.createElement("div");
+    cap.className = "cap";
+    cap.innerHTML = '<div class="t">' + (safeText(item.caption)||"") + '</div>' +
+                    '<div class="s">' + (safeText(item.transcript)||"") + '</div>';
+
+    tile.appendChild(thumb);
+    tile.appendChild(cap);
+
+    tile.addEventListener("click", function(){
+      openLightbox(item);
+    });
+
+    return tile;
+  }
+
+  function openLightbox(item){
+    var lb = $("lightbox");
+    var img = $("lb-img");
+    var vid = $("lb-video");
+    lb.classList.add("active");
+
+    img.style.display = "none";
+    vid.style.display = "none";
+
+    if(item.type === "video"){
+      vid.src = item.src;
+      vid.style.display = "block";
+      vid.play().catch(function(){});
+    } else {
+      img.src = item.src;
+      img.style.display = "block";
+    }
+  }
+
   function closeLightbox(){
-    $("lightbox").classList.remove("open");
-    $("lightbox").setAttribute("aria-hidden","true");
-    $("lbBody").innerHTML = "";
+    var lb = $("lightbox");
+    var vid = $("lb-video");
+    lb.classList.remove("active");
+    try{ vid.pause(); }catch(e){}
+    vid.removeAttribute("src");
+    vid.load();
   }
 
-  function renderGallery(items){
-    const el = $("gallery");
-    el.innerHTML = "";
-    if(!items || !items.length){
-      el.innerHTML = `<div class="muted">No media items found. Ensure <code>media.json</code> exists and assets are present.</div>`;
-      return;
-    }
+  function renderMedia(){
+    var container = $("media-gallery");
+    if(!container) return;
+    container.innerHTML = "";
 
-    const base = baseHref();
-    items.forEach((it) => {
-      const card = document.createElement("div");
-      card.className = "mediaCard";
-
-      const cap = document.createElement("div");
-      cap.className = "cap";
-      cap.textContent = it.caption || it.alt || "";
-
-      if(it.type === "video"){
-        const v = document.createElement("video");
-        v.className = "thumb";
-        v.src = new URL(it.src, base).href;
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = "metadata";
-
-        // Not autoplaying by default (better for bandwidth); click opens full player
-        card.appendChild(v);
-        card.appendChild(cap);
-
-        card.addEventListener("click", () => {
-          const vv = document.createElement("video");
-          vv.src = v.src;
-          vv.controls = true;
-          vv.playsInline = true;
-          vv.autoplay = true;
-          openLightbox(it.caption || it.alt || "Video", vv);
-        });
-
-      }else{
-        const img = document.createElement("img");
-        img.className = "thumb";
-        img.loading = "lazy";
-        img.alt = it.alt || "";
-        img.src = new URL(it.src, base).href;
-
-        card.appendChild(img);
-        card.appendChild(cap);
-
-        card.addEventListener("click", () => {
-          const ii = document.createElement("img");
-          ii.alt = img.alt;
-          ii.src = img.src;
-          openLightbox(it.caption || it.alt || "Image", ii);
-        });
+    var url = baseUrl() + "media.json";
+    safeFetchJson(url).then(function(items){
+      if(!Array.isArray(items) || !items.length){
+        container.innerHTML = '<div class="muted" style="font-weight:900">No media items found in media.json.</div>';
+        return;
       }
 
-      el.appendChild(card);
-    });
-  }
-
-  async function loadMediaManifest(){
-    const res = await fetchFirstOk(["media.json","assets/gallery/media.json"]);
-    if(!res) return [];
-    try{
-      const json = await res.resp.json();
-      if(Array.isArray(json)) return json;
-      return [];
-    }catch(e){
-      return [];
-    }
-  }
-
-  // --------------------------
-  // Main render flow
-  // --------------------------
-  let ALL = [];
-  let SKIPPED = [];
-
-  function uniqueSorted(arr){
-    const s = Array.from(new Set(arr.filter(Boolean)));
-    s.sort((a,b)=>a.localeCompare(b));
-    return s;
-  }
-
-  function applyFilters(){
-    const city = $("fCity").value || "ALL";
-    const spot = $("fSpot").value || "ALL";
-    const q = toLower($("fSearch").value || "");
-
-    let rows = ALL.slice();
-
-    if(city !== "ALL") rows = rows.filter(r => r.city === city);
-    if(spot !== "ALL") rows = rows.filter(r => r.spot === spot);
-
-    if(q){
-      rows = rows.filter(r => (
-        toLower(r.village).includes(q) ||
-        toLower(r.city).includes(q) ||
-        toLower(r.spot).includes(q) ||
-        toLower(r.topBenefit).includes(q) ||
-        toLower(r.sheet).includes(q)
-      ));
-    }
-    return rows;
-  }
-
-  function sum(rows, key){
-    return rows.reduce((a,r)=>a + (Number(r[key]||0) || 0), 0);
-  }
-
-  function avg(rows, key){
-    if(!rows.length) return 0;
-    return sum(rows, key) / rows.length;
-  }
-
-  function updateKPIs(rows){
-    $("kSessions").textContent = fmtInt(rows.length);
-    $("kSessionsSub").textContent = `Skipped sheets: ${fmtInt(SKIPPED.length)}`;
-
-    const wheatFarmers = sum(rows, "wheatFarmers");
-    const acres = sum(rows, "wheatAcres");
-    const buctrilAcres = sum(rows, "estBuctrilAcres");
-
-    $("kWheatFarmers").textContent = fmtInt(wheatFarmers);
-    $("kWheatFarmersSub").textContent = `Avg awareness: ${fmtPct(avg(rows,"awarePct"))}`;
-
-    $("kAcres").textContent = fmtInt(acres);
-    $("kAcresSub").textContent = `Avg clarity: ${fmtPct(avg(rows,"clarityPct"))}`;
-
-    $("kBuctrilAcres").textContent = fmtInt(buctrilAcres);
-    $("kBuctrilAcresSub").textContent = `Avg definite: ${fmtPct(avg(rows,"defPct"))}`;
-  }
-
-  function updateDataQuality(){
-    const parsed = ALL.length;
-    const skipped = SKIPPED.length;
-    const msg = `Data quality: ${parsed} parsed session sheets, ${skipped} skipped (blank/template or missing quick report title).`;
-    $("dqBox").textContent = msg;
-    $("dqBox").classList.toggle("error", parsed===0);
-  }
-
-  function updateCharts(rows){
-    // City donut = sum wheat farmers by city
-    const byCity = new Map();
-    rows.forEach(r => {
-      const k = r.city || "Unknown";
-      byCity.set(k, (byCity.get(k)||0) + (r.wheatFarmers||0));
-    });
-    const cityLabels = Array.from(byCity.keys()).sort((a,b)=>a.localeCompare(b));
-    const cityValues = cityLabels.map(k => byCity.get(k));
-
-    destroy(cityChart);
-    cityChart = makeDonut(
-      $("cityDonut").getContext("2d"),
-      cityLabels,
-      cityValues,
-      (evt, elems) => {
-        if(!elems || !elems.length) return;
-        const idx = elems[0].index;
-        const selectedCity = cityLabels[idx];
-        $("fCity").value = selectedCity;
-        refresh();
-      }
-    );
-
-    // Spot donut = sum wheat farmers by spot (filtered by selected city if any)
-    const citySelected = $("fCity").value || "ALL";
-    const baseRows = (citySelected==="ALL") ? rows : rows.filter(r=>r.city===citySelected);
-    const bySpot = new Map();
-    baseRows.forEach(r => {
-      const k = r.spot || "Unknown";
-      bySpot.set(k, (bySpot.get(k)||0) + (r.wheatFarmers||0));
-    });
-    const spotLabels = Array.from(bySpot.keys()).sort((a,b)=>a.localeCompare(b));
-    const spotValues = spotLabels.map(k => bySpot.get(k));
-
-    destroy(spotChart);
-    spotChart = makeDonut($("spotDonut").getContext("2d"), spotLabels, spotValues, (evt, elems)=>{
-      if(!elems || !elems.length) return;
-      const idx = elems[0].index;
-      const selectedSpot = spotLabels[idx];
-      $("fSpot").value = selectedSpot;
-      refresh();
-    });
-
-    // Intent donut
-    const def = sum(rows,"definite");
-    const may = sum(rows,"maybe");
-    const no  = sum(rows,"notInterested");
-    destroy(intentChart);
-    intentChart = makeDonut($("intentDonut").getContext("2d"), ["Definite","Maybe","Not Interested"], [def, may, no]);
-
-    // Demo donut
-    const demoYes = rows.filter(r=>r.demoMention).length;
-    const demoNo  = Math.max(0, rows.length - demoYes);
-    destroy(demoChart);
-    demoChart = makeDonut($("demoDonut").getContext("2d"), ["Demo plot mentioned","Not mentioned"], [demoYes, demoNo]);
-
-    // Reasons pivot (aggregate counts)
-    const reasonTotals = new Map();
-    rows.forEach(r=>{
-      (r.reasonsUse||[]).forEach(x=>{
-        const k = x.reason;
-        reasonTotals.set(k, (reasonTotals.get(k)||0) + (x.count||0));
+      // Fix common extension issue: if src endswith .jpeg but actual is .jpg, replace.
+      items.forEach(function(it){
+        if(it && typeof it.src === "string"){
+          it.src = it.src.replace(/\.jpeg(\?|$)/i, ".jpg$1");
+        }
       });
+
+      var groups = groupBy(items, function(it){ return groupIdFromSrc(it.src); });
+      var keys = Object.keys(groups).sort(function(a,b){
+        var na = Number(a), nb = Number(b);
+        if(Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+        return a.localeCompare(b);
+      });
+
+      keys.forEach(function(k){
+        var block = document.createElement("div");
+        block.className = "sessionBlock";
+        block.style.marginBottom = "12px";
+
+        var head = document.createElement("div");
+        head.className = "sessionHead";
+        head.innerHTML = '<div><strong>Media Group ' + k + '</strong></div>' +
+                         '<div class="sessionMeta">' + groups[k].length + ' items</div>';
+
+        var reel = document.createElement("div");
+        reel.className = "reel";
+        groups[k].forEach(function(item){
+          reel.appendChild(buildMediaTile(item));
+        });
+
+        block.appendChild(head);
+        block.appendChild(reel);
+        container.appendChild(block);
+      });
+    }).catch(function(){
+      container.innerHTML = '<div class="muted" style="font-weight:900">media.json not found (or invalid JSON). Place it in repo root.</div>';
     });
-    const top = Array.from(reasonTotals.entries()).sort((a,b)=>b[1]-a[1]).slice(0,10);
-    const rLabels = top.map(x=>x[0]);
-    const rVals = top.map(x=>x[1]);
-
-    destroy(reasonsChart);
-    reasonsChart = makeBar($("reasonsBar").getContext("2d"), rLabels, rVals);
   }
 
-  function updateFilterOptions(){
-    const cities = uniqueSorted(ALL.map(r=>r.city));
-    const spots  = uniqueSorted(ALL.map(r=>r.spot));
-
-    const citySel = $("fCity");
-    const spotSel = $("fSpot");
-
-    const prevCity = citySel.value || "ALL";
-    const prevSpot = spotSel.value || "ALL";
-
-    citySel.innerHTML = `<option value="ALL">All Cities</option>` + cities.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-    spotSel.innerHTML = `<option value="ALL">All Spots</option>` + spots.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
-
-    // restore if possible
-    if(cities.includes(prevCity)) citySel.value = prevCity; else citySel.value = "ALL";
-    if(spots.includes(prevSpot)) spotSel.value = prevSpot; else spotSel.value = "ALL";
-  }
-
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, (m)=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
-  }
-
-  function refresh(){
-    const rows = applyFilters();
-    updateKPIs(rows);
-    updateDataQuality();
-    updateCharts(rows);
-  }
-
-  async function loadXlsx(){
-    const res = await fetchFirstOk(["Buctril_Super_Activations.xlsx"]);
-    if(!res) throw new Error("Buctril_Super_Activations.xlsx not found in repo root.");
-    const buf = await res.resp.arrayBuffer();
-    const wb = XLSX.read(buf, {type:"array"});
-    return wb;
-  }
-
-  async function buildFromXlsx(){
-    setStatus("Loading XLSX (Buctril_Super_Activations.xlsx)…");
-    const wb = await loadXlsx();
-
-    const sheetNames = wb.SheetNames || [];
-    const sessionSheets = sheetNames.filter(n => /^D\d+S\d+$/i.test(n));
-
-    const records = [];
-    const skipped = [];
-
-    for(const name of sessionSheets){
-      const grid = sheetToGrid(wb, name);
-      const rec = extractSessionRecord(name, grid);
-      if(rec) records.push(rec);
-      else skipped.push(name);
+  // --------------------------
+  // Logos + background video resilience
+  // --------------------------
+  function tryAltFilenames(imgEl, candidates){
+    var i = 0;
+    function next(){
+      if(i >= candidates.length) return;
+      imgEl.src = candidates[i++];
     }
-
-    ALL = records;
-    SKIPPED = skipped;
-
-    // Mode indicator
-    $("dataMode").textContent = `Data: XLSX (${records.length} sessions)`;
-    setStatus(`Loaded ${records.length} session sheets from XLSX.`, records.length===0);
-
-    updateFilterOptions();
-    refresh();
+    imgEl.onerror = next;
+    next();
   }
 
-  async function initLogos(){
-    // If logos fail (case mismatch), try a few alternates.
-    async function trySet(imgId, candidates){
-      const img = $(imgId);
-      if(!img) return;
-      const base = baseHref();
-      for(const c of candidates){
-        try{
-          const url = new URL(c, base).href;
-          const r = await fetch(url, {method:"GET", cache:"no-store"});
-          if(r.ok){
-            img.src = url;
-            return;
-          }
-        }catch(e){}
-      }
-    }
-    await trySet("logoBayer", ["Bayer.jpg","bayer.jpg","BAYER.jpg","Bayer.jpeg","bayer.jpeg"]);
-    await trySet("logoBuctril", ["Buctril.jpg","buctril.jpg","BUCTRIL.jpg","Buctril.jpeg","buctril.jpeg"]);
-    await trySet("logoInteract", ["Interact.gif","interact.gif","INTERACT.gif"]);
+  function fixHeaderAssets(){
+    tryAltFilenames($("logoBayer"), ["Bayer.jpg", "bayer.jpg", "BAYER.jpg"]);
+    tryAltFilenames($("logoBuctril"), ["Buctril.jpg", "buctril.jpg", "BUCTRIL.jpg"]);
+    tryAltFilenames($("logoInteract"), ["Interact.gif", "interact.gif", "INTERACT.gif"]);
+
+    var v = $("bgVideo");
+    if(!v) return;
+    // Show the video only if it loads.
+    v.onloadeddata = function(){ v.style.display = "block"; };
+    v.onerror = function(){
+      // Hide if missing.
+      v.style.display = "none";
+    };
   }
 
-  APP.init = async function(){
-    if(ensureTrailingSlash()) return;
+  // --------------------------
+  // Render orchestration
+  // --------------------------
+  function renderAll(){
+    renderSnapshot();
+    renderPerformance();
+    renderDrillDonut();
+    renderPivots();
+    renderMap();
+  }
 
-    $("lbClose").addEventListener("click", closeLightbox);
-    $("lightbox").addEventListener("click", (e)=>{
-      if(e.target && e.target.id==="lightbox") closeLightbox();
+  function initCharts(){
+    destroyChart(charts.awarenessDonut);
+    destroyChart(charts.definiteDonut);
+
+    charts.awarenessDonut = ensureGaugeDonut("awarenessDonut", "#2e7d32");
+    charts.definiteDonut = ensureGaugeDonut("definiteDonut", "#ff7043");
+  }
+
+  function initUI(){
+    fixHeaderAssets();
+
+    $("filter-city").addEventListener("change", function(){
+      // reset spot when city changes
+      $("filter-spot").value = "";
+      applyFilters();
     });
+    $("filter-spot").addEventListener("change", applyFilters);
+    $("filter-search").addEventListener("input", function(){
+      // debounce-ish
+      window.clearTimeout(initUI._t);
+      initUI._t = window.setTimeout(applyFilters, 150);
+    });
+    $("btn-clear").addEventListener("click", clearFilters);
 
-    $("fCity").addEventListener("change", refresh);
-    $("fSpot").addEventListener("change", refresh);
-    $("fSearch").addEventListener("input", refresh);
-    $("btnClear").addEventListener("click", ()=>{
-      $("fCity").value="ALL";
-      $("fSpot").value="ALL";
-      $("fSearch").value="";
-      refresh();
+    $("lb-close").addEventListener("click", closeLightbox);
+    $("lightbox").addEventListener("click", function(e){
+      if(e.target && e.target.id === "lightbox") closeLightbox();
+    });
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape") closeLightbox();
     });
 
-    await initLogos();
+    initCharts();
+    rebuildFilterOptions();
+    applyFilters();
+    renderMedia();
+  }
 
-    // Build from XLSX (primary)
-    try{
-      await buildFromXlsx();
-    }catch(err){
-      setStatus(err.message || String(err), true);
-      $("dataMode").textContent = "Data: ERROR";
-    }
+  // --------------------------
+  // Boot
+  // --------------------------
+  function boot(){
+    setDiagnostics("", false);
 
-    // Media (independent from data)
-    const media = await loadMediaManifest();
-    renderGallery(media);
-  };
+    fetchXlsx().then(function(rows){
+      ALL = rows;
+      FILTERED = rows.slice();
+      renderHero();
 
+      $("loading").style.display = "none";
+      initUI();
+    }).catch(function(err){
+      $("loading").style.display = "none";
+      showError("Error loading XLSX data: " + safeText(err && err.message ? err.message : err));
+      setDiagnostics(
+        "Could not load <code>Buctril_Super_Activations.xlsx</code> or parse the <code>SUM</code> sheet. " +
+        "Confirm the XLSX is in repo root and the GitHub Pages URL ends with a trailing slash.",
+        true
+      );
+    });
+  }
+
+  boot();
 })();
