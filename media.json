@@ -1,26 +1,93 @@
-[
-  {
-    "type": "video",
-    "src": "assets/gallery/1.mp4",
-    "alt": "Activation Video 1",
-    "caption": "Activation Session 1 (Main Video)"
+{
+  "version": 1,
+  "format": "A_compact",
+  "basePath": "assets/gallery/",
+  "defaults": {
+    "mainVideoExt": "mp4",
+    "mainImageExt": "jpg",
+    "variants": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f"
+    ],
+    "variantImageExt": "jpg",
+    "variantVideoExt": "mp4"
   },
-  {
-    "type": "image",
-    "src": "assets/gallery/1.jpg",
-    "alt": "Activation Photo 1",
-    "caption": "Activation Session 1 (Main Photo)"
-  },
-  {
-    "type": "image",
-    "src": "assets/gallery/1a.jpg",
-    "alt": "Activation Photo 1a",
-    "caption": "Activation Session 1 - Variant A"
-  },
-  {
-    "type": "image",
-    "src": "assets/gallery/1b.jpg",
-    "alt": "Activation Photo 1b",
-    "caption": "Activation Session 1 - Variant B"
-  }
-]
+  "sessions": [
+    {
+      "id": 1,
+      "caption": "Activation Session 1"
+    },
+    {
+      "id": 2,
+      "caption": "Activation Session 2"
+    },
+    {
+      "id": 3,
+      "caption": "Activation Session 3"
+    },
+    {
+      "id": 4,
+      "caption": "Activation Session 4"
+    },
+    {
+      "id": 5,
+      "caption": "Activation Session 5"
+    },
+    {
+      "id": 6,
+      "caption": "Activation Session 6"
+    },
+    {
+      "id": 7,
+      "caption": "Activation Session 7"
+    },
+    {
+      "id": 8,
+      "caption": "Activation Session 8"
+    },
+    {
+      "id": 9,
+      "caption": "Activation Session 9"
+    },
+    {
+      "id": 10,
+      "caption": "Activation Session 10"
+    },
+    {
+      "id": 11,
+      "caption": "Activation Session 11"
+    },
+    {
+      "id": 12,
+      "caption": "Activation Session 12"
+    },
+    {
+      "id": 13,
+      "caption": "Activation Session 13"
+    },
+    {
+      "id": 14,
+      "caption": "Activation Session 14"
+    },
+    {
+      "id": 15,
+      "caption": "Activation Session 15"
+    },
+    {
+      "id": 16,
+      "caption": "Activation Session 16"
+    },
+    {
+      "id": 17,
+      "caption": "Activation Session 17"
+    },
+    {
+      "id": 18,
+      "caption": "Activation Session 18"
+    }
+  ]
+}

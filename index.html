@@ -1,408 +1,683 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Buctril Super Farmer Education Drive</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Buctril Super Farmer Education Drive — AgriVista</title>
 
-  <!-- Libraries (JS will also fallback-load if any CDN fails) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet (Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js + XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     :root{
-      --green-900:#0b3d1f;
-      --green-800:#0f5a2b;
-      --green-700:#147a38;
-      --green-100:#dff2e4;
-      --ink:#0b1220;
-      --bg1:#071122;
-      --bg2:#0b1a33;
-      --card:#0f213f;
-      --card2:#102a4c;
-      --stroke:rgba(255,255,255,.10);
-      --muted:rgba(255,255,255,.72);
-      --text:rgba(255,255,255,.92);
-      --shadow:0 18px 50px rgba(0,0,0,.35);
-      --r:18px;
+      --p:#228B22;
+      --p2:#32CD32;
+      --accent:#FFD700;
+      --bg:#F3F7F3;
+      --card:rgba(255,255,255,.78);
+      --card2:rgba(255,255,255,.62);
+      --text:#163018;
+      --muted:#4C5B4C;
+      --border:rgba(17,41,22,.12);
+      --shadow:0 14px 48px rgba(0,0,0,.10);
+      --shadow2:0 8px 28px rgba(0,0,0,.08);
+      --r:22px;
+      --r2:16px;
     }
+
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{
       margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-family:Roboto,system-ui,-apple-system,Segoe UI,Arial,sans-serif;
       color:var(--text);
-      background: radial-gradient(1200px 700px at 15% 20%, rgba(20,122,56,.30), transparent 55%),
-                  radial-gradient(900px 600px at 85% 10%, rgba(15,90,43,.18), transparent 55%),
-                  linear-gradient(160deg, var(--bg1), var(--bg2));
-      min-height:100vh;
-      overflow-x:hidden;
+      background:
+        radial-gradient(900px 420px at 12% 0%, rgba(50,205,50,.14), transparent 55%),
+        radial-gradient(900px 420px at 92% 10%, rgba(255,215,0,.12), transparent 55%),
+        radial-gradient(1100px 520px at 60% 110%, rgba(34,139,34,.10), transparent 60%),
+        var(--bg);
     }
 
-    /* Background video (optional) */
-    .bg-video{
-      position:fixed; inset:0; width:100%; height:100%;
-      object-fit:cover;
-      opacity:.10;
-      filter:saturate(1.05) contrast(1.05);
+    a{color:inherit}
+    .wrap{max-width:1500px; margin:22px auto; padding:0 16px 42px}
+    .glass{
+      background:var(--card);
+      border:1px solid var(--border);
+      box-shadow:var(--shadow);
+      border-radius:var(--r);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    /* HERO */
+    .hero{position:relative; overflow:hidden}
+    .hero .bgVideo{
+      position:absolute; inset:-10px;
+      width:calc(100% + 20px); height:calc(100% + 20px);
+      object-fit:cover; opacity:.18; filter:saturate(1.1) contrast(1.05);
+      transform:scale(1.02);
+    }
+    .hero .overlay{
+      position:absolute; inset:0;
+      background: linear-gradient(135deg, rgba(12,36,16,.65), rgba(12,36,16,.18));
       pointer-events:none;
-      z-index:-2;
-      display:none;
     }
-    .bg-overlay{
-      position:fixed; inset:0;
-      background: radial-gradient(800px 500px at 35% 30%, rgba(0,0,0,.10), rgba(0,0,0,.55));
-      z-index:-1;
-      pointer-events:none;
-    }
-
-    .wrap{max-width:1260px; margin:26px auto 60px; padding:0 18px;}
-    .hero{
-      background: linear-gradient(90deg, rgba(223,242,228,.95), rgba(200,235,210,.85));
-      border-radius: 22px;
-      padding: 26px 26px;
-      box-shadow: var(--shadow);
-      color:#123a21;
-      position:relative;
-      overflow:hidden;
-    }
-    .hero h1{
-      margin:0;
-      font-size:40px;
-      letter-spacing:.2px;
-      color:var(--green-900);
-      font-weight:900;
-    }
-    .hero .sub{
-      margin-top:8px;
-      font-size:18px;
-      font-weight:700;
-      color:rgba(15,90,43,.72);
-    }
-    .hero-row{
-      display:flex;
-      gap:18px;
-      align-items:flex-start;
-      justify-content:space-between;
+    .heroInner{position:relative; padding:22px 22px 18px}
+    .heroTop{
+      display:flex; gap:16px; align-items:flex-start; justify-content:space-between;
       flex-wrap:wrap;
-      margin-top:14px;
     }
-    .hero-badges{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:flex-start;
+    .titleBlock h1{
+      margin:0; font-size:26px; letter-spacing:.2px;
+      color:#F3FFF3;
+      text-shadow:0 8px 28px rgba(0,0,0,.18);
     }
-    .chip{
-      background:rgba(15,90,43,.10);
-      border:1px solid rgba(15,90,43,.18);
-      color:rgba(11,61,31,.92);
-      padding:8px 12px;
-      border-radius:999px;
+    .subtitle{
+      margin-top:6px; color:rgba(243,255,243,.86); font-weight:500;
+    }
+    .rightLogos{display:flex; gap:10px; align-items:center}
+    .logoImg{
+      height:42px; width:auto; border-radius:12px;
+      background:rgba(255,255,255,.75);
+      padding:8px; border:1px solid rgba(255,255,255,.30);
+      box-shadow:0 10px 24px rgba(0,0,0,.12);
+    }
+
+    .heroMeta{
+      display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;
+    }
+    .pill{
+      display:inline-flex; gap:8px; align-items:center;
+      padding:10px 12px; border-radius:999px;
+      background:rgba(255,255,255,.14);
+      border:1px solid rgba(255,255,255,.22);
+      color:#F3FFF3;
+      box-shadow:0 10px 26px rgba(0,0,0,.10);
       font-weight:700;
-      font-size:13px;
     }
-    .logos{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      justify-content:flex-end;
-      margin-left:auto;
-    }
-    .logo{
-      width:64px; height:44px;
-      border-radius:10px;
-      background:rgba(255,255,255,.55);
-      border:1px solid rgba(0,0,0,.10);
-      box-shadow: 0 10px 24px rgba(0,0,0,.12);
-      display:flex; align-items:center; justify-content:center;
-      overflow:hidden;
-    }
-    .logo img{width:100%; height:100%; object-fit:contain;}
-    .days{
-      font-weight:900;
-      color:rgba(11,61,31,.58);
-      font-size:18px;
-      margin-left:10px;
-      white-space:nowrap;
-    }
+    .pill small{opacity:.86; font-weight:700}
 
-    .section{margin-top:18px;}
-    .card{
-      background: linear-gradient(180deg, rgba(16,42,76,.84), rgba(15,33,63,.78));
-      border:1px solid var(--stroke);
-      border-radius: var(--r);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .card-h{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:14px 16px;
-      border-bottom:1px solid rgba(255,255,255,.08);
-    }
-    .card-h h2{
-      margin:0;
-      font-size:18px;
-      letter-spacing:.2px;
-      font-weight:900;
-    }
-    .card-h .hint{color:rgba(255,255,255,.70); font-weight:700; font-size:13px}
-    .card-b{padding:14px 16px;}
-
-    .grid{
+    /* LAYOUT */
+    .layout{
       display:grid;
-      grid-template-columns: 1.25fr .75fr;
-      gap:14px;
+      grid-template-columns: 340px 1fr;
+      gap:16px;
+      margin-top:16px;
+      align-items:start;
     }
-    @media (max-width: 980px){
-      .grid{grid-template-columns:1fr}
-    }
-    .grid2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:14px;
-    }
-    @media (max-width: 980px){
-      .grid2{grid-template-columns:1fr}
+    @media (max-width: 1040px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{position:static}
     }
 
-    .filters{
-      display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+    /* SIDEBAR */
+    .sidebar{position:sticky; top:16px; padding:14px}
+    .sideTitle{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; margin-bottom:10px;
     }
-    .filters label{display:flex; gap:8px; align-items:center; font-weight:800; color:rgba(255,255,255,.82)}
+    .sideTitle h2{margin:0; font-size:14px; letter-spacing:.6px; text-transform:uppercase; color:var(--muted)}
+    .sideTitle .hint{font-size:12px; color:var(--muted)}
+    .fgroup{margin-top:12px}
+    .fgroup label{display:block; font-weight:800; font-size:12px; color:var(--muted); margin:10px 0 6px}
     select,input{
-      background: rgba(255,255,255,.95);
-      border:1px solid rgba(0,0,0,.08);
+      width:100%; padding:10px 12px; border-radius:14px;
+      border:1px solid rgba(17,41,22,.16);
+      background:rgba(255,255,255,.72);
+      outline:none;
+      box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    }
+    input::placeholder{color:rgba(22,48,24,.55)}
+    .btnRow{display:flex; gap:10px; margin-top:12px}
+    .btn{
+      flex:1;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(17,41,22,.16);
+      background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,255,255,.62));
+      cursor:pointer;
+      font-weight:900;
+      color:var(--text);
+      box-shadow:var(--shadow2);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .btn:hover{transform: translateY(-1px); box-shadow:0 14px 40px rgba(0,0,0,.10)}
+    .btn.primary{
+      background: linear-gradient(180deg, rgba(50,205,50,.94), rgba(34,139,34,.92));
+      border-color: rgba(255,255,255,.22);
+      color:#07320B;
+    }
+    .btn.primary:hover{filter:saturate(1.08)}
+    .smallNote{margin-top:10px; font-size:12px; color:var(--muted); line-height:1.35}
+
+    /* MAIN */
+    .main{display:flex; flex-direction:column; gap:16px}
+
+    /* Tabs */
+    .tabs{
+      display:flex; gap:10px; flex-wrap:wrap; padding:12px;
+    }
+    .tabBtn{
+      border:1px solid rgba(17,41,22,.14);
+      background:rgba(255,255,255,.66);
+      border-radius:999px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-weight:900;
+      color:var(--text);
+      box-shadow:0 10px 24px rgba(0,0,0,.06);
+      transition: transform .16s ease, background .16s ease;
+    }
+    .tabBtn:hover{transform: translateY(-1px)}
+    .tabBtn[aria-selected="true"]{
+      background: linear-gradient(180deg, rgba(255,215,0,.88), rgba(255,215,0,.62));
+      border-color: rgba(255,215,0,.40);
+    }
+    .tabPanel{display:none}
+    .tabPanel.active{display:block}
+
+    /* Cards */
+    .card{padding:16px}
+    .cardHeader{
+      display:flex; gap:12px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+    .cardHeader h3{margin:0; font-size:16px}
+    .muted{color:var(--muted); font-weight:700; font-size:12px}
+
+    /* KPIs */
+    .kpiGrid{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap:12px;
+    }
+    @media (max-width: 920px){ .kpiGrid{grid-template-columns: repeat(2, minmax(160px, 1fr))} }
+    @media (max-width: 520px){ .kpiGrid{grid-template-columns: 1fr} }
+
+    .kpi{
+      border-radius:18px;
+      background:rgba(255,255,255,.64);
+      border:1px solid rgba(17,41,22,.10);
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+      padding:12px;
+      overflow:hidden;
+      position:relative;
+      transition: transform .18s ease;
+    }
+    .kpi:hover{transform: translateY(-2px)}
+    .kpi .lbl{font-size:12px; font-weight:900; color:var(--muted); letter-spacing:.3px}
+    .kpi .val{margin-top:6px; font-size:22px; font-weight:900}
+    .kpi .bar{
+      margin-top:10px;
+      height:10px; border-radius:999px;
+      background: rgba(17,41,22,.08);
+      overflow:hidden;
+    }
+    .kpi .bar > div{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, rgba(50,205,50,.95), rgba(255,215,0,.92));
+      border-radius:999px;
+      transition: width .35s ease;
+    }
+
+    /* Showcase */
+    .showcase{
+      margin-top:12px;
+      display:flex; gap:12px; overflow:auto;
+      padding:2px 0 8px;
+      scroll-snap-type: x mandatory;
+    }
+    .showItem{
+      min-width:280px;
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid rgba(17,41,22,.12);
+      background:rgba(255,255,255,.62);
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+      scroll-snap-align: start;
+      cursor:pointer;
+      transition: transform .18s ease;
+    }
+    .showItem:hover{transform: translateY(-2px)}
+    .showItem .media{
+      height:160px; background:rgba(0,0,0,.04);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .showItem img,.showItem video{
+      width:100%; height:100%; object-fit:cover; display:block;
+    }
+    .showItem .cap{padding:10px 12px}
+    .showItem .cap .t{font-weight:900}
+    .showItem .cap .s{margin-top:4px; font-size:12px; color:var(--muted); font-weight:700}
+
+    /* Charts grid */
+    .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px}
+    @media (max-width: 980px){ .grid3{grid-template-columns:1fr} .grid2{grid-template-columns:1fr} }
+
+    .chartBox{
+      border-radius:18px;
+      background:rgba(255,255,255,.62);
+      border:1px solid rgba(17,41,22,.12);
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+      padding:12px;
+    }
+    .chartBox .ct{font-weight:900; font-size:13px; margin-bottom:8px}
+    canvas{max-width:100%}
+
+    /* Map */
+    #map{
+      height:420px;
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid rgba(17,41,22,.12);
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+      background:rgba(255,255,255,.42);
+    }
+    .mapLegend{margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:12px; font-weight:800}
+
+    /* Tables */
+    table{width:100%; border-collapse:collapse}
+    th,td{padding:10px 10px; border-bottom:1px solid rgba(17,41,22,.10); font-size:13px; vertical-align:top}
+    th{font-size:12px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); font-weight:900}
+    tbody tr:hover{background:rgba(50,205,50,.08)}
+    .tableWrap{overflow:auto; border-radius:18px; border:1px solid rgba(17,41,22,.12); background:rgba(255,255,255,.62); box-shadow:0 10px 26px rgba(0,0,0,.06)}
+    .tag{
+      display:inline-flex; padding:4px 10px; border-radius:999px;
+      background:rgba(255,215,0,.20); border:1px solid rgba(255,215,0,.22);
+      font-weight:900; font-size:12px; color:#584600;
+    }
+
+    /* Gallery */
+    #galleryGrid{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+      gap:12px;
+    }
+    .tile{
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid rgba(17,41,22,.12);
+      background:rgba(255,255,255,.62);
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+      cursor:pointer;
+      transition: transform .18s ease;
+    }
+    .tile:hover{transform: translateY(-2px)}
+    .tile .m{height:180px; background:rgba(0,0,0,.04)}
+    .tile img,.tile video{width:100%; height:100%; object-fit:cover; display:block}
+    .tile .c{padding:10px 12px}
+    .tile .c .t{font-weight:900}
+    .tile .c .s{margin-top:4px; color:var(--muted); font-size:12px; font-weight:700}
+
+    /* Notices */
+    .notice{
+      padding:12px 14px;
+      border-radius:18px;
+      border:1px solid rgba(17,41,22,.12);
+      background:rgba(255,255,255,.62);
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+      color:var(--muted);
+      font-size:13px;
+      font-weight:700;
+      line-height:1.35;
+    }
+    .notice strong{color:var(--text)}
+    #diagBox{display:none; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px}
+
+    /* Lightbox */
+    #lightbox{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.62);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:9999;
+    }
+    #lightbox[aria-hidden="false"]{display:flex}
+    .lbCard{
+      width:min(1100px, 96vw);
+      border-radius:22px;
+      overflow:hidden;
+      background:rgba(255,255,255,.92);
+      box-shadow:0 22px 70px rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.30);
+    }
+    .lbHead{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(17,41,22,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.84));
+    }
+    .lbHead .left{display:flex; align-items:center; gap:10px}
+    .iconBtn{
+      border:none;
+      background:rgba(17,41,22,.08);
+      border:1px solid rgba(17,41,22,.10);
       border-radius:12px;
       padding:10px 12px;
-      font-weight:700;
-      min-width:220px;
-      outline:none;
-    }
-    input{min-width:260px}
-    .btn{
-      background: rgba(223,242,228,.95);
-      border: 1px solid rgba(15,90,43,.20);
-      color: var(--green-900);
-      font-weight:900;
-      padding:10px 14px;
-      border-radius: 12px;
       cursor:pointer;
-    }
-
-    .kpis{
-      display:grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap:12px;
-    }
-    @media (max-width: 980px){
-      .kpis{grid-template-columns: repeat(2, 1fr);}
-    }
-    .kpi{
-      padding:14px 14px;
-      border-radius:16px;
-      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
-      border:1px solid rgba(255,255,255,.10);
-    }
-    .kpi .t{font-size:12px; font-weight:900; color:rgba(255,255,255,.70); letter-spacing:.6px}
-    .kpi .v{font-size:26px; font-weight:950; margin-top:6px}
-    .kpi .s{font-size:12px; font-weight:700; color:rgba(255,255,255,.60); margin-top:4px}
-
-    .chart-wrap{height:360px; position:relative;}
-    .chart-wrap.sm{height:320px;}
-    canvas{width:100% !important; height:100% !important;}
-
-    .status{
-      display:none;
-      margin-top:12px;
-      padding:12px 14px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.07);
-      color:rgba(255,255,255,.86);
-      font-weight:700;
-      white-space:pre-wrap;
-    }
-    .status.err{
-      border-color: rgba(255,80,80,.50);
-      background: rgba(255,80,80,.10);
-    }
-
-    /* Media gallery */
-    .media-grid{
-      display:grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap:12px;
-    }
-    @media (max-width: 1100px){ .media-grid{grid-template-columns: repeat(3,1fr);} }
-    @media (max-width: 820px){ .media-grid{grid-template-columns: repeat(2,1fr);} }
-    @media (max-width: 520px){ .media-grid{grid-template-columns: 1fr;} }
-
-    .media-card{
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.18);
-      overflow:hidden;
-      position:relative;
-      min-height:210px;
-    }
-    .media-card .cap{
-      position:absolute; left:0; right:0; bottom:0;
-      padding:10px 10px;
       font-weight:900;
-      font-size:12px;
-      color:rgba(255,255,255,.85);
-      background: linear-gradient(180deg, transparent, rgba(0,0,0,.62));
-      text-overflow:ellipsis;
-      white-space:nowrap;
-      overflow:hidden;
     }
-    .media-card .missing{
-      position:absolute; inset:0;
-      display:flex; align-items:center; justify-content:center;
-      color:rgba(255,255,255,.70);
-      font-weight:900;
-      text-align:center;
-      padding:14px;
-    }
-    .media-card img, .media-card video{
-      width:100%; height:100%;
-      object-fit:cover;
-      display:block;
+    .iconBtn:hover{background:rgba(17,41,22,.12)}
+    .lbBody{padding:14px}
+    #lbMedia{border-radius:18px; overflow:hidden; background:rgba(0,0,0,.04)}
+    #lbMedia img,#lbMedia video{width:100%; max-height:62vh; object-fit:contain; display:block; background:#000}
+    #lbCaption{margin-top:10px; font-weight:900}
+    #lbTranscript{margin-top:8px; color:var(--muted); font-weight:700; font-size:13px; line-height:1.35}
+
+    /* Motion reduce */
+    @media (prefers-reduced-motion: reduce){
+      *{transition:none !important; animation:none !important}
     }
   </style>
 </head>
-
 <body>
-  <video id="bgVideo" class="bg-video" autoplay muted loop playsinline></video>
-  <div class="bg-overlay"></div>
-
   <div class="wrap">
-    <div class="hero">
-      <h1>Buctril Super Farmer Education Drive</h1>
-      <div class="sub">Donut navigation (Cities → Spots) + Pivot charts + Session story media</div>
-
-      <div class="hero-row">
-        <div class="hero-badges">
-          <div class="chip">Outer donut = Cities (multi-color)</div>
-          <div class="chip">Inner donut = Spots (drilldown)</div>
-          <div class="chip">Click donut segment to filter</div>
-          <div class="chip">Counts-based pivots (no phone-number sums)</div>
-        </div>
-
-        <div class="logos">
-          <div class="logo"><img id="logoBayer" alt="Bayer"/></div>
-          <div class="logo"><img id="logoBuctril" alt="Buctril"/></div>
-          <div class="logo"><img id="logoInteract" alt="Interact"/></div>
-          <div class="days">Campaign Days: <span id="campaignDays">–</span></div>
-        </div>
-      </div>
-
-      <div id="status" class="status"></div>
-    </div>
-
-    <div class="section card">
-      <div class="card-h">
-        <h2>Filters</h2>
-        <div class="hint">City/Spot drilldown + search</div>
-      </div>
-      <div class="card-b">
-        <div class="filters">
-          <label>City:
-            <select id="citySel"></select>
-          </label>
-          <label>Spot:
-            <select id="spotSel"></select>
-          </label>
-          <label>Search:
-            <input id="searchBox" placeholder="Search city, spot, remarks, notes..." />
-          </label>
-          <button class="btn" id="clearBtn">Clear</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="section card">
-      <div class="card-h">
-        <h2>Snapshot (Filtered)</h2>
-        <div class="hint">Sessions, farmers, acres, cities</div>
-      </div>
-      <div class="card-b">
-        <div class="kpis">
-          <div class="kpi"><div class="t">SESSIONS</div><div class="v" id="kSessions">–</div><div class="s" id="kSessionsS">–</div></div>
-          <div class="kpi"><div class="t">FARMERS</div><div class="v" id="kFarmers">–</div><div class="s" id="kFarmersS">Total Farmers</div></div>
-          <div class="kpi"><div class="t">ACRES COVERED</div><div class="v" id="kAcres">–</div><div class="s" id="kAcresS">Total Wheat Acres</div></div>
-          <div class="kpi"><div class="t">CITIES VISITED</div><div class="v" id="kCities">–</div><div class="s" id="kCitiesS">Distinct cities</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section grid">
-      <div class="card">
-        <div class="card-h">
-          <h2>Activity drilldown donut</h2>
-          <div class="hint">Cities donut (click) → Spots donut</div>
-        </div>
-        <div class="card-b">
-          <div class="grid2">
-            <div>
-              <div class="hint" style="margin-bottom:10px">Cities</div>
-              <div class="chart-wrap"><canvas id="cityDonut"></canvas></div>
-            </div>
-            <div>
-              <div class="hint" style="margin-bottom:10px">Spots (selected city)</div>
-              <div class="chart-wrap"><canvas id="spotDonut"></canvas></div>
-            </div>
+    <header class="hero glass" role="banner" aria-label="Buctril Super Farmer Education Drive header">
+      <video id="bgVideo" class="bgVideo" autoplay muted loop playsinline preload="metadata"></video>
+      <div class="overlay"></div>
+      <div class="heroInner">
+        <div class="heroTop">
+          <div class="titleBlock">
+            <h1>Buctril Super Farmer Education Drive</h1>
+            <div class="subtitle">AgriVista — modern drilldowns, pivots, map, and media showcases</div>
+          </div>
+          <div class="rightLogos" aria-label="Brand logos">
+            <img class="logoImg" src="assets/bayer.png" alt="Bayer" onerror="this.style.display='none'" />
+            <img class="logoImg" src="assets/product.png" alt="Buctril Super" onerror="this.style.display='none'" />
+            <img class="logoImg" src="assets/Interact.gif" alt="Interact" onerror="this.style.display='none'" />
           </div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="card-h">
-          <h2>Intent donut</h2>
-          <div class="hint">Plan Yes / Maybe / No</div>
-        </div>
-        <div class="card-b">
-          <div class="chart-wrap"><canvas id="intentDonut"></canvas></div>
+        <div class="heroMeta">
+          <div class="pill"><small>Campaign Days</small> <span id="campaignDays">—</span></div>
+          <div class="pill"><small>Data</small> <span id="status-xlsx">XLSX: pending</span></div>
+          <div class="pill"><small>Media</small> <span id="status-csv">media.json: pending</span></div>
         </div>
       </div>
+    </header>
+
+    <div class="layout">
+      <!-- SIDEBAR (filters) -->
+      <aside class="sidebar glass" aria-label="Filters sidebar">
+        <div class="sideTitle">
+          <h2>Filters</h2>
+          <div class="hint">Sticky</div>
+        </div>
+
+        <div class="fgroup">
+          <label for="filter-city">City</label>
+          <select id="filter-city" aria-label="Filter by city"></select>
+
+          <!-- Keep legacy ID (filter-district). Also add alias for Spot as requested. -->
+          <label for="filter-district">Spot</label>
+          <select id="filter-district" aria-label="Filter by spot"></select>
+          <input id="filter-spot" type="hidden" />
+
+          <label for="filter-date-from">Date from</label>
+          <input id="filter-date-from" type="date" aria-label="Filter date from" />
+
+          <label for="filter-date-to">Date to</label>
+          <input id="filter-date-to" type="date" aria-label="Filter date to" />
+
+          <label for="filter-search">Search</label>
+          <input id="filter-search" type="text" placeholder="City, spot, dealer, notes…" aria-label="Search text" />
+        </div>
+
+        <div class="btnRow">
+          <button class="btn primary" id="btn-export" type="button">Export CSV</button>
+          <button class="btn" id="btn-reset" type="button">Reset</button>
+        </div>
+
+        <div class="smallNote">
+          Tip: Click any donut slice to drill down. Click any media tile to open the lightbox (Prev/Next supported).
+        </div>
+
+        <div class="notice" id="noticeBox" style="margin-top:12px" aria-live="polite">
+          <strong>Status:</strong> initializing…
+        </div>
+        <div class="notice" id="diagBox" style="margin-top:10px"></div>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="main" aria-label="Dashboard main content">
+        <!-- Tabs -->
+        <section class="glass tabs" aria-label="Tabs">
+          <button class="tabBtn" type="button" data-tab="tab-snapshot" aria-selected="true">Snapshot</button>
+          <button class="tabBtn" type="button" data-tab="tab-analytics" aria-selected="false">Analytics</button>
+          <button class="tabBtn" type="button" data-tab="tab-map" aria-selected="false">Map</button>
+          <button class="tabBtn" type="button" data-tab="tab-media" aria-selected="false">Media</button>
+          <button class="tabBtn" type="button" data-tab="tab-sessions" aria-selected="false">Sessions</button>
+        </section>
+
+        <!-- SNAPSHOT -->
+        <section id="tab-snapshot" class="tabPanel active">
+          <section class="glass card">
+            <div class="cardHeader">
+              <h3>Snapshot (Filtered)</h3>
+              <div class="muted">KPIs update instantly with filters</div>
+            </div>
+
+            <div class="kpiGrid">
+              <div class="kpi">
+                <div class="lbl">Sessions</div>
+                <div class="val" id="kpi-sessions">—</div>
+                <div class="bar"><div id="bar-sessions"></div></div>
+              </div>
+              <div class="kpi">
+                <div class="lbl">Farmers</div>
+                <div class="val" id="kpi-farmers">—</div>
+                <div class="bar"><div id="bar-farmers"></div></div>
+              </div>
+              <div class="kpi">
+                <div class="lbl">Acres covered</div>
+                <div class="val" id="kpi-acres">—</div>
+                <div class="bar"><div id="bar-acres"></div></div>
+              </div>
+              <div class="kpi">
+                <div class="lbl">Demo-plot desire</div>
+                <div class="val" id="kpi-demo">—</div>
+                <div class="bar"><div id="bar-demo"></div></div>
+              </div>
+            </div>
+
+            <div class="showcase" id="snapshotShowcase" aria-label="Snapshot showcase"></div>
+          </section>
+
+          <section class="glass card" style="margin-top:16px">
+            <div class="cardHeader">
+              <h3>Highlights</h3>
+              <div class="muted">Auto-extracted callouts from recent / relevant sessions</div>
+            </div>
+            <div id="highlightsTrack" class="showcase" aria-label="Highlights track"></div>
+          </section>
+
+          <section class="glass card" style="margin-top:16px">
+            <div class="cardHeader">
+              <h3>Action List</h3>
+              <div class="muted">Threshold-driven recommendations</div>
+            </div>
+            <div class="tableWrap">
+              <table>
+                <thead><tr><th>Priority</th><th>Finding</th><th>Recommended action</th></tr></thead>
+                <tbody id="actionList"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <!-- ANALYTICS -->
+        <section id="tab-analytics" class="tabPanel">
+          <section class="glass card">
+            <div class="cardHeader">
+              <h3>Donut Navigation + Pivots (Filtered)</h3>
+              <div class="muted">Cities / spots / intent, plus trends</div>
+            </div>
+
+            <div class="grid3">
+              <div class="chartBox">
+                <div class="ct">Activity drilldown (Cities ➝ Spots)</div>
+                <canvas id="chartCities" aria-label="Cities donut chart"></canvas>
+              </div>
+              <div class="chartBox">
+                <div class="ct">Intent donut</div>
+                <canvas id="chartIntent" aria-label="Intent donut chart"></canvas>
+              </div>
+              <div class="chartBox">
+                <div class="ct">Trends over time</div>
+                <canvas id="chartTrend" aria-label="Trends chart"></canvas>
+              </div>
+            </div>
+
+            <div class="grid2" style="margin-top:12px">
+              <div class="chartBox">
+                <div class="ct">Performance (Awareness / Clarity / Definite)</div>
+                <canvas id="chartPerf" aria-label="Performance chart"></canvas>
+              </div>
+              <div class="chartBox">
+                <div class="ct">Farmer-level intent (from session sheets)</div>
+                <canvas id="chartBackchecker" aria-label="Farmer intent chart"></canvas>
+              </div>
+            </div>
+
+            <div class="showcase" id="chartsShowcase" aria-label="Charts showcase"></div>
+          </section>
+
+          <section class="glass card" style="margin-top:16px">
+            <div class="cardHeader">
+              <h3>Top reasons to USE / NOT use</h3>
+              <div class="muted">Pivoted from SUM sheet “reasons” columns (where present)</div>
+            </div>
+
+            <div class="grid2">
+              <div class="chartBox">
+                <div class="ct">Top reasons to USE</div>
+                <div class="tableWrap">
+                  <table>
+                    <thead><tr><th>Reason</th><th>Count</th></tr></thead>
+                    <tbody id="reasonsUse"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="chartBox">
+                <div class="ct">Top reasons NOT to use</div>
+                <div class="tableWrap">
+                  <table>
+                    <thead><tr><th>Reason</th><th>Count</th></tr></thead>
+                    <tbody id="reasonsNoUse"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- MAP -->
+        <section id="tab-map" class="tabPanel">
+          <section class="glass card">
+            <div class="cardHeader">
+              <h3>Leaflet Map (Re-enabled)</h3>
+              <div class="muted">Sessions with coordinates; route line is date-ordered</div>
+            </div>
+
+            <div id="map" aria-label="Leaflet map"></div>
+            <div class="mapLegend">
+              <span class="tag">Marker: session</span>
+              <span>Click a marker to see details</span>
+              <span>Note: if coordinates are missing, the session will not be plotted.</span>
+            </div>
+
+            <div class="showcase" id="mapShowcase" aria-label="Map showcase"></div>
+          </section>
+        </section>
+
+        <!-- MEDIA -->
+        <section id="tab-media" class="tabPanel">
+          <section class="glass card">
+            <div class="cardHeader">
+              <h3>Session Story Media</h3>
+              <div class="muted">Gallery is filter-aware (best-effort session linking)</div>
+            </div>
+
+            <div id="galleryGrid" aria-label="Media gallery"></div>
+          </section>
+        </section>
+
+        <!-- SESSIONS -->
+        <section id="tab-sessions" class="tabPanel">
+          <section class="glass card">
+            <div class="cardHeader">
+              <h3>Sessions Table</h3>
+              <div class="muted">Click a row to open the nearest media item (if any)</div>
+            </div>
+
+            <div class="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SN</th>
+                    <th>Date</th>
+                    <th>City</th>
+                    <th>Spot</th>
+                    <th>Farmers</th>
+                    <th>Acres</th>
+                    <th>Definite</th>
+                    <th>Maybe</th>
+                    <th>Not</th>
+                    <th>Awareness</th>
+                    <th>Clarity</th>
+                  </tr>
+                </thead>
+                <tbody id="tblSessions"></tbody>
+              </table>
+            </div>
+
+            <div class="notice" style="margin-top:12px">
+              <strong>Backchecker / Benefits:</strong> if you want the “last 3 rows per session sheet” logic back exactly, say so and I’ll align the extractor to your latest workbook conventions.
+            </div>
+
+            <!-- Keep legacy IDs for compatibility -->
+            <div style="display:none">
+              <canvas id="chartBenefit"></canvas>
+              <table><tbody id="tblBackchecker"></tbody></table>
+            </div>
+          </section>
+        </section>
+      </main>
     </div>
 
-    <div class="section grid2">
-      <div class="card">
-        <div class="card-h">
-          <h2>Top reasons to USE</h2>
-          <div class="hint">Summed counts from “Reason to Use:” columns</div>
+    <!-- LIGHTBOX -->
+    <div id="lightbox" aria-hidden="true" role="dialog" aria-label="Media lightbox">
+      <div class="lbCard">
+        <div class="lbHead">
+          <div class="left">
+            <button class="iconBtn" id="lbPrev" type="button" aria-label="Previous media">Prev</button>
+            <button class="iconBtn" id="lbNext" type="button" aria-label="Next media">Next</button>
+          </div>
+          <button class="iconBtn" id="lbClose" type="button" aria-label="Close lightbox">Close</button>
         </div>
-        <div class="card-b">
-          <div class="chart-wrap sm"><canvas id="useBar"></canvas></div>
+        <div class="lbBody">
+          <div id="lbMedia"></div>
+          <div id="lbCaption"></div>
+          <div id="lbTranscript"></div>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="card-h">
-          <h2>Top reasons NOT to use</h2>
-          <div class="hint">Summed counts from “Reason Not to Use:” columns</div>
-        </div>
-        <div class="card-b">
-          <div class="chart-wrap sm"><canvas id="notUseBar"></canvas></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section card">
-      <div class="card-h">
-        <h2>Session story media</h2>
-        <div class="hint">Loaded from media.json (or assets/gallery/media.json)</div>
-      </div>
-      <div class="card-b">
-        <div id="mediaGrid" class="media-grid"></div>
       </div>
     </div>
   </div>
 
-  <script src="data_processor.js"></script>
+  <!-- App logic -->
+  <script src="data_processor.js" defer></script>
 </body>
 </html>
