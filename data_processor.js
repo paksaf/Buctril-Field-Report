@@ -1,7 +1,8 @@
 /* AgriVista dashboard logic (Leaflet + Chart.js + XLSX)
    - Reads: Buctril_Super_Activations.xlsx (sheet: SUM; session sheets: D#S#)
-   - Reads: media.json (format A_compact or legacy flat array)
-   - Updates: KPIs, charts, map, sessions table, media gallery, showcases
+   - Reads: media.json (A_compact or flat array)
+   - Updates: KPIs, charts, map (acre bubbles), sessions table, gallery, showcases
+   - Best-match parsing enabled for inconsistent header names.
 */
 (() => {
   'use strict';
@@ -9,89 +10,81 @@
   const CFG = Object.freeze({
     xlsx: 'Buctril_Super_Activations.xlsx',
     media: 'media.json',
-    defaultMapCenter: [30.3753, 69.3451], // Pakistan
-    defaultMapZoom: 5,
-    maxGalleryItems: 60,
-    maxShowcaseItems: 10,
-    maxReasons: 12,
+    heroVideo: 'assets/bg.mp4',           // optional; if missing it will be hidden automatically
+    mapCenter: [30.3753, 69.3451],        // Pakistan
+    mapZoom: 5,
+    maxGallery: 72,
+    maxShowcase: 10,
+    maxReasons: 10,
+    routeLine: true,
+    // Bubble sizing:
+    // Use true-area circles (meters). 1 acre = 4046.86 m^2.
+    // Optional clamp (meters) to keep visuals sane if acres are very large.
+    bubbleClampMeters: 5000,
   });
 
+  // --- DOM helpers (IDs preserved from index.html) ---
   const $ = (id) => document.getElementById(id);
-  const fmtInt = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : '—');
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const qa = (sel) => Array.from(document.querySelectorAll(sel));
 
-  function setText(id, v) {
+  function setText(id, val) {
     const el = $(id);
-    if (el) el.textContent = v;
+    if (el) el.textContent = val;
   }
 
-  function setNotice(msg, isError = false) {
+  function setNotice(msg, isErr = false) {
     const nb = $('noticeBox');
     if (!nb) return;
-    nb.innerHTML = `<strong>${isError ? 'Error' : 'Status'}:</strong> ${escapeHtml(String(msg))}`;
-    nb.style.borderColor = isError ? 'rgba(165,42,42,.28)' : 'rgba(17,41,22,.12)';
+    nb.innerHTML = `<strong>${isErr ? 'Error' : 'Status'}:</strong> ${escapeHtml(String(msg))}`;
+    nb.style.borderColor = isErr ? 'rgba(251,113,133,.55)' : 'rgba(255,255,255,.14)';
   }
 
-  function setDiag(txt) {
-    const db = $('diagBox');
-    if (!db) return;
-    if (!txt) {
-      db.style.display = 'none';
-      db.textContent = '';
-      return;
-    }
-    db.style.display = 'block';
-    db.textContent = txt;
+  function logDiag(line) {
+    const el = $('diagBox');
+    if (!el) return;
+    const ts = new Date().toISOString().split('T')[1].replace('Z', '');
+    el.textContent = `[${ts}] ${line}\n` + el.textContent;
   }
+
+  // --- Formatting ---
+  const fmtInt = (n) => Number.isFinite(n) ? Math.round(n).toLocaleString() : '—';
+  const fmt1 = (n) => Number.isFinite(n) ? (Math.round(n * 10) / 10).toLocaleString() : '—';
+  const fmtPct = (p) => Number.isFinite(p) ? `${Math.round(p)}%` : '—';
 
   function escapeHtml(s) {
-    return s
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
+    return String(s).replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[m]));
   }
 
+  // --- Normalization / parsing ---
   function norm(s) {
     return String(s ?? '')
       .trim()
       .toLowerCase()
       .replace(/\s+/g, ' ')
-      .replace(/[^\w% ]+/g, '');
+      .replace(/[^\w% ]/g, '');
   }
 
-  function asNumber(v) {
-    if (v == null) return NaN;
-    if (typeof v === 'number') return v;
-    if (v instanceof Date) return NaN;
-    const s = String(v).trim();
+  function asNum(v) {
+    if (v === null || v === undefined) return NaN;
+    const s = String(v).replace(/[,]/g, '').trim();
     if (!s) return NaN;
-    // handle "12,345" or "65%" or "65 %"
-    const cleaned = s.replace(/,/g, '').replace(/%/g, '').trim();
-    const n = Number(cleaned);
+    const n = Number(s.replace(/[ %]/g, ''));
     return Number.isFinite(n) ? n : NaN;
   }
 
   function asDate(v) {
+    if (!v) return null;
     if (v instanceof Date && !isNaN(v.getTime())) return v;
-    if (typeof v === 'number' && typeof XLSX !== 'undefined' && XLSX.SSF && XLSX.SSF.parse_date_code) {
-      // Excel date serial
+
+    // Excel serial date (best effort)
+    if (typeof v === 'number' && window.XLSX?.SSF?.parse_date_code) {
       const dc = XLSX.SSF.parse_date_code(v);
       if (dc && dc.y && dc.m && dc.d) return new Date(dc.y, dc.m - 1, dc.d);
     }
-    const s = String(v ?? '').trim();
-    if (!s) return null;
 
-    // Try yyyy-mm-dd first
-    const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-    if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
-
-    // Try dd-mm-yyyy
-    const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
-    if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
-
-    const dt = new Date(s);
+    const dt = new Date(String(v));
     return isNaN(dt.getTime()) ? null : dt;
   }
 
@@ -99,1306 +92,8 @@
     if (!d) return '—';
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
-    const da = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${da}`;
-  }
-
-  function uniq(arr) {
-    return Array.from(new Set(arr.filter(Boolean)));
-  }
-
-  function safeUrl(rel) {
-    // Robust relative URL resolution on GitHub Pages (handles both / and /index.html)
-    return new URL(rel, window.location.href).toString();
-  }
-
-  // --- App state ---
-  const state = {
-    wb: null,
-    sessions: [],
-    farmers: [],
-    mediaItems: [],
-    filteredSessions: [],
-    filteredFarmers: [],
-    filteredMedia: [],
-    totals: { sessions: 0, farmers: 0, acres: 0, demo: 0 },
-    drill: { city: null }, // donut drill state
-    charts: {},
-    map: { map: null, markers: null, route: null },
-    lightbox: { items: [], idx: 0 },
-  };
-
-  // --- Tabs ---
-  function initTabs() {
-    const buttons = Array.from(document.querySelectorAll('.tabBtn'));
-    const panels = new Map();
-    for (const b of buttons) {
-      const id = b.getAttribute('data-tab');
-      if (id) panels.set(id, $(id));
-      b.addEventListener('click', () => {
-        for (const bb of buttons) bb.setAttribute('aria-selected', bb === b ? 'true' : 'false');
-        for (const [pid, p] of panels.entries()) p.classList.toggle('active', pid === id);
-      });
-    }
-  }
-
-  // --- Lightbox ---
-  function initLightbox() {
-    const lb = $('lightbox');
-    const btnClose = $('lbClose');
-    const btnPrev = $('lbPrev');
-    const btnNext = $('lbNext');
-
-    if (btnClose) btnClose.addEventListener('click', closeLightbox);
-    if (btnPrev) btnPrev.addEventListener('click', () => showLightbox(state.lightbox.idx - 1));
-    if (btnNext) btnNext.addEventListener('click', () => showLightbox(state.lightbox.idx + 1));
-
-    if (lb) lb.addEventListener('click', (e) => {
-      if (e.target === lb) closeLightbox();
-    });
-
-    window.addEventListener('keydown', (e) => {
-      const open = lb && lb.getAttribute('aria-hidden') === 'false';
-      if (!open) return;
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowLeft') showLightbox(state.lightbox.idx - 1);
-      if (e.key === 'ArrowRight') showLightbox(state.lightbox.idx + 1);
-    });
-  }
-
-  function openLightbox(items, idx) {
-    state.lightbox.items = items || [];
-    state.lightbox.idx = clamp(idx ?? 0, 0, Math.max(0, state.lightbox.items.length - 1));
-    const lb = $('lightbox');
-    if (!lb) return;
-    lb.setAttribute('aria-hidden', 'false');
-    showLightbox(state.lightbox.idx);
-  }
-
-  function closeLightbox() {
-    const lb = $('lightbox');
-    if (!lb) return;
-    lb.setAttribute('aria-hidden', 'true');
-    const m = $('lbMedia');
-    if (m) m.innerHTML = '';
-  }
-
-  function showLightbox(idx) {
-    if (!state.lightbox.items.length) return;
-    state.lightbox.idx = clamp(idx, 0, state.lightbox.items.length - 1);
-    const it = state.lightbox.items[state.lightbox.idx];
-
-    const mediaWrap = $('lbMedia');
-    const cap = $('lbCaption');
-    const tr = $('lbTranscript');
-    if (!mediaWrap) return;
-
-    mediaWrap.innerHTML = '';
-    if (it.type === 'video') {
-      const v = document.createElement('video');
-      v.src = it.src;
-      v.controls = true;
-      v.autoplay = true;
-      v.playsInline = true;
-      v.preload = 'metadata';
-      v.addEventListener('error', () => {
-        v.outerHTML = `<div style="padding:14px;font-weight:800;color:#7a2b2b">Video not found: ${escapeHtml(it.src)}</div>`;
-      });
-      mediaWrap.appendChild(v);
-    } else {
-      const img = document.createElement('img');
-      img.src = it.src;
-      img.alt = it.caption || 'Media';
-      img.addEventListener('error', () => {
-        img.outerHTML = `<div style="padding:14px;font-weight:800;color:#7a2b2b">Image not found: ${escapeHtml(it.src)}</div>`;
-      });
-      mediaWrap.appendChild(img);
-    }
-
-    if (cap) cap.textContent = it.caption || '';
-    if (tr) tr.textContent = it.transcript || '';
-  }
-
-  // --- Filters ---
-  function initFilters() {
-    const citySel = $('filter-city');
-    const distSel = $('filter-district');
-    const spotAlias = $('filter-spot'); // hidden alias
-    const fromEl = $('filter-date-from');
-    const toEl = $('filter-date-to');
-    const searchEl = $('filter-search');
-
-    const resetBtn = $('btn-reset');
-    const exportBtn = $('btn-export');
-
-    function syncSpotAlias() {
-      if (spotAlias && distSel) spotAlias.value = distSel.value;
-    }
-
-    if (citySel) citySel.addEventListener('change', () => { state.drill.city = null; applyFilters(); });
-    if (distSel) distSel.addEventListener('change', () => { syncSpotAlias(); applyFilters(); });
-    if (fromEl) fromEl.addEventListener('change', applyFilters);
-    if (toEl) toEl.addEventListener('change', applyFilters);
-    if (searchEl) searchEl.addEventListener('input', debounce(applyFilters, 140));
-
-    if (resetBtn) resetBtn.addEventListener('click', () => {
-      if (citySel) citySel.value = '__ALL__';
-      if (distSel) distSel.value = '__ALL__';
-      if (spotAlias) spotAlias.value = '__ALL__';
-      if (fromEl) fromEl.value = '';
-      if (toEl) toEl.value = '';
-      if (searchEl) searchEl.value = '';
-      state.drill.city = null;
-      applyFilters();
-    });
-
-    if (exportBtn) exportBtn.addEventListener('click', exportCSV);
-
-    // initial sync
-    syncSpotAlias();
-  }
-
-  function populateSelect(el, options, selected) {
-    if (!el) return;
-    const opts = ['__ALL__', ...options];
-    const label = (v) => (v === '__ALL__' ? 'All' : v);
-    el.innerHTML = opts.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(label(v))}</option>`).join('');
-    if (selected && opts.includes(selected)) el.value = selected;
-    else el.value = '__ALL__';
-  }
-
-  function getFilter() {
-    const city = $('filter-city')?.value || '__ALL__';
-    const dist = $('filter-district')?.value || '__ALL__';
-    const from = asDate($('filter-date-from')?.value);
-    const to = asDate($('filter-date-to')?.value);
-    const search = norm($('filter-search')?.value || '');
-    return { city, dist, from, to, search };
-  }
-
-  function inRange(d, from, to) {
-    if (!d) return true;
-    const t = d.getTime();
-    if (from && t < from.getTime()) return false;
-    if (to) {
-      // inclusive end-date
-      const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
-      if (t > end.getTime()) return false;
-    }
-    return true;
-  }
-
-  function applyFilters() {
-    const f = getFilter();
-
-    // Spot list depends on City selection
-    const allSpots = uniq(state.sessions
-      .filter(r => f.city === '__ALL__' ? true : r.city === f.city)
-      .map(r => r.spot));
-    populateSelect($('filter-district'), allSpots, f.dist);
-
-    // now get dist again (it might have been reset by populateSelect)
-    const dist = $('filter-district')?.value || '__ALL__';
-
-    const filtered = state.sessions.filter(r => {
-      if (f.city !== '__ALL__' && r.city !== f.city) return false;
-      if (dist !== '__ALL__' && r.spot !== dist) return false;
-      if (!inRange(r.date, f.from, f.to)) return false;
-      if (f.search && !(r.searchText || '').includes(f.search)) return false;
-      return true;
-    });
-
-    state.filteredSessions = filtered;
-
-    const sheetSet = new Set(filtered.map(r => r.sessionSheet).filter(Boolean));
-    state.filteredFarmers = state.farmers.filter(fr => sheetSet.size ? sheetSet.has(fr.sessionSheet) : true);
-
-    const sessionIdSet = new Set();
-    for (const r of filtered) {
-      if (Number.isFinite(r.sn)) sessionIdSet.add(r.sn);
-      if (Number.isFinite(r.day)) sessionIdSet.add(r.day);
-    }
-    state.filteredMedia = state.mediaItems.filter(mi => sessionIdSet.size ? sessionIdSet.has(mi.sessionId) : true);
-
-    renderAll();
-  }
-
-  // --- Loading ---
-  async function loadWorkbook() {
-    if (typeof XLSX === 'undefined') throw new Error('XLSX library not available (xlsx.full.min.js failed to load).');
-
-    setText('status-xlsx', 'XLSX: loading…');
-    const url = safeUrl(CFG.xlsx);
-
-    let buf;
-    try {
-      const res = await fetch(url, { cache: 'no-cache' });
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${CFG.xlsx}`);
-      buf = await res.arrayBuffer();
-    } catch (e) {
-      setText('status-xlsx', 'XLSX: error');
-      throw new Error(`Could not load ${CFG.xlsx}. Ensure it is in the same folder as index.html.`);
-    }
-
-    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-    state.wb = wb;
-
-    const sessions = extractSessionsFromSUM(wb);
-    state.sessions = sessions;
-    state.totals = calcTotals(sessions);
-
-    const { farmers, coordsBySheet } = extractFarmersAndCoords(wb);
-    state.farmers = farmers;
-
-    // Backfill missing coordinates from session-sheet header areas (if present)
-    let backfilled = 0;
-    for (const s of state.sessions) {
-      if ((!Number.isFinite(s.lat) || !Number.isFinite(s.lon)) && s.sessionSheet && coordsBySheet && coordsBySheet.has(s.sessionSheet)) {
-        const c = coordsBySheet.get(s.sessionSheet);
-        if (c && Number.isFinite(c.lat) && Number.isFinite(c.lon)) {
-          s.lat = c.lat;
-          s.lon = c.lon;
-          backfilled++;
-        }
-      }
-    }
-
-
-    // campaign days
-    const dmin = sessions.map(s => s.date).filter(Boolean).sort((a,b) => a - b)[0];
-    const dmax = sessions.map(s => s.date).filter(Boolean).sort((a,b) => a - b).slice(-1)[0];
-    if (dmin && dmax) setText('campaignDays', `${fmtDate(dmin)} → ${fmtDate(dmax)}`);
-    else setText('campaignDays', '—');
-
-    setText('status-xlsx', `XLSX: OK (${wb.SheetNames.length} sheets)`);
-  }
-
-  async function loadMedia() {
-    setText('status-csv', 'media.json: loading…');
-
-    let manifest;
-    try {
-      const res = await fetch(safeUrl(CFG.media), { cache: 'no-cache' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      manifest = await res.json();
-    } catch (e) {
-      setText('status-csv', 'media.json: missing');
-      state.mediaItems = [];
-      return;
-    }
-
-    state.mediaItems = expandMediaManifest(manifest);
-    setText('status-csv', `media.json: OK (${state.mediaItems.length} items)`);
-  }
-
-  function expandMediaManifest(manifest) {
-    // Legacy: flat array of items [{type,src,caption,sessionId,...}]
-    if (Array.isArray(manifest)) {
-      return manifest
-        .map((it, idx) => normalizeMediaItem(it, idx))
-        .filter(Boolean);
-    }
-
-    // Format A_compact (preferred)
-    if (manifest && typeof manifest === 'object' && Array.isArray(manifest.sessions)) {
-      const base = String(manifest.basePath || '').trim() || 'assets/gallery/';
-      const def = manifest.defaults || {};
-      const variants = Array.isArray(def.variants) ? def.variants : [];
-      const mainV = def.mainVideoExt || 'mp4';
-      const mainI = def.mainImageExt || 'jpg';
-      const varVI = def.variantVideoExt || 'mp4';
-      const varII = def.variantImageExt || 'jpg';
-
-      const out = [];
-      for (const s of manifest.sessions) {
-        const sid = Number(s.id);
-        if (!Number.isFinite(sid)) continue;
-        const captionBase = s.caption || `Session ${sid}`;
-
-        // Main video + main image (best-effort)
-        out.push(normalizeMediaItem({
-          type: 'video',
-          src: `${base}${sid}.${mainV}`,
-          caption: `${captionBase} — Main video`,
-          sessionId: sid,
-          role: 'main'
-        }, out.length));
-
-        out.push(normalizeMediaItem({
-          type: 'image',
-          src: `${base}${sid}.${mainI}`,
-          caption: `${captionBase} — Main image`,
-          sessionId: sid,
-          role: 'main'
-        }, out.length));
-
-        // Variants (images + videos)
-        for (const v of variants) {
-          out.push(normalizeMediaItem({
-            type: 'image',
-            src: `${base}${sid}${v}.${varII}`,
-            caption: `${captionBase} — Image ${String(v).toUpperCase()}`,
-            sessionId: sid,
-            role: 'variant',
-            variant: v
-          }, out.length));
-
-          out.push(normalizeMediaItem({
-            type: 'video',
-            src: `${base}${sid}${v}.${varVI}`,
-            caption: `${captionBase} — Video ${String(v).toUpperCase()}`,
-            sessionId: sid,
-            role: 'variant',
-            variant: v
-          }, out.length));
-        }
-      }
-      return out.filter(Boolean);
-    }
-
-    // Unknown format
-    return [];
-  }
-
-  function normalizeMediaItem(it, idx) {
-    if (!it) return null;
-    const type = (it.type === 'video' ? 'video' : 'image');
-    const src = String(it.src || it.file || '').trim();
-    if (!src) return null;
-    const sessionId = Number(it.sessionId ?? it.sid ?? it.id);
-    return {
-      idx,
-      type,
-      src,
-      caption: String(it.caption || it.title || ''),
-      transcript: String(it.transcript || ''),
-      sessionId: Number.isFinite(sessionId) ? sessionId : null,
-      role: it.role || '',
-      meta: it.meta || null,
-    };
-  }
-
-  // --- Extractors (Workbook) ---
-  function findSheetName(wb, target) {
-    const t = norm(target);
-    const exact = wb.SheetNames.find(n => norm(n) === t);
-    if (exact) return exact;
-    // fuzzy: startsWith/contains
-    const cand = wb.SheetNames.find(n => norm(n).includes(t));
-    return cand || null;
-  }
-
-  function extractSessionsFromSUM(wb) {
-    const sumName = findSheetName(wb, 'sum') || wb.SheetNames[0];
-    const ws = wb.Sheets[sumName];
-    if (!ws) throw new Error('SUM sheet not found in workbook.');
-
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const headerIdx = detectHeaderRow(rows);
-    if (headerIdx < 0) throw new Error('Could not detect header row in SUM sheet.');
-
-    const header = rows[headerIdx].map(h => norm(h));
-    const col = buildColIndex(header);
-
-    const idxSN = pickCol(col, ['sn', 'sno', 'sr', 'serial']);
-    const idxCity = pickCol(col, ['city', 'district city']);
-    const idxSpot = pickCol(col, ['spot', 'district', 'area', 'venue', 'location', 'village']);
-    const idxDate = pickCol(col, ['date', 'session date', 'activation date']);
-    const idxFarmers = pickCol(col, ['farmers', 'participants', 'attendance', 'turnout']);
-    const idxAcres = pickCol(col, ['acres', 'acres approx', 'area acres', 'wheat acres', 'acre']);
-    const idxDef = pickCol(col, ['definite', 'definite yes', 'yes', 'yes definite', 'ductrl plan yes']);
-    const idxMay = pickCol(col, ['maybe', 'maybe plan', 'maybe yes']);
-    const idxNo = pickCol(col, ['no', 'not', 'not use', 'no plan']);
-    const idxAware = pickCol(col, ['awareness', 'awareness %', 'awareness percent']);
-    const idxClarity = pickCol(col, ['clarity', 'clarity %', 'message clarity']);
-    const idxDemo = pickCol(col, ['demo plot desire', 'demo plot', 'demo desire']);
-    const idxDay = pickCol(col, ['day', 'day no', 'd']);
-    const idxSess = pickCol(col, ['session', 'session no', 'session #', 's']);
-    const idxLat = pickCol(col, ['lat', 'latitude']);
-    const idxLon = pickCol(col, ['lon', 'long', 'longitude']);
-    const idxReasonUse = pickCol(col, ['reason to use', 'reasons to use', 'use reasons', 'benefit', 'why use']);
-    const idxReasonNo = pickCol(col, ['reason not', 'reasons not', 'not use reason', 'why not', 'objection']);
-
-    const out = [];
-    let emptyRun = 0;
-
-    for (let r = headerIdx + 1; r < rows.length; r++) {
-      const row = rows[r];
-      const isEmpty = row.every(c => String(c ?? '').trim() === '');
-      if (isEmpty) {
-        emptyRun++;
-        if (emptyRun >= 6) break;
-        continue;
-      }
-      emptyRun = 0;
-
-      const sn = asNumber(row[idxSN]);
-      const city = String(row[idxCity] ?? '').trim();
-      const spot = String(row[idxSpot] ?? '').trim();
-      const date = asDate(row[idxDate]);
-      const farmers = asNumber(row[idxFarmers]);
-      const acres = asNumber(row[idxAcres]);
-      const def = asNumber(row[idxDef]);
-      const may = asNumber(row[idxMay]);
-      const no = asNumber(row[idxNo]);
-      const awareness = asNumber(row[idxAware]);
-      const clarity = asNumber(row[idxClarity]);
-      const demo = asNumber(row[idxDemo]);
-      const day = asNumber(row[idxDay]);
-      const sessNo = asNumber(row[idxSess]);
-
-      let lat = asNumber(row[idxLat]);
-      let lon = asNumber(row[idxLon]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        const ll = tryParseLatLonFromRow(row);
-        if (ll) { lat = ll[0]; lon = ll[1]; }
-      }
-
-      const sessionSheet = inferSessionSheet(wb, day, sessNo);
-
-      const reasonsUse = String(row[idxReasonUse] ?? '').trim();
-      const reasonsNo = String(row[idxReasonNo] ?? '').trim();
-
-      const searchText = norm([
-        sn, fmtDate(date), city, spot, reasonsUse, reasonsNo,
-        row.join(' ')
-      ].join(' '));
-
-      out.push({
-        sn: Number.isFinite(sn) ? sn : null,
-        city: city || '—',
-        spot: spot || '—',
-        date,
-        farmers: Number.isFinite(farmers) ? farmers : 0,
-        acres: Number.isFinite(acres) ? acres : 0,
-        def: Number.isFinite(def) ? def : 0,
-        may: Number.isFinite(may) ? may : 0,
-        no: Number.isFinite(no) ? no : 0,
-        awareness: Number.isFinite(awareness) ? awareness : NaN,
-        clarity: Number.isFinite(clarity) ? clarity : NaN,
-        demo: Number.isFinite(demo) ? demo : NaN,
-        day: Number.isFinite(day) ? day : null,
-        sessNo: Number.isFinite(sessNo) ? sessNo : null,
-        sessionSheet,
-        lat: Number.isFinite(lat) ? lat : null,
-        lon: Number.isFinite(lon) ? lon : null,
-        reasonsUse,
-        reasonsNo,
-        searchText,
-      });
-    }
-
-    // Populate filter selects now that sessions exist
-    populateSelect($('filter-city'), uniq(out.map(r => r.city)), '__ALL__');
-    populateSelect($('filter-district'), uniq(out.map(r => r.spot)), '__ALL__');
-
-    return out;
-  }
-
-  function detectHeaderRow(rows) {
-    const max = Math.min(rows.length, 60);
-    for (let i = 0; i < max; i++) {
-      const line = rows[i].map(c => norm(c)).join(' | ');
-      if (line.includes('city') && (line.includes('date') || line.includes('session') || line.includes('farmers'))) return i;
-      if (line.includes('farmer') && line.includes('mobile')) return i;
-    }
-    return 0; // fallback to first row
-  }
-
-  function buildColIndex(headerNorm) {
-    const m = new Map();
-    for (let i = 0; i < headerNorm.length; i++) {
-      const h = headerNorm[i];
-      if (!h) continue;
-      if (!m.has(h)) m.set(h, i);
-    }
-    return m;
-  }
-
-  function pickCol(colMap, keys) {
-    for (const k of keys) {
-      const nk = norm(k);
-      if (colMap.has(nk)) return colMap.get(nk);
-    }
-    // fuzzy match
-    for (const k of keys) {
-      const nk = norm(k);
-      for (const [h, idx] of colMap.entries()) {
-        if (h.includes(nk) || nk.includes(h)) return idx;
-      }
-    }
-    return -1;
-  }
-
-  function tryParseLatLonFromRow(row) {
-    const joined = row.map(c => String(c ?? '')).join(' ');
-    // capture patterns like "24.8607, 67.0011" or "24.86 67.00"
-    const m = joined.match(/(-?\d{1,2}\.\d{3,})\s*[, ]\s*(-?\d{1,3}\.\d{3,})/);
-    if (!m) return null;
-    const lat = Number(m[1]);
-    const lon = Number(m[2]);
-    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return [lat, lon];
-    return null;
-  }
-
-  function inferSessionSheet(wb, day, sessNo) {
-    if (!Number.isFinite(day) || !Number.isFinite(sessNo)) return null;
-    const target = `D${Math.round(day)}S${Math.round(sessNo)}`;
-    const exact = wb.SheetNames.find(n => norm(n) === norm(target));
-    if (exact) return exact;
-
-    // fallback: any sheet that includes D{day} and S{sessNo}
-    const cand = wb.SheetNames.find(n => {
-      const nn = norm(n);
-      return nn.includes(`d${Math.round(day)}`) && nn.includes(`s${Math.round(sessNo)}`);
-    });
-    return cand || null;
-  }
-
-  
-  function extractFarmersAndCoords(wb) {
-    const farmers = [];
-    const coordsBySheet = new Map();
-
-    const sheetNames = wb.SheetNames.filter(n => /^d\d+s\d+/i.test(String(n).trim()));
-    for (const name of sheetNames) {
-      const ws = wb.Sheets[name];
-      if (!ws) continue;
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-      // 1) Try to capture coordinates from the sheet “header” area (first ~40 rows)
-      const coord = detectCoordsInSheet(rows);
-      if (coord) coordsBySheet.set(name, coord);
-
-      // 2) Farmer table
-      const headerIdx = detectFarmerHeader(rows);
-      if (headerIdx < 0) continue;
-
-      const header = rows[headerIdx].map(h => norm(h));
-      const col = buildColIndex(header);
-
-      const idxName = pickCol(col, ['farmer name', 'name']);
-      const idxPhone = pickCol(col, ['mobile', 'whatsapp', 'mobile whatsapp', 'phone']);
-      const idxVillage = pickCol(col, ['village', 'area', 'spot']);
-      const idxAcres = pickCol(col, ['wheat acres', 'acres', 'acres approx']);
-      const idxPlan = pickCol(col, ['ductrl plan', 'plan', 'yesmaybe no']);
-      const idxOther = pickCol(col, ['other brands', 'method', 'other brandsmethod']);
-      const idxRemarks = pickCol(col, ['remarks', 'comment', 'notes']);
-
-      let emptyRun = 0;
-      for (let r = headerIdx + 1; r < rows.length; r++) {
-        const row = rows[r];
-        const nameV = String(row[idxName] ?? '').trim();
-        const phoneV = String(row[idxPhone] ?? '').trim();
-
-        const isEmpty = !nameV && !phoneV && row.every(c => String(c ?? '').trim() === '');
-        if (isEmpty) {
-          emptyRun++;
-          if (emptyRun >= 6) break;
-          continue;
-        }
-        emptyRun = 0;
-
-        if (!nameV && !phoneV) continue;
-
-        farmers.push({
-          sessionSheet: name,
-          name: nameV,
-          phone: phoneV,
-          village: String(row[idxVillage] ?? '').trim(),
-          acres: asNumber(row[idxAcres]),
-          plan: String(row[idxPlan] ?? '').trim(),
-          other: String(row[idxOther] ?? '').trim(),
-          remarks: String(row[idxRemarks] ?? '').trim(),
-        });
-      }
-    }
-
-    return { farmers, coordsBySheet };
-  }
-
-  function detectCoordsInSheet(rows) {
-    const maxR = Math.min(rows.length, 40);
-    for (let r = 0; r < maxR; r++) {
-      const row = rows[r] || [];
-      const joined = row.map(c => String(c ?? '')).join(' ');
-      // patterns: "Latitude: 31.1234 Longitude: 74.5678" or "31.1234, 74.5678"
-      const m1 = joined.match(/lat(?:itude)?\s*[:=]?\s*(-?\d{1,2}\.\d{3,}).*?(lon(?:gitude)?|long)\s*[:=]?\s*(-?\d{1,3}\.\d{3,})/i);
-      if (m1) {
-        const lat = Number(m1[1]);
-        const lon = Number(m1[3]);
-        if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon };
-      }
-
-      const m2 = joined.match(/(-?\d{1,2}\.\d{3,})\s*[, ]\s*(-?\d{1,3}\.\d{3,})/);
-      if (m2) {
-        const lat = Number(m2[1]);
-        const lon = Number(m2[2]);
-        if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon };
-      }
-    }
-    return null;
-  }
-
-
-  function detectFarmerHeader(rows) {
-    const max = Math.min(rows.length, 80);
-    for (let i = 0; i < max; i++) {
-      const line = rows[i].map(c => norm(c)).join(' | ');
-      if (line.includes('farmer') && (line.includes('mobile') || line.includes('whatsapp'))) return i;
-      if (line.includes('mobile') && line.includes('village')) return i;
-    }
-    return -1;
-  }
-
-  // --- Metrics + Render ---
-  function calcTotals(rows) {
-    const sessions = rows.length;
-    const farmers = rows.reduce((a, r) => a + (Number.isFinite(r.farmers) ? r.farmers : 0), 0);
-    const acres = rows.reduce((a, r) => a + (Number.isFinite(r.acres) ? r.acres : 0), 0);
-
-    // Demo desire: prefer percentage average if provided; fallback: NaN
-    const demoVals = rows.map(r => r.demo).filter(Number.isFinite);
-    const demo = demoVals.length ? (demoVals.reduce((a, x) => a + x, 0) / demoVals.length) : NaN;
-
-    return { sessions, farmers, acres, demo };
-  }
-
-  function renderAll() {
-    renderKPIs();
-    renderDonutsAndTrends();
-    renderPerfAndFarmerIntent();
-    renderReasons();
-    renderMap();
-    renderSessionsTable();
-    renderMedia();
-    renderShowcases();
-    renderActionList();
-  }
-
-  function renderKPIs() {
-    const t = state.totals;
-    const f = calcTotals(state.filteredSessions);
-
-    setText('kpi-sessions', fmtInt(f.sessions));
-    setText('kpi-farmers', fmtInt(f.farmers));
-    setText('kpi-acres', fmtInt(f.acres));
-    setText('kpi-demo', Number.isFinite(f.demo) ? `${Math.round(f.demo)}%` : '—');
-
-    setBar('bar-sessions', t.sessions ? (f.sessions / t.sessions) * 100 : 0);
-    setBar('bar-farmers', t.farmers ? (f.farmers / t.farmers) * 100 : 0);
-    setBar('bar-acres', t.acres ? (f.acres / t.acres) * 100 : 0);
-    setBar('bar-demo', Number.isFinite(f.demo) ? clamp(f.demo, 0, 100) : 0);
-  }
-
-  function setBar(id, pct) {
-    const el = $(id);
-    if (!el) return;
-    el.style.width = `${clamp(pct, 0, 100).toFixed(1)}%`;
-  }
-
-  function renderDonutsAndTrends() {
-    if (typeof Chart === 'undefined') {
-      setNotice('Chart.js failed to load. Charts are disabled.', true);
-      return;
-    }
-
-    // --- Cities -> Spots drill donut ---
-    const rows = state.filteredSessions;
-
-    let labels = [];
-    let values = [];
-    let title = '';
-
-    if (state.drill.city && rows.some(r => r.city === state.drill.city)) {
-      const city = state.drill.city;
-      const bySpot = groupCount(rows.filter(r => r.city === city), r => r.spot);
-      labels = Object.keys(bySpot);
-      values = Object.values(bySpot);
-      title = `Spots within ${city} (click slice to go back)`;
-    } else {
-      const byCity = groupCount(rows, r => r.city);
-      labels = Object.keys(byCity);
-      values = Object.values(byCity);
-      title = 'Cities (click slice to drill into spots)';
-    }
-
-    const citiesCanvas = $('chartCities');
-    if (citiesCanvas) {
-      const chart = ensureChart('chartCities', citiesCanvas, 'doughnut', {
-        labels,
-        datasets: [{ data: values }]
-      }, {
-        plugins: {
-          legend: { position: 'bottom' },
-          title: { display: true, text: title }
-        },
-        onClick: (evt, elements) => {
-          if (!elements || !elements.length) return;
-          const idx = elements[0].index;
-          const clicked = labels[idx];
-          if (!clicked) return;
-          if (state.drill.city) {
-            state.drill.city = null;
-          } else {
-            state.drill.city = clicked;
-          }
-          renderDonutsAndTrends();
-        }
-      });
-      state.charts.chartCities = chart;
-    }
-
-    // --- Intent donut ---
-    const def = rows.reduce((a, r) => a + (Number.isFinite(r.def) ? r.def : 0), 0);
-    const may = rows.reduce((a, r) => a + (Number.isFinite(r.may) ? r.may : 0), 0);
-    const no = rows.reduce((a, r) => a + (Number.isFinite(r.no) ? r.no : 0), 0);
-    const intentLabels = ['Definite', 'Maybe', 'Not'];
-    const intentValues = [def, may, no];
-
-    const intentCanvas = $('chartIntent');
-    if (intentCanvas) {
-      const chart = ensureChart('chartIntent', intentCanvas, 'doughnut', {
-        labels: intentLabels,
-        datasets: [{ data: intentValues }]
-      }, {
-        plugins: { legend: { position: 'bottom' } }
-      });
-      state.charts.chartIntent = chart;
-    }
-
-    // --- Trend chart (farmers + acres by date) ---
-    const trendCanvas = $('chartTrend');
-    if (trendCanvas) {
-      const byDate = groupSumByDate(rows);
-      const tLabels = byDate.map(x => x.dateLabel);
-      const seriesFarmers = byDate.map(x => x.farmers);
-      const seriesAcres = byDate.map(x => x.acres);
-
-      const chart = ensureChart('chartTrend', trendCanvas, 'line', {
-        labels: tLabels,
-        datasets: [
-          { label: 'Farmers', data: seriesFarmers, tension: 0.25 },
-          { label: 'Acres', data: seriesAcres, tension: 0.25 },
-        ]
-      }, {
-        plugins: { legend: { position: 'bottom' } },
-        scales: {
-          y: { beginAtZero: true }
-        }
-      });
-      state.charts.chartTrend = chart;
-    }
-  }
-
-  function renderPerfAndFarmerIntent() {
-    if (typeof Chart === 'undefined') return;
-
-    const rows = state.filteredSessions;
-    const perfCanvas = $('chartPerf');
-    if (perfCanvas) {
-      // compute averages
-      const aware = avg(rows.map(r => r.awareness));
-      const clar = avg(rows.map(r => r.clarity));
-      const defPct = pct(rows.reduce((a, r) => a + r.def, 0), rows.reduce((a, r) => a + r.def + r.may + r.no, 0));
-      const chart = ensureChart('chartPerf', perfCanvas, 'radar', {
-        labels: ['Awareness', 'Clarity', 'Definite intent'],
-        datasets: [{
-          label: 'Average %',
-          data: [
-            Number.isFinite(aware) ? clamp(aware, 0, 100) : 0,
-            Number.isFinite(clar) ? clamp(clar, 0, 100) : 0,
-            Number.isFinite(defPct) ? clamp(defPct, 0, 100) : 0,
-          ]
-        }]
-      }, {
-        plugins: { legend: { position: 'bottom' } },
-        scales: { r: { beginAtZero: true, max: 100 } }
-      });
-      state.charts.chartPerf = chart;
-    }
-
-    const fiCanvas = $('chartBackchecker');
-    if (fiCanvas) {
-      const farmers = state.filteredFarmers;
-      const planCounts = groupCount(farmers, fr => normalizePlan(fr.plan));
-      const labels = Object.keys(planCounts);
-      const data = Object.values(planCounts);
-      const chart = ensureChart('chartBackchecker', fiCanvas, 'bar', {
-        labels,
-        datasets: [{ label: 'Farmers', data }]
-      }, {
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-      });
-      state.charts.chartBackchecker = chart;
-    }
-  }
-
-  function normalizePlan(p) {
-    const s = norm(p);
-    if (!s) return 'Unknown';
-    if (s.includes('yes') || s.includes('definite')) return 'Yes';
-    if (s.includes('maybe')) return 'Maybe';
-    if (s === 'no' || s.includes('not')) return 'No';
-    return 'Other';
-  }
-
-  function renderReasons() {
-    const rows = state.filteredSessions;
-
-    const useMap = new Map();
-    const noMap = new Map();
-
-    for (const r of rows) {
-      for (const item of splitReasons(r.reasonsUse)) useMap.set(item, (useMap.get(item) || 0) + 1);
-      for (const item of splitReasons(r.reasonsNo)) noMap.set(item, (noMap.get(item) || 0) + 1);
-    }
-
-    fillReasonTable('reasonsUse', useMap);
-    fillReasonTable('reasonsNoUse', noMap);
-  }
-
-  function splitReasons(s) {
-    const t = String(s || '').trim();
-    if (!t) return [];
-    return t
-      .split(/[,;|•\n]+/g)
-      .map(x => norm(x))
-      .map(x => x.replace(/^\d+\s*/,'').trim())
-      .filter(x => x.length >= 3)
-      .map(x => x.replace(/\b(benefit|reason|because)\b/g,'').trim())
-      .filter(Boolean)
-      .slice(0, 30);
-  }
-
-  function fillReasonTable(tbodyId, m) {
-    const tb = $(tbodyId);
-    if (!tb) return;
-
-    const entries = Array.from(m.entries()).sort((a,b) => b[1] - a[1]).slice(0, CFG.maxReasons);
-    if (!entries.length) {
-      tb.innerHTML = `<tr><td colspan="2" style="color:#4C5B4C;font-weight:800">No “reason” columns found (or empty) in current filtered rows.</td></tr>`;
-      return;
-    }
-    tb.innerHTML = entries.map(([k,v]) => `<tr><td>${escapeHtml(titleCase(k))}</td><td style="font-weight:900">${fmtInt(v)}</td></tr>`).join('');
-  }
-
-  function titleCase(s) {
-    return String(s).split(' ').map(w => w ? (w[0].toUpperCase() + w.slice(1)) : w).join(' ');
-  }
-
-  function renderMap() {
-    // Leaflet may be blocked; handle gracefully.
-    if (typeof L === 'undefined') {
-      setNotice('Leaflet failed to load. Map is disabled.', true);
-      return;
-    }
-
-    const rows = state.filteredSessions.filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lon));
-    const mapEl = $('map');
-    if (!mapEl) return;
-
-    if (!state.map.map) {
-      const map = L.map(mapEl, { zoomControl: true });
-      state.map.map = map;
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-
-      state.map.markers = L.layerGroup().addTo(map);
-      state.map.route = L.polyline([], { weight: 3 }).addTo(map);
-
-      map.setView(CFG.defaultMapCenter, CFG.defaultMapZoom);
-    }
-
-    const map = state.map.map;
-    state.map.markers.clearLayers();
-    state.map.route.setLatLngs([]);
-
-    if (!rows.length) {
-      map.setView(CFG.defaultMapCenter, CFG.defaultMapZoom);
-      return;
-    }
-
-    const pts = [];
-    const sorted = rows.slice().sort((a,b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
-
-    for (const r of sorted) {
-      const pt = [r.lat, r.lon];
-      pts.push(pt);
-      const popup = `
-        <div style="font-weight:900">${escapeHtml(r.city)} — ${escapeHtml(r.spot)}</div>
-        <div style="margin-top:4px;font-weight:700;color:#4C5B4C">
-          Date: ${escapeHtml(fmtDate(r.date))}<br/>
-          Farmers: ${fmtInt(r.farmers)}<br/>
-          Acres: ${fmtInt(r.acres)}
-        </div>
-      `;
-      L.marker(pt).bindPopup(popup).addTo(state.map.markers);
-    }
-
-    if (pts.length >= 2) state.map.route.setLatLngs(pts);
-
-    const bounds = L.latLngBounds(pts.map(p => L.latLng(p[0], p[1])));
-    map.fitBounds(bounds.pad(0.18));
-  }
-
-  function renderSessionsTable() {
-    const tb = $('tblSessions');
-    if (!tb) return;
-
-    const rows = state.filteredSessions.slice()
-      .sort((a,b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
-
-    if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="11" style="color:#4C5B4C;font-weight:800">No sessions match current filters.</td></tr>`;
-      return;
-    }
-
-    tb.innerHTML = rows.slice(0, 220).map(r => {
-      const aware = Number.isFinite(r.awareness) ? `${Math.round(r.awareness)}%` : '—';
-      const clar = Number.isFinite(r.clarity) ? `${Math.round(r.clarity)}%` : '—';
-      const sn = Number.isFinite(r.sn) ? Math.round(r.sn) : '—';
-      return `
-        <tr data-sn="${escapeHtml(String(sn))}" style="cursor:pointer">
-          <td style="font-weight:900">${escapeHtml(String(sn))}</td>
-          <td>${escapeHtml(fmtDate(r.date))}</td>
-          <td>${escapeHtml(r.city)}</td>
-          <td>${escapeHtml(r.spot)}</td>
-          <td style="font-weight:900">${fmtInt(r.farmers)}</td>
-          <td style="font-weight:900">${fmtInt(r.acres)}</td>
-          <td>${fmtInt(r.def)}</td>
-          <td>${fmtInt(r.may)}</td>
-          <td>${fmtInt(r.no)}</td>
-          <td>${escapeHtml(aware)}</td>
-          <td>${escapeHtml(clar)}</td>
-        </tr>
-      `;
-    }).join('');
-
-    // Row click opens nearest media item (best-effort by sessionId)
-    Array.from(tb.querySelectorAll('tr[data-sn]')).forEach(tr => {
-      tr.addEventListener('click', () => {
-        const sn = Number(tr.getAttribute('data-sn'));
-        if (!Number.isFinite(sn)) return;
-        const items = state.filteredMedia.length ? state.filteredMedia : state.mediaItems;
-        const idx = items.findIndex(it => it.sessionId === sn);
-        if (idx >= 0) openLightbox(items, idx);
-      });
-    });
-  }
-
-  function renderMedia() {
-    const grid = $('galleryGrid');
-    if (!grid) return;
-
-    const items = (state.filteredMedia.length ? state.filteredMedia : state.mediaItems).slice(0, CFG.maxGalleryItems);
-
-    if (!items.length) {
-      grid.innerHTML = `
-        <div class="notice" style="grid-column:1/-1">
-          <strong>No media items were loaded.</strong><br/>
-          Ensure <code>media.json</code> exists in the same folder, and media files exist under <code>assets/gallery/</code>.
-        </div>
-      `;
-      return;
-    }
-
-    grid.innerHTML = items.map((it, idx) => renderTile(it, idx)).join('');
-
-    Array.from(grid.querySelectorAll('[data-mi]')).forEach(el => {
-      el.addEventListener('click', () => {
-        const idx = Number(el.getAttribute('data-mi'));
-        if (!Number.isFinite(idx)) return;
-        openLightbox(items, idx);
-      });
-    });
-  }
-
-  function renderTile(it, idx) {
-    const cap = it.caption || `Session ${it.sessionId ?? '—'}`;
-    const sub = it.type === 'video' ? 'Video' : 'Image';
-    const media = it.type === 'video'
-      ? `<video src="${escapeHtml(it.src)}" muted playsinline preload="metadata"></video>`
-      : `<img src="${escapeHtml(it.src)}" alt="${escapeHtml(cap)}" loading="lazy" />`;
-
-    return `
-      <div class="tile" data-mi="${idx}">
-        <div class="m">${media}</div>
-        <div class="c">
-          <div class="t">${escapeHtml(cap)}</div>
-          <div class="s">${escapeHtml(sub)} • Session ${escapeHtml(String(it.sessionId ?? '—'))}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderShowcases() {
-    // Snapshot showcase: media items first
-    fillShowcase('snapshotShowcase', state.filteredMedia.length ? state.filteredMedia : state.mediaItems);
-
-    // Charts showcase: same items, but fewer
-    fillShowcase('chartsShowcase', state.filteredMedia.length ? state.filteredMedia : state.mediaItems);
-
-    // Map showcase: focus on sessions with coords (if any) -> show callout cards
-    fillMapShowcase();
-
-    // Highlights track: callouts (not media)
-    fillHighlights();
-  }
-
-  function fillShowcase(id, items) {
-    const el = $(id);
-    if (!el) return;
-
-    const list = (items || []).slice(0, CFG.maxShowcaseItems);
-    if (!list.length) {
-      el.innerHTML = `<div class="notice" style="min-width:280px"><strong>No showcase media</strong><br/>Add assets/gallery items + media.json.</div>`;
-      return;
-    }
-
-    el.innerHTML = list.map((it, idx) => {
-      const cap = it.caption || `Session ${it.sessionId ?? '—'}`;
-      const sub = it.type === 'video' ? 'Video' : 'Image';
-      const media = it.type === 'video'
-        ? `<video src="${escapeHtml(it.src)}" muted playsinline preload="metadata"></video>`
-        : `<img src="${escapeHtml(it.src)}" alt="${escapeHtml(cap)}" loading="lazy" />`;
-
-      return `
-        <div class="showItem" data-mi="${idx}">
-          <div class="media">${media}</div>
-          <div class="cap">
-            <div class="t">${escapeHtml(cap)}</div>
-            <div class="s">${escapeHtml(sub)} • click to open</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    Array.from(el.querySelectorAll('[data-mi]')).forEach(node => {
-      node.addEventListener('click', () => {
-        const idx = Number(node.getAttribute('data-mi'));
-        if (!Number.isFinite(idx)) return;
-        openLightbox(list, idx);
-      });
-    });
-  }
-
-  function fillMapShowcase() {
-    const el = $('mapShowcase');
-    if (!el) return;
-
-    const rows = state.filteredSessions
-      .filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lon))
-      .slice()
-      .sort((a,b) => (b.farmers || 0) - (a.farmers || 0))
-      .slice(0, 8);
-
-    if (!rows.length) {
-      el.innerHTML = `<div class="notice" style="min-width:280px"><strong>No coordinate rows</strong><br/>Add Latitude/Longitude columns in SUM (or put “lat, lon” in a notes cell).</div>`;
-      return;
-    }
-
-    el.innerHTML = rows.map(r => {
-      const title = `${r.city} — ${r.spot}`;
-      const sub = `${fmtDate(r.date)} • Farmers ${fmtInt(r.farmers)} • Acres ${fmtInt(r.acres)}`;
-      return `
-        <div class="showItem">
-          <div class="media" style="height:120px;display:flex;align-items:center;justify-content:center">
-            <div style="font-weight:900;color:#163018;text-align:center;padding:12px">
-              ${escapeHtml(title)}<br/>
-              <span style="color:#4C5B4C;font-weight:800;font-size:12px">${escapeHtml(sub)}</span>
-            </div>
-          </div>
-          <div class="cap">
-            <div class="t">Map-highlight</div>
-            <div class="s">Lat ${escapeHtml(String(r.lat))}, Lon ${escapeHtml(String(r.lon))}</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function fillHighlights() {
-    const el = $('highlightsTrack');
-    if (!el) return;
-
-    const rows = state.filteredSessions.slice()
-      .sort((a,b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0))
-      .slice(0, 8);
-
-    if (!rows.length) {
-      el.innerHTML = `<div class="notice" style="min-width:280px"><strong>No highlights</strong><br/>Adjust filters or verify SUM sheet has rows.</div>`;
-      return;
-    }
-
-    el.innerHTML = rows.map(r => {
-      const aware = Number.isFinite(r.awareness) ? `${Math.round(r.awareness)}%` : '—';
-      const clar = Number.isFinite(r.clarity) ? `${Math.round(r.clarity)}%` : '—';
-      const defPct = pct(r.def, r.def + r.may + r.no);
-      const defStr = Number.isFinite(defPct) ? `${Math.round(defPct)}%` : '—';
-
-      return `
-        <div class="showItem">
-          <div class="media" style="height:120px;display:flex;align-items:center;justify-content:center">
-            <div style="text-align:center;padding:12px">
-              <div style="font-weight:900">${escapeHtml(r.city)}</div>
-              <div style="font-weight:800;color:#4C5B4C;font-size:12px;margin-top:4px">${escapeHtml(r.spot)} • ${escapeHtml(fmtDate(r.date))}</div>
-            </div>
-          </div>
-          <div class="cap">
-            <div class="t">Farmers ${fmtInt(r.farmers)} • Acres ${fmtInt(r.acres)}</div>
-            <div class="s">Awareness ${escapeHtml(aware)} • Clarity ${escapeHtml(clar)} • Definite ${escapeHtml(defStr)}</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function renderActionList() {
-    const tb = $('actionList');
-    if (!tb) return;
-
-    const rows = state.filteredSessions;
-    const actions = [];
-
-    // Thresholds (tuned to user's earlier rules)
-    const lowAwareness = rows.filter(r => Number.isFinite(r.awareness) && r.awareness < 60);
-    const lowClarity = rows.filter(r => Number.isFinite(r.clarity) && r.clarity < 75);
-    const lowDefinite = rows.filter(r => {
-      const dp = pct(r.def, r.def + r.may + r.no);
-      return Number.isFinite(dp) && dp < 70;
-    });
-    const lowTurnout = rows.filter(r => Number.isFinite(r.farmers) && r.farmers > 0 && r.farmers < 20);
-
-    if (lowAwareness.length) actions.push({
-      pr: 'High',
-      finding: `Awareness below 60% in ${lowAwareness.length} session(s)`,
-      action: 'Strengthen pre-activation dealer touchpoints; include “prior event” checks at the start of sessions.'
-    });
-    if (lowDefinite.length) actions.push({
-      pr: 'High',
-      finding: `Definite intent below 70% in ${lowDefinite.length} session(s)`,
-      action: 'Improve objection handling and value narrative; add a tighter talk-track on ROI and outcomes.'
-    });
-    if (lowClarity.length) actions.push({
-      pr: 'Medium',
-      finding: `Clarity below 75% in ${lowClarity.length} session(s)`,
-      action: 'Retrain field team on the 4 key messages; add a “repeat-back” question after each message.'
-    });
-    if (lowTurnout.length) actions.push({
-      pr: 'Medium',
-      finding: `Low turnout (<20 farmers) in ${lowTurnout.length} session(s)`,
-      action: 'Review venue selection and mobilization; validate dealer invites and morning timing.'
-    });
-
-    if (!actions.length) {
-      tb.innerHTML = `<tr><td colspan="3" style="color:#4C5B4C;font-weight:800">No action triggers under current filters.</td></tr>`;
-      return;
-    }
-
-    tb.innerHTML = actions.map(a => `
-      <tr>
-        <td style="font-weight:900">${escapeHtml(a.pr)}</td>
-        <td>${escapeHtml(a.finding)}</td>
-        <td>${escapeHtml(a.action)}</td>
-      </tr>
-    `).join('');
-  }
-
-  // --- Export ---
-  function exportCSV() {
-    const rows = state.filteredSessions;
-    if (!rows.length) {
-      setNotice('Nothing to export (no sessions match current filters).', true);
-      return;
-    }
-    const header = [
-      'SN','Date','City','Spot','Farmers','Acres','Definite','Maybe','Not','Awareness','Clarity','Day','Session','Sheet','Lat','Lon','ReasonsUse','ReasonsNo'
-    ];
-    const lines = [header.join(',')];
-
-    for (const r of rows) {
-      const line = [
-        val(r.sn),
-        val(fmtDate(r.date)),
-        val(r.city),
-        val(r.spot),
-        val(r.farmers),
-        val(r.acres),
-        val(r.def),
-        val(r.may),
-        val(r.no),
-        val(Number.isFinite(r.awareness) ? r.awareness : ''),
-        val(Number.isFinite(r.clarity) ? r.clarity : ''),
-        val(r.day),
-        val(r.sessNo),
-        val(r.sessionSheet),
-        val(r.lat),
-        val(r.lon),
-        val(r.reasonsUse),
-        val(r.reasonsNo),
-      ].join(',');
-      lines.push(line);
-    }
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `buctril_sessions_${fmtDate(new Date())}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setNotice(`Exported ${rows.length} rows.`);
-  }
-
-  function val(x) {
-    const s = String(x ?? '').replaceAll('"', '""');
-    return `"${s}"`;
-  }
-
-  // --- Helpers for charts ---
-  function ensureChart(key, canvas, type, data, options) {
-    if (state.charts[key]) {
-      state.charts[key].data = data;
-      state.charts[key].options = options || {};
-      state.charts[key].update();
-      return state.charts[key];
-    }
-    return new Chart(canvas, { type, data, options: options || {} });
-  }
-
-  function groupCount(rows, keyFn) {
-    const m = {};
-    for (const r of rows) {
-      const k = (keyFn(r) ?? '—');
-      const kk = String(k);
-      m[kk] = (m[kk] || 0) + 1;
-    }
-    return m;
-  }
-
-  function groupSumByDate(rows) {
-    // group per YYYY-MM-DD
-    const m = new Map();
-    for (const r of rows) {
-      const d = r.date ? fmtDate(r.date) : '—';
-      if (!m.has(d)) m.set(d, { dateLabel: d, farmers: 0, acres: 0, t: r.date ? r.date.getTime() : 0 });
-      const rec = m.get(d);
-      rec.farmers += Number.isFinite(r.farmers) ? r.farmers : 0;
-      rec.acres += Number.isFinite(r.acres) ? r.acres : 0;
-      rec.t = r.date ? r.date.getTime() : rec.t;
-    }
-    return Array.from(m.values()).sort((a,b) => a.t - b.t);
-  }
-
-  function avg(arr) {
-    const xs = arr.filter(Number.isFinite);
-    if (!xs.length) return NaN;
-    return xs.reduce((a,x) => a + x, 0) / xs.length;
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
   }
 
   function pct(a, b) {
@@ -1406,54 +101,1143 @@
     return (a / b) * 100;
   }
 
+  function avg(nums) {
+    const xs = nums.filter(Number.isFinite);
+    if (!xs.length) return NaN;
+    return xs.reduce((s, n) => s + n, 0) / xs.length;
+  }
+
+  function uniq(arr) {
+    return Array.from(new Set(arr.filter(v => v !== null && v !== undefined && String(v).trim() !== '')));
+  }
+
+  // --- Coordinate parsing: supports "lat,lon" or DMS with N/E/S/W ---
+  function dmsToDd(deg, min, sec, dir) {
+    let dd = Math.abs(deg) + (min || 0) / 60 + (sec || 0) / 3600;
+    if (dir === 'S' || dir === 'W') dd = -dd;
+    return dd;
+  }
+
+  function parseOneCoord(part) {
+    // decimal degrees
+    const dec = part.match(/-?\d+(?:\.\d+)?/);
+    if (dec && !/[NSEW]/i.test(part)) return Number(dec[0]);
+
+    // DMS like 31°23'28.5"N or 31 23 28.5 N
+    const m = part.match(/(-?\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)?\D*(\d+(?:\.\d+)?)?\D*([NSEW])/i);
+    if (!m) return NaN;
+    const deg = Number(m[1]);
+    const mi = m[2] ? Number(m[2]) : 0;
+    const se = m[3] ? Number(m[3]) : 0;
+    const dir = (m[4] || '').toUpperCase();
+    return dmsToDd(deg, mi, se, dir);
+  }
+
+  function parseCoord(s) {
+    if (!s) return {lat: NaN, lon: NaN};
+    const raw = String(s).trim();
+    if (!raw) return {lat: NaN, lon: NaN};
+
+    // "lat, lon"
+    if (raw.includes(',')) {
+      const [a, b] = raw.split(',').map(t => t.trim());
+      const lat = Number(a);
+      const lon = Number(b);
+      return {lat: Number.isFinite(lat) ? lat : NaN, lon: Number.isFinite(lon) ? lon : NaN};
+    }
+
+    // Try to find two coordinates with N/S and E/W
+    const parts = raw.split(/\s+/);
+    if (parts.length >= 2) {
+      // Heuristic: join into two halves if needed
+      const join = (arr) => arr.join(' ');
+      // If it already looks like "31°..N 73°..E"
+      const latPart = join(parts.slice(0, Math.ceil(parts.length / 2)));
+      const lonPart = join(parts.slice(Math.ceil(parts.length / 2)));
+      let lat = parseOneCoord(latPart);
+      let lon = parseOneCoord(lonPart);
+
+      // If failed, try the first token as lat and second as lon
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        lat = parseOneCoord(parts[0]);
+        lon = parseOneCoord(parts[1]);
+      }
+
+      return {lat, lon};
+    }
+
+    return {lat: NaN, lon: NaN};
+  }
+
+  // --- Best-match header lookup ---
+  function findHeaderRow(mat, mustHaveAny) {
+    const must = mustHaveAny.map(norm);
+    for (let r = 0; r < mat.length; r++) {
+      const row = (mat[r] || []).map(norm);
+      const hits = must.filter(k => row.includes(k));
+      if (hits.length >= Math.min(3, must.length)) return r; // usually City/Date/Spot/Farmers
+    }
+    return -1;
+  }
+
+  function findCol(headersNorm, candidates) {
+    const cands = candidates.map(norm);
+
+    // 1) exact match
+    for (const c of cands) {
+      const i = headersNorm.indexOf(c);
+      if (i >= 0) return i;
+    }
+
+    // 2) substring match (header contains candidate)
+    for (let i = 0; i < headersNorm.length; i++) {
+      const h = headersNorm[i];
+      for (const c of cands) {
+        if (h && c && h.includes(c)) return i;
+      }
+    }
+
+    return -1;
+  }
+
+  function sheetToMatrix(ws) {
+    return XLSX.utils.sheet_to_json(ws, {header: 1, raw: true, blankrows: false});
+  }
+
+  // --- State ---
+  const state = {
+    wb: null,
+    sessions: [],
+    farmers: [],
+    media: [],
+    filtered: [],
+    filter: { city: '', spot: '', q: '', from: null, to: null },
+    charts: { city: null, intent: null, trend: null },
+    map: { obj: null, base: null, layer: null, route: null, selectedKey: '' },
+  };
+
+  // --- Tabs ---
+  function initTabs() {
+    const btns = qa('.tabBtn');
+    btns.forEach(b => b.addEventListener('click', () => {
+      btns.forEach(bb => bb.classList.toggle('active', bb === b));
+      qa('.tabPanel').forEach(p => p.classList.toggle('active', p.id === b.dataset.tab));
+      if (b.dataset.tab === 'tab-map' && state.map.obj) state.map.obj.invalidateSize();
+    }));
+  }
+
+  // --- Lightbox ---
+  function initLightbox() {
+    const lb = $('lightbox');
+    const close = () => { lb.style.display = 'none'; };
+    const nav = (delta) => {
+      if (!state._lb || !state._lb.items.length) return;
+      state._lb.idx = (state._lb.idx + delta + state._lb.items.length) % state._lb.items.length;
+      renderLightbox();
+    };
+
+    $('lbClose')?.addEventListener('click', close);
+    $('lbPrev')?.addEventListener('click', () => nav(-1));
+    $('lbNext')?.addEventListener('click', () => nav(1));
+    lb?.addEventListener('click', e => { if (e.target === lb) close(); });
+
+    document.addEventListener('keydown', e => {
+      if (!lb || lb.style.display !== 'flex') return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') nav(-1);
+      if (e.key === 'ArrowRight') nav(1);
+    });
+  }
+
+  function openLightbox(items, startIdx = 0) {
+    state._lb = { items, idx: startIdx };
+    renderLightbox();
+    $('lightbox').style.display = 'flex';
+  }
+
+  function renderLightbox() {
+    const item = state._lb.items[state._lb.idx];
+    const box = $('lbMedia');
+    if (!item || !box) return;
+
+    box.innerHTML = '';
+    if (item.type === 'video') {
+      const v = document.createElement('video');
+      v.src = item.src;
+      v.controls = true;
+      v.autoplay = true;
+      v.playsInline = true;
+      v.preload = 'metadata';
+      box.appendChild(v);
+    } else {
+      const img = document.createElement('img');
+      img.src = item.src;
+      img.alt = item.alt || item.caption || 'image';
+      box.appendChild(img);
+    }
+
+    setText('lbCaption', item.caption || '—');
+    setText('lbTranscript', item.transcript || '—');
+  }
+
+  // --- Filters ---
+  function initFilters() {
+    const citySel = $('filter-city');
+    const spotSel = $('filter-district'); // visible spot selector
+    const spotCompat = $('filter-spot');  // hidden compat selector
+    const q = $('filter-search');
+    const from = $('filter-date-from');
+    const to = $('filter-date-to');
+    const reset = $('btn-reset');
+    const exportBtn = $('btn-export');
+
+    const apply = () => {
+      state.filter.city = citySel.value || '';
+      state.filter.spot = spotSel.value || '';
+      state.filter.q = (q.value || '').trim();
+      state.filter.from = from.value ? new Date(from.value + 'T00:00:00') : null;
+      state.filter.to = to.value ? new Date(to.value + 'T23:59:59') : null;
+
+      // keep compat spot in sync
+      if (spotCompat) spotCompat.value = spotSel.value;
+
+      updateSpotOptions();
+      applyFilters();
+    };
+
+    citySel.addEventListener('change', apply);
+    spotSel.addEventListener('change', apply);
+    q.addEventListener('input', debounce(apply, 120));
+    from.addEventListener('change', apply);
+    to.addEventListener('change', apply);
+
+    reset.addEventListener('click', () => {
+      citySel.value = '';
+      spotSel.value = '';
+      if (spotCompat) spotCompat.value = '';
+      q.value = '';
+      from.value = '';
+      to.value = '';
+      state.filter = { city: '', spot: '', q: '', from: null, to: null };
+      updateSpotOptions(true);
+      applyFilters();
+    });
+
+    exportBtn.addEventListener('click', exportFilteredCsv);
+  }
+
   function debounce(fn, ms) {
     let t = null;
     return (...args) => {
-      if (t) clearTimeout(t);
+      clearTimeout(t);
       t = setTimeout(() => fn(...args), ms);
     };
   }
 
-  // --- Init ---
-  async function init() {
-    initTabs();
-    initLightbox();
-    initFilters();
+  function buildFilterOptions() {
+    const citySel = $('filter-city');
+    // reset (keep "All")
+    citySel.innerHTML = '<option value="">All</option>';
+    const cities = uniq(state.sessions.map(s => s.city)).sort((a,b) => a.localeCompare(b));
+    for (const c of cities) {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      citySel.appendChild(opt);
+    }
+    updateSpotOptions(true);
+  }
 
-    // Background video (optional)
-    const bg = $('bgVideo');
-    if (bg) {
-      bg.src = 'assets/bg.mp4';
-      bg.addEventListener('error', () => { bg.style.display = 'none'; });
+  function updateSpotOptions(forceReset = false) {
+    const spotSel = $('filter-district');
+    if (!spotSel) return;
+    const cur = forceReset ? '' : (spotSel.value || '');
+    spotSel.innerHTML = '<option value="">All</option>';
+
+    const spots = uniq(
+      state.sessions
+        .filter(s => !state.filter.city || s.city === state.filter.city)
+        .map(s => s.spot)
+    ).sort((a,b) => a.localeCompare(b));
+
+    for (const sp of spots) {
+      const opt = document.createElement('option');
+      opt.value = sp;
+      opt.textContent = sp;
+      spotSel.appendChild(opt);
     }
 
-    setNotice('Loading workbook + media…');
+    // Keep selection if still valid
+    if (cur && spots.includes(cur)) spotSel.value = cur;
+  }
 
-    const diag = [];
+  function matchesText(session, q) {
+    if (!q) return true;
+    const hay = [
+      session.city, session.spot, session.reasonsUse, session.reasonsNo, session.sessionCode
+    ].join(' ').toLowerCase();
+    return hay.includes(q.toLowerCase());
+  }
+
+  function applyFilters() {
+    const { city, spot, q, from, to } = state.filter;
+
+    state.filtered = state.sessions.filter(s => {
+      if (city && s.city !== city) return false;
+      if (spot && s.spot !== spot) return false;
+      if (from && s.date && s.date < from) return false;
+      if (to && s.date && s.date > to) return false;
+      if (q && !matchesText(s, q)) return false;
+      return true;
+    });
+
+    // If nothing matches, still render empty state without crashing.
+    renderAll();
+  }
+
+  // --- Workbook loading ---
+  async function loadWorkbook() {
+    logDiag(`fetch: ${CFG.xlsx}`);
+    const res = await fetch(CFG.xlsx);
+    if (!res.ok) throw new Error(`Failed to load ${CFG.xlsx} (HTTP ${res.status})`);
+    const buf = await res.arrayBuffer();
+
+    // Git LFS pointer detection (common on GitHub if LFS not configured on Pages)
+    const head = new TextDecoder().decode(buf.slice(0, 140));
+    if (head.includes('git-lfs.github.com/spec/v1')) {
+      throw new Error(`Your XLSX appears to be a Git LFS pointer. GitHub Pages will not serve the real binary unless LFS is properly published. Upload the actual XLSX (non-LFS) to the Pages branch/folder.`);
+    }
+
+    state.wb = XLSX.read(buf, { type: 'array' });
+    state.sessions = buildSessions(state.wb);
+    state.farmers = buildFarmers(state.wb);
+    logDiag(`workbook: sheets=${state.wb.SheetNames.length}, sessions=${state.sessions.length}, farmers=${state.farmers.length}`);
+  }
+
+  function buildSessions(wb) {
+    const sumWs = wb.Sheets['SUM'] || wb.Sheets['Sum'] || wb.Sheets['sum'];
+    if (!sumWs) throw new Error('Missing SUM sheet');
+
+    const mat = sheetToMatrix(sumWs);
+    const hRow = findHeaderRow(mat, ['City', 'Date', 'Session Location', 'Total Farmers']);
+    if (hRow < 0) throw new Error('Could not find a header row in SUM (expected City/Date/Session Location/Total Farmers)');
+
+    const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
+    const headersNorm = rawHeaders.map(norm);
+
+    // Required (best-match)
+    const iCity = findCol(headersNorm, ['city', 'district', 'tehsil']);
+    const iDate = findCol(headersNorm, ['date', 'session date', 'event date']);
+    const iSpot = findCol(headersNorm, ['session location', 'spot', 'location', 'session spot', 'spot name', 'village', 'place']);
+    const iFarmers = findCol(headersNorm, ['total farmers', 'farmers', 'farmers gathered', 'attendees', 'total attendance']);
+    const iAcres = findCol(headersNorm, ['total wheat acres', 'wheat acres', 'crop area', 'acres', 'wheat area']);
+    const iDef = findCol(headersNorm, ['will definitely use', 'definite', 'definitely use', 'definitely']);
+    const iMay = findCol(headersNorm, ['maybe']);
+    const iNo = findCol(headersNorm, ['not interested', 'no', 'no intent', 'not']);
+    const iKnow = findCol(headersNorm, ['know buctril', 'awareness', 'know about buctril', 'already using', 'heard of']);
+    const iCoords = findCol(headersNorm, ['spot coordinates', 'coordinates', 'lat', 'latitude', 'gps']);
+    const iReasonUse = findCol(headersNorm, ['top reason to use', 'reason to use', 'top use reason', 'use reason']);
+    const iReasonNo = findCol(headersNorm, ['top reason not to use', 'reason not to use', 'no reason', 'not use reason']);
+
+    const iSn = findCol(headersNorm, ['sn', 'sno', 'session no', 'session number', 'sr']);
+
+    // Clarity score columns: all columns that contain "score understood" or "understood:" or "clarity"
+    const clarityCols = [];
+    headersNorm.forEach((h, idx) => {
+      if (h.includes('score understood') || h.includes('understood') || h.includes('clarity score') || h.includes('message clarity')) {
+        clarityCols.push(idx);
+      }
+    });
+
+    if (iCity < 0 || iDate < 0 || iSpot < 0 || iFarmers < 0) {
+      logDiag(`SUM mapping: city=${iCity}, date=${iDate}, spot=${iSpot}, farmers=${iFarmers}. (Some required columns not detected.)`);
+    } else {
+      logDiag(`SUM mapping: city=${rawHeaders[iCity]}, date=${rawHeaders[iDate]}, spot=${rawHeaders[iSpot]}, farmers=${rawHeaders[iFarmers]}`);
+    }
+
+    const sessions = [];
+    for (let r = hRow + 1; r < mat.length; r++) {
+      const row = mat[r] || [];
+      const city = iCity >= 0 ? String(row[iCity] ?? '').trim() : '';
+      const spot = iSpot >= 0 ? String(row[iSpot] ?? '').trim() : '';
+      const farmers = iFarmers >= 0 ? asNum(row[iFarmers]) : NaN;
+
+      // Skip empty rows
+      if (!city && !spot && !Number.isFinite(farmers)) continue;
+
+      const date = iDate >= 0 ? asDate(row[iDate]) : null;
+      const acres = iAcres >= 0 ? asNum(row[iAcres]) : NaN;
+
+      const def = iDef >= 0 ? asNum(row[iDef]) : NaN;
+      const may = iMay >= 0 ? asNum(row[iMay]) : NaN;
+      const no = iNo >= 0 ? asNum(row[iNo]) : NaN;
+
+      const knowRaw = iKnow >= 0 ? asNum(row[iKnow]) : NaN;
+      // awareness heuristic: if <= farmers => count, else if <=100 assume percent
+      const awareness = (Number.isFinite(knowRaw) && Number.isFinite(farmers) && farmers > 0)
+        ? (knowRaw <= farmers ? pct(knowRaw, farmers) : (knowRaw <= 100 ? knowRaw : NaN))
+        : NaN;
+
+      const clarity = clarityCols.length
+        ? avg(clarityCols.map(ci => asNum(row[ci])).filter(n => Number.isFinite(n) && n <= 100))
+        : NaN;
+
+      const coordStr = iCoords >= 0 ? String(row[iCoords] ?? '').trim() : '';
+      const { lat, lon } = parseCoord(coordStr);
+
+      const reasonsUse = iReasonUse >= 0 ? String(row[iReasonUse] ?? '').trim() : '';
+      const reasonsNo = iReasonNo >= 0 ? String(row[iReasonNo] ?? '').trim() : '';
+
+      const sn = iSn >= 0 ? asNum(row[iSn]) : NaN;
+
+      // Optional day/session code if present (D#S#) in SUM
+      const sessionCode = (() => {
+        // Scan the row for tokens like D1S1 (useful for cross-linking)
+        const joined = row.map(v => String(v ?? '')).join(' ');
+        const m = joined.match(/\bD\d+S\d+\b/i);
+        return m ? m[0].toUpperCase() : '';
+      })();
+
+      sessions.push({
+        sn: Number.isFinite(sn) ? Math.round(sn) : null,
+        date,
+        city,
+        spot,
+        farmers: Number.isFinite(farmers) ? farmers : NaN,
+        acres: Number.isFinite(acres) ? acres : NaN,
+        def: Number.isFinite(def) ? def : NaN,
+        may: Number.isFinite(may) ? may : NaN,
+        no: Number.isFinite(no) ? no : NaN,
+        defPct: (Number.isFinite(def) && Number.isFinite(farmers) && farmers > 0) ? pct(def, farmers) : NaN,
+        awareness,
+        clarity,
+        lat, lon,
+        reasonsUse,
+        reasonsNo,
+        sessionCode,
+      });
+    }
+
+    // Sort by date then city/spot
+    sessions.sort((a, b) => {
+      const ad = a.date ? a.date.getTime() : 0;
+      const bd = b.date ? b.date.getTime() : 0;
+      if (ad !== bd) return ad - bd;
+      const c = (a.city || '').localeCompare(b.city || '');
+      if (c) return c;
+      return (a.spot || '').localeCompare(b.spot || '');
+    });
+
+    return sessions;
+  }
+
+  function buildFarmers(wb) {
+    const farmers = [];
+    for (const sh of wb.SheetNames) {
+      if (!/^D\d+S\d+$/i.test(sh)) continue;
+      const ws = wb.Sheets[sh];
+      const mat = sheetToMatrix(ws);
+      const hRow = findHeaderRow(mat, ['name', 'mobile']);
+      if (hRow < 0) continue;
+
+      const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
+      const headersNorm = rawHeaders.map(norm);
+
+      const iName = findCol(headersNorm, ['name', 'farmer name']);
+      const iPhone = findCol(headersNorm, ['mobile', 'mobile whatsapp', 'phone', 'mobile / whatsapp', 'mobilewhatsapp']);
+
+      for (let r = hRow + 1; r < mat.length; r++) {
+        const row = mat[r] || [];
+        const name = iName >= 0 ? String(row[iName] ?? '').trim() : '';
+        const phone = iPhone >= 0 ? String(row[iPhone] ?? '').trim() : '';
+        if (!name && !phone) continue;
+        farmers.push({ session: sh.toUpperCase(), name, phone });
+      }
+    }
+    return farmers;
+  }
+
+  // --- Media loading ---
+  async function loadMedia() {
+    logDiag(`fetch: ${CFG.media}`);
     try {
-      await loadWorkbook();
-      diag.push(`Workbook: ${CFG.xlsx}`);
-      diag.push(`Sessions: ${state.sessions.length}`);
-      diag.push(`Farmer rows (session sheets): ${state.farmers.length}`);
-      const coordCount = state.sessions.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lon)).length;
-      diag.push(`Sessions with coordinates: ${coordCount}`);
+      const res = await fetch(CFG.media, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      state.media = expandMedia(data);
+      logDiag(`media: items=${state.media.length}`);
     } catch (e) {
-      setNotice(e.message || String(e), true);
-      setDiag(`Load failed.\n\nCommon fixes:\n- Put ${CFG.xlsx} in the SAME folder as index.html\n- Ensure GitHub Pages is serving the folder (Settings → Pages)\n- Keep file name EXACT: ${CFG.xlsx}\n\nDetails:\n${String(e.stack || e)}`);
+      state.media = [];
+      logDiag(`media: failed (${e.message})`);
+    }
+  }
+
+  function expandMedia(data) {
+    // Flat legacy: [{type, src, caption, ...}]
+    if (Array.isArray(data)) return data.map(m => normalizeMediaItem(m)).filter(Boolean);
+
+    // A_compact:
+    // {format:"A_compact", basePath:"assets/gallery/", defaults:{...}, sessions:[{id,caption,city,spot,date}]}
+    if (!data || data.format !== 'A_compact' || !Array.isArray(data.sessions)) return [];
+
+    const base = String(data.basePath || '');
+    const d = data.defaults || {};
+    const mainVideoExt = d.mainVideoExt || 'mp4';
+    const mainImageExt = d.mainImageExt || 'jpg';
+    const variantImageExt = d.variantImageExt || 'jpg';
+    const variantVideoExt = d.variantVideoExt || 'mp4';
+    const variants = Array.isArray(d.variants) ? d.variants : ['a','b','c','d','e','f'];
+
+    const items = [];
+    for (const s of data.sessions) {
+      const sid = s.id;
+      const sessionId = Number.isFinite(Number(sid)) ? Number(sid) : null;
+      const stem = `${base}${sid}`;
+
+      // Main media
+      items.push(normalizeMediaItem({
+        type: 'video',
+        src: `${stem}.${mainVideoExt}`,
+        caption: s.caption ? `${s.caption} (Video)` : `Session ${sid} (Video)`,
+        transcript: s.transcript || '',
+        sessionId,
+        city: s.city || '',
+        spot: s.spot || '',
+        date: s.date || '',
+      }));
+      items.push(normalizeMediaItem({
+        type: 'image',
+        src: `${stem}.${mainImageExt}`,
+        caption: s.caption ? `${s.caption} (Photo)` : `Session ${sid} (Photo)`,
+        transcript: '',
+        sessionId,
+        city: s.city || '',
+        spot: s.spot || '',
+        date: s.date || '',
+      }));
+
+      // Variants
+      for (const v of variants) {
+        items.push(normalizeMediaItem({
+          type: 'image',
+          src: `${stem}${v}.${variantImageExt}`,
+          caption: s.caption ? `${s.caption} (Photo ${String(v).toUpperCase()})` : `Session ${sid} (Photo ${String(v).toUpperCase()})`,
+          transcript: '',
+          sessionId,
+          city: s.city || '',
+          spot: s.spot || '',
+          date: s.date || '',
+        }));
+        items.push(normalizeMediaItem({
+          type: 'video',
+          src: `${stem}${v}.${variantVideoExt}`,
+          caption: s.caption ? `${s.caption} (Video ${String(v).toUpperCase()})` : `Session ${sid} (Video ${String(v).toUpperCase()})`,
+          transcript: '',
+          sessionId,
+          city: s.city || '',
+          spot: s.spot || '',
+          date: s.date || '',
+        }));
+      }
+    }
+
+    return items.filter(Boolean);
+  }
+
+  function normalizeMediaItem(m) {
+    if (!m || !m.src) return null;
+    const type = (m.type === 'video') ? 'video' : 'image';
+    const caption = String(m.caption || '').trim();
+    const alt = String(m.alt || caption || 'media').trim();
+    const transcript = String(m.transcript || '').trim();
+
+    let sessionId = null;
+    if (Number.isFinite(Number(m.sessionId))) sessionId = Number(m.sessionId);
+
+    // Parse from caption "Session 12"
+    if (!sessionId && caption) {
+      const mm = caption.match(/\b(?:session|sess)\s*(\d+)\b/i);
+      if (mm) sessionId = Number(mm[1]);
+    }
+    // Parse from filename
+    if (!sessionId) {
+      const mm = String(m.src).match(/\/(\d+)[a-z]?\.(jpg|jpeg|png|webp|mp4|mov)$/i);
+      if (mm) sessionId = Number(mm[1]);
+    }
+
+    return {
+      type,
+      src: String(m.src),
+      caption: caption || (sessionId ? `Session ${sessionId}` : 'Media'),
+      alt,
+      transcript,
+      sessionId,
+      city: String(m.city || ''),
+      spot: String(m.spot || ''),
+      date: String(m.date || ''),
+    };
+  }
+
+  // --- Render pipeline ---
+  function renderAll() {
+    renderFilterSummary();
+    renderKpis();
+    renderSnapshotText();
+    renderCharts();
+    renderMap();
+    renderSessionsTable();
+    renderShowcases();
+    renderGallery();
+  }
+
+  function computeTotals(rows) {
+    const sessions = rows.length;
+    const farmers = rows.reduce((a, s) => a + (Number.isFinite(s.farmers) ? s.farmers : 0), 0);
+    const acres = rows.reduce((a, s) => a + (Number.isFinite(s.acres) ? s.acres : 0), 0);
+    const def = rows.reduce((a, s) => a + (Number.isFinite(s.def) ? s.def : 0), 0);
+    const may = rows.reduce((a, s) => a + (Number.isFinite(s.may) ? s.may : 0), 0);
+    const no = rows.reduce((a, s) => a + (Number.isFinite(s.no) ? s.no : 0), 0);
+    const defPct = pct(def, farmers);
+
+    const dates = rows.map(s => s.date).filter(Boolean).sort((a,b) => a - b);
+    const dateFrom = dates.length ? dates[0] : null;
+    const dateTo = dates.length ? dates[dates.length - 1] : null;
+
+    return { sessions, farmers, acres, def, may, no, defPct, dateFrom, dateTo };
+  }
+
+  function renderFilterSummary() {
+    const sum = computeTotals(state.filtered);
+    const fs = $('filterSummary');
+    const city = state.filter.city || 'All Cities';
+    const spot = state.filter.spot || 'All Spots';
+    const dateLabel = (sum.dateFrom && sum.dateTo)
+      ? (fmtDate(sum.dateFrom) === fmtDate(sum.dateTo) ? fmtDate(sum.dateFrom) : `${fmtDate(sum.dateFrom)} → ${fmtDate(sum.dateTo)}`)
+      : '—';
+
+    if (fs) {
+      fs.innerHTML = `<b>Selection:</b> ${escapeHtml(city)} • ${escapeHtml(spot)}<br/>` +
+                     `<b>Sessions:</b> ${fmtInt(sum.sessions)} • <b>Farmers:</b> ${fmtInt(sum.farmers)} • <b>Acres:</b> ${fmtInt(sum.acres)}<br/>` +
+                     `<b>Date:</b> ${escapeHtml(dateLabel)}`;
+    }
+
+    // Map banner (defaults to aggregated view unless a specific marker is selected)
+    if (!state.map.selectedKey) {
+      setText('mapSelTitle', `${city} • ${spot}`);
+      setText('mapSelFarmers', fmtInt(sum.farmers));
+      setText('mapSelAcres', fmtInt(sum.acres));
+      setText('mapSelDate', dateLabel);
+    }
+  }
+
+  function renderKpis() {
+    const sum = computeTotals(state.filtered);
+
+    setText('kpi-sessions', fmtInt(sum.sessions));
+    setText('kpi-farmers', fmtInt(sum.farmers));
+    setText('kpi-acres', fmtInt(sum.acres));
+    setText('kpi-demo', Number.isFinite(sum.defPct) ? `${Math.round(sum.defPct)}% definite` : '—');
+
+    // Bars: scale relative to full dataset (not filtered) for a stable sense of size
+    const all = computeTotals(state.sessions);
+    const pctSessions = all.sessions ? (sum.sessions / all.sessions) * 100 : 0;
+    const pctFarmers = all.farmers ? (sum.farmers / all.farmers) * 100 : 0;
+    const pctAcres = all.acres ? (sum.acres / all.acres) * 100 : 0;
+    const pctDemo = Number.isFinite(sum.defPct) ? Math.max(0, Math.min(100, sum.defPct)) : 0;
+
+    const setBar = (id, p) => {
+      const el = $(id);
+      if (el) el.style.width = `${Math.max(0, Math.min(100, p))}%`;
+    };
+    setBar('bar-sessions', pctSessions);
+    setBar('bar-farmers', pctFarmers);
+    setBar('bar-acres', pctAcres);
+    setBar('bar-demo', pctDemo);
+  }
+
+  function renderSnapshotText() {
+    const sum = computeTotals(state.filtered);
+    const city = state.filter.city || 'All Cities';
+    const spot = state.filter.spot || 'All Spots';
+    const dateLabel = (sum.dateFrom && sum.dateTo)
+      ? (fmtDate(sum.dateFrom) === fmtDate(sum.dateTo) ? fmtDate(sum.dateFrom) : `${fmtDate(sum.dateFrom)} → ${fmtDate(sum.dateTo)}`)
+      : '—';
+
+    const topUse = topCounts(state.filtered.map(s => s.reasonsUse).filter(Boolean), CFG.maxReasons);
+    const topNo = topCounts(state.filtered.map(s => s.reasonsNo).filter(Boolean), CFG.maxReasons);
+
+    $('snapshot').textContent =
+      `${city} • ${spot} • Date: ${dateLabel}. ` +
+      `Sessions: ${fmtInt(sum.sessions)}, Farmers: ${fmtInt(sum.farmers)}, Acres: ${fmtInt(sum.acres)}. ` +
+      (Number.isFinite(sum.defPct) ? `Definite intent: ${Math.round(sum.defPct)}%. ` : '') +
+      (topUse.length ? `Top reason to use: "${topUse[0][0]}" (${topUse[0][1]}). ` : '') +
+      (topNo.length ? `Top reason not to use: "${topNo[0][0]}" (${topNo[0][1]}).` : '');
+
+    renderReasons('reasonUse', topUse);
+    renderReasons('reasonNo', topNo);
+  }
+
+  function topCounts(values, maxN) {
+    const m = new Map();
+    for (const v of values) {
+      const k = String(v).trim();
+      if (!k) continue;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return Array.from(m.entries()).sort((a,b) => b[1] - a[1]).slice(0, maxN);
+  }
+
+  function renderReasons(tbodyId, pairs) {
+    const tb = $(tbodyId);
+    if (!tb) return;
+    tb.innerHTML = '';
+    if (!pairs.length) {
+      tb.innerHTML = `<tr><td class="muted">—</td><td>—</td></tr>`;
+      return;
+    }
+    for (const [k, v] of pairs) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(k)}</td><td>${fmtInt(v)}</td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  // --- Charts ---
+  function ensureChart(prev, canvasEl, type, data, options) {
+    if (!canvasEl) return null;
+    if (prev) prev.destroy();
+    return new Chart(canvasEl, { type, data, options: options || {} });
+  }
+
+  function renderCharts() {
+    // City distribution (by sessions count)
+    const cityCounts = new Map();
+    for (const s of state.filtered) {
+      const k = s.city || 'Other';
+      cityCounts.set(k, (cityCounts.get(k) || 0) + 1);
+    }
+    const cityLabels = Array.from(cityCounts.keys()).sort((a,b) => a.localeCompare(b));
+    const cityData = cityLabels.map(l => cityCounts.get(l));
+
+    state.charts.city = ensureChart(
+      state.charts.city,
+      $('chartCity'),
+      'doughnut',
+      {
+        labels: cityLabels,
+        datasets: [{ data: cityData }]
+      },
+      { responsive: true, plugins: { legend: { position: 'right' } } }
+    );
+
+    // Intent split (by counts)
+    const sum = computeTotals(state.filtered);
+    state.charts.intent = ensureChart(
+      state.charts.intent,
+      $('chartIntent'),
+      'pie',
+      {
+        labels: ['Definite', 'Maybe', 'Not Interested'],
+        datasets: [{ data: [sum.def, sum.may, sum.no] }]
+      },
+      { responsive: true, plugins: { legend: { position: 'right' } } }
+    );
+
+    // Trend: by date (sum farmers, sum acres)
+    const byDate = new Map();
+    for (const s of state.filtered) {
+      const d = s.date ? fmtDate(s.date) : 'Unknown';
+      const cur = byDate.get(d) || { farmers: 0, acres: 0 };
+      cur.farmers += Number.isFinite(s.farmers) ? s.farmers : 0;
+      cur.acres += Number.isFinite(s.acres) ? s.acres : 0;
+      byDate.set(d, cur);
+    }
+    const tLabels = Array.from(byDate.keys()).sort();
+    const tFarmers = tLabels.map(d => byDate.get(d).farmers);
+    const tAcres = tLabels.map(d => byDate.get(d).acres);
+
+    state.charts.trend = ensureChart(
+      state.charts.trend,
+      $('chartTrend'),
+      'line',
+      {
+        labels: tLabels,
+        datasets: [
+          { label: 'Farmers', data: tFarmers, tension: 0.25 },
+          { label: 'Acres', data: tAcres, tension: 0.25 }
+        ]
+      },
+      { responsive: true, scales: { y: { beginAtZero: true } } }
+    );
+  }
+
+  // --- Map ---
+  function initMapIfNeeded() {
+    if (state.map.obj) return;
+
+    const mapEl = $('map');
+    if (!mapEl) return;
+
+    state.map.obj = L.map(mapEl).setView(CFG.mapCenter, CFG.mapZoom);
+    state.map.base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(state.map.obj);
+
+    state.map.layer = L.layerGroup().addTo(state.map.obj);
+    logDiag('map: initialized');
+  }
+
+  function acresToRadiusMeters(acres) {
+    if (!Number.isFinite(acres) || acres <= 0) return 150; // fallback
+    const area = acres * 4046.86;
+    const r = Math.sqrt(area / Math.PI);
+    return Math.max(80, Math.min(CFG.bubbleClampMeters, r));
+  }
+
+  function sessionKey(s) {
+    // Prefer SN; fallback to city|spot|date
+    if (Number.isFinite(Number(s.sn))) return `sn:${s.sn}`;
+    return `k:${s.city}|${s.spot}|${fmtDate(s.date)}`;
+  }
+
+  function renderMap() {
+    initMapIfNeeded();
+    if (!state.map.obj || !state.map.layer) return;
+
+    state.map.layer.clearLayers();
+    if (state.map.route) {
+      state.map.route.remove();
+      state.map.route = null;
+    }
+
+    const rows = state.filtered.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lon));
+    if (!rows.length) {
+      $('mapLegend').textContent = 'No valid coordinates for the current selection. (Coordinates are optional; ensure SUM has a Spot Coordinates column.)';
       return;
     }
 
-    await loadMedia();
-    diag.push(`Media items: ${state.mediaItems.length}`);
-    diag.push(`Leaflet: ${typeof L === 'undefined' ? 'missing' : 'OK'}`);
-    diag.push(`Chart.js: ${typeof Chart === 'undefined' ? 'missing' : 'OK'}`);
-    diag.push(`XLSX: ${typeof XLSX === 'undefined' ? 'missing' : 'OK'}`);
-    setDiag(diag.join('\n'));
+    const latlngs = [];
+    for (const s of rows) {
+      const key = sessionKey(s);
+      const rMeters = acresToRadiusMeters(s.acres);
 
-    // initial filter apply
-    applyFilters();
+      const circle = L.circle([s.lat, s.lon], {
+        radius: rMeters,
+        color: 'rgba(134,239,172,.95)',
+        weight: 2,
+        fillColor: 'rgba(125,211,252,.35)',
+        fillOpacity: 0.55
+      });
 
-    setNotice('Ready. Use filters or click chart slices to drill down.');
+      circle.bindPopup(
+        `<b>${escapeHtml(s.spot || 'Spot')}</b><br/>` +
+        `${escapeHtml(s.city || '')}<br/>` +
+        `Farmers: ${fmtInt(s.farmers)}<br/>` +
+        `Wheat acres: ${fmtInt(s.acres)}<br/>` +
+        `Date: ${escapeHtml(fmtDate(s.date))}`
+      );
+
+      circle.on('click', () => selectMapSession(s));
+      circle.addTo(state.map.layer);
+
+      // center marker (for crisp point)
+      L.circleMarker([s.lat, s.lon], {
+        radius: 4,
+        color: 'rgba(231,237,247,.95)',
+        weight: 1,
+        fillOpacity: 1
+      }).addTo(state.map.layer);
+
+      latlngs.push([s.lat, s.lon]);
+    }
+
+    // Optional route polyline (chronological)
+    if (CFG.routeLine && rows.length > 1) {
+      const ordered = rows.slice().sort((a,b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
+      const pts = ordered.map(s => [s.lat, s.lon]);
+      state.map.route = L.polyline(pts, { color: 'rgba(251,191,36,.85)', weight: 2, dashArray: '6, 8' }).addTo(state.map.layer);
+    }
+
+    // Fit bounds
+    const bounds = L.latLngBounds(latlngs);
+    if (bounds.isValid()) state.map.obj.fitBounds(bounds, { padding: [30, 30] });
+
+    // Keep map banner aggregated unless a selection is pinned
+    state.map.selectedKey = state.map.selectedKey || '';
+  }
+
+  function selectMapSession(s) {
+    const key = sessionKey(s);
+    state.map.selectedKey = key;
+
+    setText('mapSelTitle', `${s.city || '—'} • ${s.spot || '—'}`);
+    setText('mapSelFarmers', fmtInt(s.farmers));
+    setText('mapSelAcres', fmtInt(s.acres));
+    setText('mapSelDate', fmtDate(s.date));
+
+    const rel = relatedMediaForSession(s);
+    renderShowcase('mapShowcase', rel);
+
+    // Also update sidebar summary line to reflect "pinned" selection
+    const fs = $('filterSummary');
+    if (fs) {
+      const pinned = `<br/><b>Pinned:</b> ${escapeHtml(s.city || '')} • ${escapeHtml(s.spot || '')} • ${escapeHtml(fmtDate(s.date))}`;
+      if (!fs.innerHTML.includes('Pinned:')) fs.innerHTML += pinned;
+      else fs.innerHTML = fs.innerHTML.replace(/<br\/><b>Pinned:<\/b>[\s\S]*$/i, pinned);
+    }
+  }
+
+  function relatedMediaForSession(s) {
+    // Priority order:
+    // 1) exact sessionId match (SN)
+    // 2) city/spot tag match in media.json
+    // 3) caption contains spot/city text
+    const sid = Number.isFinite(Number(s.sn)) ? Number(s.sn) : null;
+
+    const bySid = sid ? state.media.filter(m => m.sessionId === sid) : [];
+    if (bySid.length) return bySid;
+
+    const city = (s.city || '').toLowerCase();
+    const spot = (s.spot || '').toLowerCase();
+
+    const byTags = state.media.filter(m => {
+      if (m.city && city && m.city.toLowerCase() === city) return true;
+      if (m.spot && spot && m.spot.toLowerCase() === spot) return true;
+      return false;
+    });
+    if (byTags.length) return byTags;
+
+    const byCaption = state.media.filter(m => {
+      const cap = (m.caption || '').toLowerCase();
+      return (spot && cap.includes(spot)) || (city && cap.includes(city));
+    });
+    return byCaption;
+  }
+
+  // --- Sessions table ---
+  function renderSessionsTable() {
+    const tb = $('tblSessions');
+    if (!tb) return;
+    tb.innerHTML = '';
+
+    const rows = state.filtered.slice().sort((a,b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+    if (!rows.length) {
+      tb.innerHTML = `<tr><td colspan="8" class="muted">No sessions match the current filters.</td></tr>`;
+      return;
+    }
+
+    for (const s of rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(fmtDate(s.date))}</td>
+        <td>${escapeHtml(s.city || '—')}</td>
+        <td>${escapeHtml(s.spot || '—')}</td>
+        <td>${fmtInt(s.farmers)}</td>
+        <td>${fmtInt(s.acres)}</td>
+        <td>${fmtPct(s.defPct)}</td>
+        <td>${fmtPct(s.awareness)}</td>
+        <td>${fmtPct(s.clarity)}</td>
+      `;
+      tr.addEventListener('click', () => {
+        const rel = relatedMediaForSession(s);
+        if (rel.length) openLightbox(rel, 0);
+        // also pin on map if possible
+        if (Number.isFinite(s.lat) && Number.isFinite(s.lon)) selectMapSession(s);
+      });
+      tb.appendChild(tr);
+    }
+  }
+
+  // --- Gallery + showcases ---
+  function renderShowcases() {
+    // Snapshot showcase: pick first N media matching filter (or general)
+    const items = filteredMedia().slice(0, CFG.maxShowcase);
+    renderShowcase('snapshotShowcase', items);
+  }
+
+  function renderShowcase(id, items) {
+    const sc = $(id);
+    if (!sc) return;
+    sc.innerHTML = '';
+    if (!items.length) return;
+
+    items.slice(0, CFG.maxShowcase).forEach((item, idx) => {
+      const it = document.createElement('div');
+      it.className = 'showItem';
+
+      const prev = document.createElement(item.type === 'video' ? 'video' : 'img');
+      prev.src = item.src;
+      prev.loading = 'lazy';
+      if (item.type === 'video') {
+        prev.muted = true;
+        prev.playsInline = true;
+        prev.preload = 'metadata';
+      } else {
+        prev.alt = item.alt || item.caption || 'media';
+      }
+      prev.addEventListener('error', () => it.classList.add('broken'));
+      it.appendChild(prev);
+
+      it.title = item.caption || '';
+      it.addEventListener('click', () => openLightbox(items, idx));
+      sc.appendChild(it);
+    });
+  }
+
+  function filteredMedia() {
+    // If we can join by sessionId (SN), do it. Otherwise fall back to city/spot.
+    const { city, spot, q } = state.filter;
+    const rows = state.filtered;
+
+    const sids = new Set(rows.map(s => s.sn).filter(n => Number.isFinite(Number(n))));
+    let items = state.media;
+
+    if (sids.size) {
+      items = items.filter(m => m.sessionId && sids.has(m.sessionId));
+    } else if (city || spot) {
+      const c = (city || '').toLowerCase();
+      const sp = (spot || '').toLowerCase();
+      items = items.filter(m => {
+        const mc = (m.city || '').toLowerCase();
+        const ms = (m.spot || '').toLowerCase();
+        const cap = (m.caption || '').toLowerCase();
+        return (!city || mc === c || cap.includes(c)) && (!spot || ms === sp || cap.includes(sp));
+      });
+    }
+
+    if (q) {
+      const qq = q.toLowerCase();
+      items = items.filter(m => (m.caption || '').toLowerCase().includes(qq));
+    }
+
+    return items;
+  }
+
+  function renderGallery() {
+    const gg = $('galleryGrid');
+    if (!gg) return;
+    gg.innerHTML = '';
+
+    const items = filteredMedia().slice(0, CFG.maxGallery);
+    if (!items.length) {
+      gg.innerHTML = `<div class="muted">No media matched the current filters.</div>`;
+      return;
+    }
+
+    items.forEach((item, i) => {
+      const tile = document.createElement('div');
+      tile.className = 'mediaTile';
+
+      const prev = document.createElement(item.type === 'video' ? 'video' : 'img');
+      prev.src = item.src;
+      prev.loading = 'lazy';
+      if (item.type === 'video') {
+        prev.muted = true;
+        prev.playsInline = true;
+        prev.preload = 'metadata';
+      } else {
+        prev.alt = item.alt || item.caption || 'media';
+      }
+      prev.addEventListener('error', () => tile.classList.add('broken'));
+      tile.appendChild(prev);
+
+      const tag = document.createElement('div');
+      tag.className = 'mediaTag';
+      tag.textContent = item.caption || (item.sessionId ? `Session ${item.sessionId}` : 'Media');
+      tile.appendChild(tag);
+
+      tile.addEventListener('click', () => openLightbox(items, i));
+      gg.appendChild(tile);
+    });
+  }
+
+  // --- Export ---
+  function exportFilteredCsv() {
+    const rows = state.filtered;
+    if (!rows.length) {
+      setNotice('Nothing to export (no rows in the current filter).', true);
+      return;
+    }
+
+    const header = ['Date','City','Spot','Farmers','Acres','Definite','Maybe','NotInterested','DefinitePct','AwarenessPct','ClarityPct'];
+    const lines = [header.join(',')];
+    for (const s of rows) {
+      const vals = [
+        fmtDate(s.date),
+        csvSafe(s.city),
+        csvSafe(s.spot),
+        safeNum(s.farmers),
+        safeNum(s.acres),
+        safeNum(s.def),
+        safeNum(s.may),
+        safeNum(s.no),
+        safeNum(s.defPct),
+        safeNum(s.awareness),
+        safeNum(s.clarity),
+      ];
+      lines.push(vals.join(','));
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AgriVista_export_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function safeNum(n) {
+    return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : '';
+  }
+  function csvSafe(s) {
+    const v = String(s ?? '');
+    if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+    return v;
+  }
+
+  // --- Hero video (optional) ---
+  function initHeroVideo() {
+    const v = $('heroVideo');
+    if (!v) return;
+    v.src = CFG.heroVideo;
+    v.addEventListener('error', () => {
+      v.classList.add('hide');
+      logDiag(`heroVideo: not found (${CFG.heroVideo})`);
+    });
+  }
+
+  // --- Init ---
+  async function init() {
+    setText('buildStamp', 'v' + (new Date().toISOString().slice(0,10)));
+    initTabs();
+    initLightbox();
+    initFilters();
+    initHeroVideo();
+
+    setNotice('Loading workbook and media…');
+    logDiag('init: start');
+
+    try {
+      await loadWorkbook();
+      await loadMedia();
+
+      buildFilterOptions();
+      state.filtered = state.sessions.slice();
+      renderAll();
+
+      setNotice('Ready.');
+      logDiag('init: ready');
+    } catch (e) {
+      setNotice(e.message || String(e), true);
+      logDiag(`init: error: ${e.message || e}`);
+      // still attempt to render empty UI (so the page looks "alive")
+      state.sessions = state.sessions || [];
+      state.filtered = [];
+      renderAll();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

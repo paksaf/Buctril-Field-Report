@@ -19,75 +19,129 @@
   "sessions": [
     {
       "id": 1,
-      "caption": "Activation Session 1"
+      "caption": "Activation Session 1",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 2,
-      "caption": "Activation Session 2"
+      "caption": "Activation Session 2",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 3,
-      "caption": "Activation Session 3"
+      "caption": "Activation Session 3",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 4,
-      "caption": "Activation Session 4"
+      "caption": "Activation Session 4",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 5,
-      "caption": "Activation Session 5"
+      "caption": "Activation Session 5",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 6,
-      "caption": "Activation Session 6"
+      "caption": "Activation Session 6",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 7,
-      "caption": "Activation Session 7"
+      "caption": "Activation Session 7",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 8,
-      "caption": "Activation Session 8"
+      "caption": "Activation Session 8",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 9,
-      "caption": "Activation Session 9"
+      "caption": "Activation Session 9",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 10,
-      "caption": "Activation Session 10"
+      "caption": "Activation Session 10",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 11,
-      "caption": "Activation Session 11"
+      "caption": "Activation Session 11",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 12,
-      "caption": "Activation Session 12"
+      "caption": "Activation Session 12",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 13,
-      "caption": "Activation Session 13"
+      "caption": "Activation Session 13",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 14,
-      "caption": "Activation Session 14"
+      "caption": "Activation Session 14",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 15,
-      "caption": "Activation Session 15"
+      "caption": "Activation Session 15",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 16,
-      "caption": "Activation Session 16"
+      "caption": "Activation Session 16",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 17,
-      "caption": "Activation Session 17"
+      "caption": "Activation Session 17",
+      "city": "",
+      "spot": "",
+      "date": ""
     },
     {
       "id": 18,
-      "caption": "Activation Session 18"
+      "caption": "Activation Session 18",
+      "city": "",
+      "spot": "",
+      "date": ""
     }
   ]
 }
