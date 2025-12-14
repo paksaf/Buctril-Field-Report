@@ -1,986 +1,625 @@
-/* Buctril Dashboard (Rev3)
- * Fixes:
- * - XLSX library missing: auto-load fallback CDNs when XLSX is undefined.
- * - Wrong pivots (e.g., phone numbers summed): pivots are COUNT-based from SUM sheet reason columns.
- * - Unknown donut: reads City + Session Location from SUM sheet.
- * - Missing bg.mp4: checks common locations and hides video if not present.
- * - Media not loading: retries path and .jpeg/.jpg variations.
- *
- * Expected repo root files:
- * - index.html
- * - data_processor.js
- * - Buctril_Super_Activations.xlsx
- * - media.json  (optional but recommended)
- * - Bayer.jpg, Buctril.jpg, Interact.gif (optional)
- * - bg.mp4 or assets/bg.mp4 (optional)
- */
-
+/* Buctril dashboard – rev4 (clean)
+   - Guaranteed XLSX + Chart.js via fallback loader (Safari-safe)
+   - Parses SUM sheet robustly (header discovery + strict reason columns)
+   - Donuts + pivot bars (no tables)
+   - Media grid always visible; handles missing media; bg.mp4 optional
+*/
 (function(){
   "use strict";
 
-  // ---------- Small utilities ----------
-  function $(id){ return document.getElementById(id); }
-  function text(el, v){ if(el) el.textContent = (v===null||v===undefined) ? "–" : String(v); }
-  function safeText(v){ return (v===null||v===undefined) ? "" : String(v).trim(); }
-  function safeNumber(v){
-    if(v===null||v===undefined||v==="") return 0;
-    if(typeof v === "number" && isFinite(v)) return v;
-    var s = String(v).replace(/,/g,"").trim();
-    var m = s.match(/-?\d+(?:\.\d+)?/);
-    return m ? (parseFloat(m[0]) || 0) : 0;
-  }
-  function fmtInt(n){ try { return Math.round(n).toLocaleString("en-US"); } catch(e){ return String(Math.round(n)); } }
-  function fmtPct(p){ if(!isFinite(p)) return "–"; return (Math.round(p*10)/10).toFixed(1) + "%"; }
-  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
-  function normHeader(h){
-    return safeText(h).replace(/^\ufeff/,"").replace(/\u00a0/g," ").replace(/\s+/g," ").trim().toLowerCase();
+  const STATUS = document.getElementById("status");
+  const citySel = document.getElementById("citySel");
+  const spotSel = document.getElementById("spotSel");
+  const searchBox = document.getElementById("searchBox");
+  const clearBtn = document.getElementById("clearBtn");
+
+  const kSessions = document.getElementById("kSessions");
+  const kFarmers = document.getElementById("kFarmers");
+  const kAcres = document.getElementById("kAcres");
+  const kCities = document.getElementById("kCities");
+  const campaignDaysEl = document.getElementById("campaignDays");
+
+  const mediaGrid = document.getElementById("mediaGrid");
+
+  let ALL = [];
+  let FILTERED = [];
+  let HEADERS = [];
+  let REASON_USE_COLS = [];
+  let REASON_NOT_COLS = [];
+
+  let charts = { city:null, spot:null, intent:null, use:null, notUse:null };
+
+  function logStatus(msg, isErr=false){
+    if (!STATUS) return;
+    STATUS.style.display = "block";
+    STATUS.classList.toggle("err", !!isErr);
+    STATUS.textContent = msg;
   }
 
-  // Deterministic city colors (stable between reloads)
-  function hashHue(s){
-    var str = (safeText(s).toLowerCase());
-    var h = 0;
-    for(var i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) % 360;
-    return h;
+  function normalize(s){ return String(s ?? "").trim(); }
+  function normKey(s){
+    return normalize(s).toLowerCase().replace(/\s+/g," ").replace(/[^a-z0-9 :%/_-]/g,"").trim();
   }
-  function cityColor(city){ return "hsl(" + hashHue(city) + ", 70%, 55%)"; }
-  function spotColor(city, i){
-    var h = hashHue(city);
-    var l = 72 - (i % 7) * 6;
-    return "hsl(" + h + ", 70%, " + l + "%)";
+  function isEmpty(v){
+    return v===null || v===undefined || String(v).trim()==="";
   }
+  function toNum(v){
+    if (v===null || v===undefined) return NaN;
+    if (typeof v === "number") return v;
+    const s = String(v).replace(/,/g,"").trim();
+    if (!s) return NaN;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  function fmtInt(n){
+    if (!Number.isFinite(n)) return "–";
+    return Math.round(n).toLocaleString();
+  }
+  function distinct(arr){ return Array.from(new Set(arr)); }
 
-  function setBar(id, pct){
-    var el = $(id);
-    if(!el) return;
-    var p = clamp01((pct||0)/100)*100;
-    el.style.width = p.toFixed(1) + "%";
-  }
-
-  function showDQ(msg){
-    var el = $("dqBox");
-    if(!el) return;
-    el.style.display = "block";
-    el.innerHTML = msg;
-  }
-  function hideDQ(){
-    var el = $("dqBox");
-    if(!el) return;
-    el.style.display = "none";
-    el.innerHTML = "";
-  }
-
-  function setStatus(msg){
-    var el = $("dataStatus");
-    if(el) el.textContent = msg;
-  }
-
-  // ---------- Dynamic lib loader (for Safari / CDN blocking) ----------
-  function loadScript(url){
-    return new Promise(function(resolve, reject){
-      var s = document.createElement("script");
-      s.src = url;
-      s.async = true;
-      s.onload = function(){ resolve(true); };
-      s.onerror = function(){ reject(new Error("Failed to load " + url)); };
+  function loadScript(src){
+    return new Promise((resolve,reject)=>{
+      const s=document.createElement("script");
+      s.src=src;
+      s.async=true;
+      s.onload=()=>resolve(src);
+      s.onerror=()=>reject(new Error("Failed: "+src));
       document.head.appendChild(s);
     });
   }
-  async function ensureGlobal(name, urls){
-    if(window[name]) return true;
-    for(var i=0;i<urls.length;i++){
-      try{
-        await loadScript(urls[i]);
-        if(window[name]) return true;
-      }catch(e){}
+
+  async function ensureLibs(){
+    if (!window.XLSX){
+      const tries=[
+        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+        "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+      ];
+      let ok=false, lastErr=null;
+      for (const t of tries){
+        try{ await loadScript(t); if (window.XLSX){ ok=true; break; } }catch(e){ lastErr=e; }
+      }
+      if (!ok) throw new Error("XLSX library not available (CDN blocked). " + (lastErr?lastErr.message:""));
     }
-    return !!window[name];
+
+    if (!window.Chart){
+      const tries=[
+        "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+        "https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+      ];
+      let ok=false, lastErr=null;
+      for (const t of tries){
+        try{ await loadScript(t); if (window.Chart){ ok=true; break; } }catch(e){ lastErr=e; }
+      }
+      if (!ok) throw new Error("Chart.js library not available (CDN blocked). " + (lastErr?lastErr.message:""));
+    }
   }
 
-  // ---------- Background video existence check ----------
   async function trySetBgVideo(){
-    var v = document.getElementById("bgVideo");
-    if(!v) return;
-    var candidates = ["bg.mp4", "assets/bg.mp4"];
-    for(var i=0;i<candidates.length;i++){
+    const v = document.getElementById("bgVideo");
+    if (!v) return;
+    const candidates=["bg.mp4","assets/bg.mp4"];
+    for (const c of candidates){
       try{
-        var res = await fetch(candidates[i], { method:"HEAD", cache:"no-store" });
-        if(res && res.ok){
-          v.src = candidates[i] + "?v=" + Date.now();
+        const r = await fetch(c, {method:"HEAD"});
+        if (r.ok){
+          v.src = c;
           v.style.display = "block";
           return;
         }
       }catch(e){}
     }
-    // leave hidden if none
   }
 
-  // ---------- XLSX loading + parsing ----------
-  async function fetchArrayBuffer(path){
-    var res = await fetch(path + "?v=" + Date.now(), { cache:"no-store" });
-    if(!res.ok) throw new Error("Fetch failed for " + path + " (" + res.status + ")");
-    var buf = await res.arrayBuffer();
-
-    // Detect Git LFS pointer (rare but common cause)
-    try{
-      var head = new TextDecoder("utf-8").decode(buf.slice(0, 200));
-      if(head && head.indexOf("git-lfs.github.com/spec") >= 0){
-        throw new Error("XLSX appears to be a Git LFS pointer file. Upload the actual .xlsx binary (disable LFS for this file).");
+  async function setLogos(){
+    const map = [
+      {id:"logoBayer", names:["Bayer.jpg","bayer.jpg","Bayer.jpeg","bayer.jpeg","assets/Bayer.jpg","assets/bayer.jpg"]},
+      {id:"logoBuctril", names:["Buctril.jpg","buctril.jpg","Buctril.jpeg","buctril.jpeg","assets/Buctril.jpg","assets/buctril.jpg"]},
+      {id:"logoInteract", names:["Interact.gif","interact.gif","Interact.png","interact.png","assets/Interact.gif","assets/interact.gif"]}
+    ];
+    for (const item of map){
+      const img = document.getElementById(item.id);
+      if (!img) continue;
+      let set=false;
+      for (const n of item.names){
+        try{
+          const r = await fetch(n, {method:"HEAD"});
+          if (r.ok){ img.src=n; set=true; break; }
+        }catch(e){}
       }
-    }catch(e2){
-      // ignore decoder issues
+      if (!set) img.alt="—";
     }
-    return buf;
   }
 
-  function findHeaderRow(sheet, want){
-    // Look in first 10 rows for a cell matching want (e.g., "City")
-    for(var r=0;r<10;r++){
-      var row = sheet[r] || [];
-      for(var c=0;c<row.length;c++){
-        if(normHeader(row[c]) === want) return r;
-      }
+  async function fetchWorkbook(){
+    const candidates=["Buctril_Super_Activations.xlsx","./Buctril_Super_Activations.xlsx"];
+    let lastErr=null;
+    for (const c of candidates){
+      try{
+        const r = await fetch(c, {cache:"no-cache"});
+        if (!r.ok) throw new Error("HTTP "+r.status+" for "+c);
+        return await r.arrayBuffer();
+      }catch(e){ lastErr=e; }
     }
-    return -1;
+    throw new Error("Could not fetch XLSX. " + (lastErr?lastErr.message:""));
   }
 
-  function sheetToMatrix(ws){
-    // array of arrays; keep empty as ""
-    return XLSX.utils.sheet_to_json(ws, { header:1, raw:true, blankrows:false, defval:"" });
+  function findHeaderRow(sheetAOA){
+    for (let i=0;i<Math.min(20, sheetAOA.length);i++){
+      const row = sheetAOA[i] || [];
+      const keys = row.map(normKey);
+      const hasCity = keys.includes("city");
+      const hasSpot = keys.includes("session location") || keys.includes("spot") || keys.includes("sessionlocation");
+      if (hasCity && hasSpot) return i;
+    }
+    return 1;
   }
 
-  function buildRowsFromSUM(wb){
-    var sheetName = "SUM";
-    if(!wb.Sheets[sheetName]){
-      // sometimes renamed
-      var alt = Object.keys(wb.Sheets).find(function(n){ return normHeader(n) === "sum"; });
-      if(alt) sheetName = alt;
-    }
-    var ws = wb.Sheets[sheetName];
-    if(!ws) throw new Error("Could not find SUM sheet in workbook.");
+  function parseSUM(wb){
+    const sumName = (wb.SheetNames||[]).find(s=>String(s).trim().toLowerCase()==="sum") || "SUM";
+    const ws = wb.Sheets[sumName];
+    if (!ws) throw new Error("SUM sheet not found in workbook.");
 
-    var matrix = sheetToMatrix(ws);
-    var headerRowIdx = findHeaderRow(matrix, "city");
-    if(headerRowIdx < 0) throw new Error("Could not detect header row in SUM sheet (expected a 'City' column).");
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, blankrows:false});
+    const hr = findHeaderRow(aoa);
+    HEADERS = (aoa[hr] || []).map(h=>normalize(h));
+    const rows = aoa.slice(hr+1);
 
-    var headers = matrix[headerRowIdx].map(function(h){ return safeText(h); });
-    var hnorm = headers.map(function(h){ return normHeader(h); });
-    var rows = [];
+    const idxByKey = {};
+    HEADERS.forEach((h,i)=>{ if(h) idxByKey[normKey(h)] = i; });
 
-    function idxOf(headerName){
-      var want = headerName.toLowerCase();
-      for(var i=0;i<hnorm.length;i++){
-        if(hnorm[i] === want) return i;
+    REASON_USE_COLS = [];
+    REASON_NOT_COLS = [];
+    HEADERS.forEach((h,i)=>{
+      const hs=normalize(h);
+      if (hs.startsWith("Reason to Use:")) REASON_USE_COLS.push({i, label: hs.replace("Reason to Use:","").trim() || "Other"});
+      if (hs.startsWith("Reason Not to Use:")) REASON_NOT_COLS.push({i, label: hs.replace("Reason Not to Use:","").trim() || "Other"});
+    });
+
+    const col = (k, alts=[])=>{
+      const kk = normKey(k);
+      if (idxByKey[kk]!==undefined) return idxByKey[kk];
+      for (const a of alts){
+        const aa=normKey(a);
+        if (idxByKey[aa]!==undefined) return idxByKey[aa];
       }
       return -1;
-    }
+    };
 
-    // Required fields
-    var iCity = idxOf("city");
-    var iSpot = idxOf("session location");
-    var iDate = idxOf("date");
-    var iDay  = idxOf("day");
-    var iFarm = idxOf("total farmers");
-    var iAcres = idxOf("total wheat acres");
-    var iKnow = idxOf("know buctril");
-    var iDef  = idxOf("will definitely use");
-    var iMaybe= idxOf("maybe");
-    var iNot  = idxOf("not interested");
-    var iEst  = idxOf("estimated buctril acres from this session");
+    const cCity = col("City");
+    const cSpot = col("Session Location", ["Spot","Location"]);
+    const cDate = col("Date");
+    const cFarmers = col("Total Farmers", ["Farmers","No. of Farmers","Farmers engaged"]);
+    const cAcres = col("Total Wheat Acres", ["Wheat acres","Total Acres","Acres"]);
+    const cPlanYes = col("Plan Yes Count", ["Plan Yes"]);
+    const cPlanMaybe = col("Plan Maybe Count", ["Plan Maybe"]);
+    const cPlanNo = col("Plan No Count", ["Plan No"]);
+    const cRemarks = col("Remarks");
+    const cNotes = col("Notes", ["Remarks"]);
 
-    var scoreNames = [
-      "score understood: yield loss 20-40%",
-      "score understood: golden period",
-      "score understood: buctril broadleaf",
-      "score understood combine benefit: buctril+atlantis",
-      "score: safety ppe"
-    ];
-    var scoreIdx = scoreNames.map(idxOf);
+    const out = [];
+    for (const r of rows){
+      if (!r || r.length===0) continue;
+      const nonEmpty = r.some(v=>!isEmpty(v));
+      if (!nonEmpty) continue;
 
-    // Reason columns
-    var reasonUseIdx = [];
-    var reasonNotIdx = [];
-    var reasonUseLabels = [];
-    var reasonNotLabels = [];
+      const city = normalize(r[cCity]);
+      const spot = normalize(r[cSpot]);
+      if (!city && !spot) continue;
 
-    for(var i=0;i<headers.length;i++){
-      var nh = hnorm[i];
-      var h = headers[i];
-      if(!nh) continue;
-      if(nh.indexOf("reason") === 0){
-        if(nh.indexOf("reason to  use:") === 0 || nh.indexOf("reason to use:") === 0 || nh.indexOf("reason to use") === 0){
-          if(nh.indexOf("reason not") === 0) continue;
-          if(nh.indexOf("top reason") === 0) continue;
-          reasonUseIdx.push(i);
-          reasonUseLabels.push(h.replace(/^Reason\s*to\s*Use\s*:?\s*/i,"").replace(/^Reason\s*to\s*Use\s*/i,"").trim());
-        }
-        if(nh.indexOf("reason not to use:") === 0 || nh.indexOf("reason not to use") === 0){
-          reasonNotIdx.push(i);
-          reasonNotLabels.push(h.replace(/^Reason\s*Not\s*to\s*Use\s*:?\s*/i,"").replace(/^Reason\s*Not\s*to\s*Use\s*/i,"").trim());
-        }
-      }
-    }
-
-    for(var r=headerRowIdx+1;r<matrix.length;r++){
-      var row = matrix[r];
-      if(!row || !row.length) continue;
-
-      var city = safeText(row[iCity]);
-      var spot = safeText(row[iSpot]);
-      var total = safeNumber(row[iFarm]);
-
-      // Ignore non-session rows (Total Farmers empty/0)
-      if(!city || total <= 0) continue;
-
-      // Exclude Multan as requested
-      if(city.trim().toLowerCase() === "multan") continue;
-
-      var acres = safeNumber(row[iAcres]);
-      var know = safeNumber(row[iKnow]);
-      var def  = safeNumber(row[iDef]);
-      var may  = safeNumber(row[iMaybe]);
-      var notI = safeNumber(row[iNot]);
-      var estA = safeNumber(row[iEst]);
-
-      // Excel date can be a number serial or a string
-      var dateRaw = row[iDate];
-      var dateStr = "";
-      if(typeof dateRaw === "number"){
-        var d = XLSX.SSF.parse_date_code(dateRaw);
-        if(d) dateStr = String(d.y).padStart(4,"0")+"-"+String(d.m).padStart(2,"0")+"-"+String(d.d).padStart(2,"0");
-      } else {
-        dateStr = safeText(dateRaw);
-      }
-
-      var day = safeText(row[iDay]);
-
-      var scores = [];
-      for(var si=0;si<scoreIdx.length;si++){
-        var idx = scoreIdx[si];
-        if(idx >= 0){
-          var sc = safeNumber(row[idx]);
-          if(sc > 0) scores.push(sc);
-        }
-      }
-      var clarityPct = 0;
-      if(scores.length){
-        var avg = scores.reduce(function(a,b){return a+b;},0) / scores.length;
-        clarityPct = (avg / 3) * 100;
-      }
-
-      // reasons (counts)
-      var useCounts = {};
-      for(var u=0;u<reasonUseIdx.length;u++){
-        var cidx = reasonUseIdx[u];
-        var label = reasonUseLabels[u] || ("Use " + (u+1));
-        var n = safeNumber(row[cidx]);
-        if(n > 0) useCounts[label] = (useCounts[label]||0) + n;
-      }
-      var notCounts = {};
-      for(var n2=0;n2<reasonNotIdx.length;n2++){
-        var cidx2 = reasonNotIdx[n2];
-        var label2 = reasonNotLabels[n2] || ("NotUse " + (n2+1));
-        var nn = safeNumber(row[cidx2]);
-        if(nn > 0) notCounts[label2] = (notCounts[label2]||0) + nn;
-      }
-
-      rows.push({
+      out.push({
         city: city || "Unknown",
         spot: spot || "Unknown",
-        date: dateStr,
-        day: day,
-        totalFarmers: total,
-        wheatAcres: acres,
-        knowBuctril: know,
-        willDefinite: def,
-        maybe: may,
-        notInterested: notI,
-        estBuctrilAcres: estA,
-        clarityPct: clarityPct,
-        useCounts: useCounts,
-        notCounts: notCounts
+        date: r[cDate],
+        farmers: toNum(r[cFarmers]),
+        acres: toNum(r[cAcres]),
+        planYes: toNum(r[cPlanYes]),
+        planMaybe: toNum(r[cPlanMaybe]),
+        planNo: toNum(r[cPlanNo]),
+        remarks: normalize(r[cRemarks]),
+        notes: normalize(r[cNotes]),
+        _raw: r
       });
-    }
-
-    return rows;
-  }
-
-  // ---------- Filtering ----------
-  var state = {
-    all: [],
-    filtered: [],
-    city: "",
-    spot: "",
-    search: ""
-  };
-
-  function applyFilters(){
-    var city = state.city.trim().toLowerCase();
-    var spot = state.spot.trim().toLowerCase();
-    var q = state.search.trim().toLowerCase();
-
-    state.filtered = state.all.filter(function(r){
-      if(city && r.city.toLowerCase() !== city) return false;
-      if(spot && r.spot.toLowerCase() !== spot) return false;
-
-      if(q){
-        var hay = (r.city + " " + r.spot + " " + (r.day||"") + " " + (r.date||"")).toLowerCase();
-        if(hay.indexOf(q) < 0) return false;
-      }
-      return true;
-    });
-  }
-
-  function unique(list){
-    var seen = {};
-    var out = [];
-    for(var i=0;i<list.length;i++){
-      var v = list[i];
-      var k = safeText(v);
-      if(!k) continue;
-      if(seen[k]) continue;
-      seen[k]=true;
-      out.push(k);
     }
     return out;
   }
 
-  function buildFilterOptions(){
-    var cities = unique(state.all.map(function(r){ return r.city; })).sort(function(a,b){ return a.localeCompare(b); });
-
-    var citySel = $("filter-city");
-    if(citySel){
-      citySel.innerHTML = '<option value="">All Cities</option>' + cities.map(function(c){
-        return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>';
-      }).join("");
-      citySel.value = state.city || "";
-    }
-
-    buildSpotOptions();
+  function hashColor(label, sat=68, light=58){
+    const s = String(label ?? "x");
+    let h = 0;
+    for (let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) >>> 0; }
+    const hue = h % 360;
+    return `hsl(${hue} ${sat}% ${light}%)`;
   }
 
-  function buildSpotOptions(){
-    var base = state.city ? state.all.filter(function(r){ return r.city === state.city; }) : state.all;
-    var spots = unique(base.map(function(r){ return r.spot; })).sort(function(a,b){ return a.localeCompare(b); });
-
-    var spotSel = $("filter-spot");
-    if(spotSel){
-      spotSel.innerHTML = '<option value="">All Spots</option>' + spots.map(function(s){
-        return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>';
-      }).join("");
-      spotSel.value = state.spot || "";
-    }
-  }
-
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, function(m){
-      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+  function computeCampaignDays(rows){
+    const dates=[];
+    rows.forEach(r=>{
+      const v=r.date;
+      if (v===null || v===undefined || v==="") return;
+      if (typeof v === "number" && Number.isFinite(v)){
+        const d = new Date(Date.UTC(1899,11,30) + v*86400000);
+        dates.push(d); return;
+      }
+      const d2 = new Date(v);
+      if (!isNaN(d2.getTime())) dates.push(d2);
     });
+    if (!dates.length) return "–";
+    dates.sort((a,b)=>a-b);
+    const min=dates[0], max=dates[dates.length-1];
+    const diffDays = Math.max(1, Math.round((max-min)/86400000)+1);
+    return String(diffDays);
   }
 
-  // ---------- Metrics ----------
-  function sum(list, fn){
-    var t = 0;
-    for(var i=0;i<list.length;i++) t += fn(list[i]) || 0;
-    return t;
+  function destroyChart(ch){ if (ch){ try{ ch.destroy(); }catch(e){} } }
+
+  function renderKPIs(){
+    const sessions = FILTERED.length;
+    const farmers = FILTERED.reduce((s,r)=>s+(Number.isFinite(r.farmers)?r.farmers:0),0);
+    const acres = FILTERED.reduce((s,r)=>s+(Number.isFinite(r.acres)?r.acres:0),0);
+    const cities = distinct(FILTERED.map(r=>r.city)).length;
+
+    kSessions.textContent = fmtInt(sessions);
+    kFarmers.textContent = fmtInt(farmers);
+    kAcres.textContent = fmtInt(acres);
+    kCities.textContent = fmtInt(cities);
   }
 
-  function computeDateRange(rows){
-    var dates = rows.map(function(r){ return safeText(r.date); }).filter(Boolean);
-    // Expect YYYY-MM-DD strings
-    var parsed = dates.map(function(d){
-      var m = d.match(/(\d{4})-(\d{2})-(\d{2})/);
-      if(!m) return null;
-      return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-    }).filter(Boolean);
-    if(!parsed.length) return {days:null, from:"–", to:"–"};
-    parsed.sort(function(a,b){ return a-b; });
-    var from = parsed[0];
-    var to = parsed[parsed.length-1];
-    var diff = Math.round((to - from) / (24*3600*1000)) + 1;
-    return {
-      days: diff,
-      from: from.toISOString().slice(0,10),
-      to: to.toISOString().slice(0,10)
-    };
-  }
-
-  // ---------- Charts ----------
-  var drillChart=null, intentChart=null, useChart=null, notChart=null;
-
-  function destroyChart(ch){ try{ if(ch) ch.destroy(); }catch(e){} }
-
-  function buildDrillData(rows){
-    // Outer ring: city by farmers
-    var cityMap = {};
-    rows.forEach(function(r){
-      cityMap[r.city] = (cityMap[r.city]||0) + (r.totalFarmers||0);
+  function buildCounts(field, baseRows){
+    const m = new Map();
+    baseRows.forEach(r=>{
+      const key = r[field] || "Unknown";
+      m.set(key, (m.get(key)||0) + 1);
     });
-    var cities = Object.keys(cityMap).sort(function(a,b){ return cityMap[b]-cityMap[a]; });
-
-    // Inner ring: spots for selected city, else top spots overall
-    var innerBase = rows;
-    var selectedCity = state.city || "";
-    if(selectedCity){
-      innerBase = rows.filter(function(r){ return r.city === selectedCity; });
-    }
-    var spotMap = {};
-    innerBase.forEach(function(r){
-      var key = r.spot || "Unknown";
-      spotMap[key] = (spotMap[key]||0) + (r.totalFarmers||0);
-    });
-    var spots = Object.keys(spotMap).sort(function(a,b){ return spotMap[b]-spotMap[a]; }).slice(0, 10);
-
-    var cityValues = cities.map(function(c){ return cityMap[c]; });
-    var cityColors = cities.map(cityColor);
-
-    var spotValues = spots.map(function(s){ return spotMap[s]; });
-    var spotColors = spots.map(function(_,i){ return spotColor(selectedCity || "all", i); });
-
-    return {
-      outerLabels: cities,
-      outerValues: cityValues,
-      outerColors: cityColors,
-      innerLabels: spots,
-      innerValues: spotValues,
-      innerColors: spotColors
-    };
+    return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]).slice(0,18);
   }
 
-  function buildIntent(rows){
-    var def = sum(rows, function(r){ return r.willDefinite; });
-    var may = sum(rows, function(r){ return r.maybe; });
-    var notI = sum(rows, function(r){ return r.notInterested; });
-    return { labels:["Definite","Maybe","Not interested"], values:[def, may, notI] };
-  }
+  function renderDonuts(){
+    const cityItems = buildCounts("city", FILTERED);
+    const selectedCity = citySel.value || "All";
+    const base = (selectedCity!=="All") ? FILTERED.filter(r=>r.city===selectedCity) : FILTERED;
+    const spotItems = buildCounts("spot", base);
 
-  function aggReasons(rows, key){
-    var out = {};
-    rows.forEach(function(r){
-      var obj = r[key] || {};
-      Object.keys(obj).forEach(function(k){
-        out[k] = (out[k]||0) + safeNumber(obj[k]);
-      });
-    });
-    var pairs = Object.keys(out).map(function(k){ return {k:k, v:out[k]}; })
-      .filter(function(p){ return p.v > 0; })
-      .sort(function(a,b){ return b.v - a.v; })
-      .slice(0, 10);
-    return { labels: pairs.map(function(p){return p.k;}), values: pairs.map(function(p){return p.v;}) };
-  }
+    const cityLabels = cityItems.map(x=>x[0]);
+    const cityVals = cityItems.map(x=>x[1]);
+    const cityColors = cityLabels.map(l=>hashColor(l,72,58));
 
-  function renderCharts(){
-    if(!window.Chart){
-      showDQ("Charts failed to load (Chart.js missing).");
-      return;
-    }
-
-    // Drill donut (two rings in one doughnut chart)
-    var drill = buildDrillData(state.filtered);
-    var drillCtx = $("drillDonut").getContext("2d");
-    destroyChart(drillChart);
-    drillChart = new Chart(drillCtx, {
+    destroyChart(charts.city);
+    charts.city = new Chart(document.getElementById("cityDonut"), {
       type:"doughnut",
-      data:{
-        labels: drill.outerLabels,
-        datasets:[
-          { // outer ring
-            label:"Cities",
-            data: drill.outerValues,
-            backgroundColor: drill.outerColors,
-            borderColor: "rgba(255,255,255,.9)",
-            borderWidth: 2,
-            hoverOffset: 6,
-            weight: 2
-          },
-          { // inner ring
-            label: state.city ? ("Spots in " + state.city) : "Top spots",
-            data: drill.innerValues,
-            backgroundColor: drill.innerColors,
-            borderColor: "rgba(255,255,255,.9)",
-            borderWidth: 2,
-            hoverOffset: 6,
-            weight: 1
-          }
-        ]
-      },
+      data:{ labels: cityLabels, datasets:[{ data: cityVals, backgroundColor: cityColors, borderColor:"rgba(255,255,255,.20)", borderWidth:1 }]},
       options:{
-        responsive:true,
-        maintainAspectRatio:false,
+        responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{ position:"bottom", labels:{ boxWidth:18, font:{weight:"700"} } },
-          tooltip:{
-            callbacks:{
-              label: function(ctx){
-                var v = ctx.parsed || 0;
-                var label = ctx.label || "";
-                return " " + label + ": " + fmtInt(v);
-              }
-            }
-          }
+          legend:{ position:"bottom", labels:{ color:"rgba(255,255,255,.85)", boxWidth:14, font:{weight:"700"} } },
+          tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${ctx.raw}` } }
         },
-        onClick: function(evt, elems){
-          if(!elems || !elems.length) return;
-          var el = elems[0];
-          var datasetIndex = el.datasetIndex;
-          var index = el.index;
-
-          // datasetIndex 0 = city ring
-          if(datasetIndex === 0){
-            var city = drill.outerLabels[index];
-            state.city = (state.city === city) ? "" : city;
-            // when city changes, reset spot filter
-            state.spot = "";
-            buildSpotOptions();
-            applyFilters();
-            renderAll();
-          }
-          // datasetIndex 1 = inner ring (spot)
-          if(datasetIndex === 1){
-            var spot = drill.innerLabels[index];
-            state.spot = (state.spot === spot) ? "" : spot;
-            var spotSel = $("filter-spot");
-            if(spotSel) spotSel.value = state.spot;
-            applyFilters();
-            renderAll();
-          }
+        onClick:(evt, els)=>{
+          if (!els || !els.length) return;
+          const label = cityLabels[els[0].index];
+          citySel.value = label;
+          updateSpotOptionsForCity();
+          applyFilters();
         }
       }
     });
 
-    // Intent donut
-    var intent = buildIntent(state.filtered);
-    var intentCtx = $("intentDonut").getContext("2d");
-    destroyChart(intentChart);
-    intentChart = new Chart(intentCtx, {
+    const spotLabels = spotItems.map(x=>x[0]);
+    const spotVals = spotItems.map(x=>x[1]);
+    const spotColors = spotLabels.map(l=>hashColor(l,62,54));
+
+    destroyChart(charts.spot);
+    charts.spot = new Chart(document.getElementById("spotDonut"), {
+      type:"doughnut",
+      data:{ labels: spotLabels, datasets:[{ data: spotVals, backgroundColor: spotColors, borderColor:"rgba(255,255,255,.20)", borderWidth:1 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ position:"bottom", labels:{ color:"rgba(255,255,255,.85)", boxWidth:14, font:{weight:"700"} } },
+          tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${ctx.raw}` } }
+        },
+        onClick:(evt, els)=>{
+          if (!els || !els.length) return;
+          const label = spotLabels[els[0].index];
+          spotSel.value = label;
+          applyFilters();
+        }
+      }
+    });
+  }
+
+  function renderIntent(){
+    let yes=0, maybe=0, no=0;
+    FILTERED.forEach(r=>{
+      if (Number.isFinite(r.planYes)) yes += r.planYes;
+      if (Number.isFinite(r.planMaybe)) maybe += r.planMaybe;
+      if (Number.isFinite(r.planNo)) no += r.planNo;
+    });
+    const allZero = [yes,maybe,no].every(v=>!v || v===0);
+
+    destroyChart(charts.intent);
+    charts.intent = new Chart(document.getElementById("intentDonut"), {
       type:"doughnut",
       data:{
-        labels:intent.labels,
+        labels: allZero ? ["No plan counts found"] : ["Plan Yes","Plan Maybe","Plan No"],
         datasets:[{
-          data:intent.values,
-          backgroundColor:["#2e7d32","#ffb300","#b71c1c"],
-          borderColor:"rgba(255,255,255,.9)",
-          borderWidth:2,
-          hoverOffset:6
+          data: allZero ? [FILTERED.length||1] : [yes, maybe, no],
+          backgroundColor: allZero ? ["hsl(210 15% 55%)"] : ["hsl(145 70% 48%)","hsl(45 85% 55%)","hsl(0 75% 55%)"],
+          borderColor:"rgba(255,255,255,.20)",
+          borderWidth:1
         }]
       },
       options:{
         responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ position:"bottom" } }
-      }
-    });
-
-    // Reasons (bars)
-    var use = aggReasons(state.filtered, "useCounts");
-    var notU = aggReasons(state.filtered, "notCounts");
-
-    destroyChart(useChart);
-    useChart = new Chart($("useBar").getContext("2d"), {
-      type:"bar",
-      data:{ labels: use.labels, datasets:[{ label:"Count", data: use.values, borderWidth:0 }] },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:false } },
-        scales:{
-          x:{ ticks:{ font:{weight:"700"} } },
-          y:{ beginAtZero:true }
-        }
-      }
-    });
-
-    destroyChart(notChart);
-    notChart = new Chart($("notUseBar").getContext("2d"), {
-      type:"bar",
-      data:{ labels: notU.labels, datasets:[{ label:"Count", data: notU.values, borderWidth:0 }] },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:false } },
-        scales:{
-          x:{ ticks:{ font:{weight:"700"} } },
-          y:{ beginAtZero:true }
+        plugins:{
+          legend:{ position:"bottom", labels:{ color:"rgba(255,255,255,.85)", boxWidth:14, font:{weight:"800"} } },
+          tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${Math.round(ctx.raw||0)}` } }
         }
       }
     });
   }
 
-  function renderMetrics(){
-    var rows = state.filtered;
-
-    var sessions = rows.length;
-    var farmers = sum(rows, function(r){ return r.totalFarmers; });
-    var acres = sum(rows, function(r){ return r.wheatAcres; });
-    var est = sum(rows, function(r){ return r.estBuctrilAcres; });
-    var cities = unique(rows.map(function(r){ return r.city; })).length;
-
-    var know = sum(rows, function(r){ return r.knowBuctril; });
-    var def = sum(rows, function(r){ return r.willDefinite; });
-
-    var awareness = farmers ? (know / farmers * 100) : 0;
-    var definite = farmers ? (def / farmers * 100) : 0;
-
-    // Weighted average clarity by farmers
-    var clarityNum = sum(rows, function(r){ return (r.clarityPct||0) * (r.totalFarmers||0); });
-    var clarityDen = sum(rows, function(r){ return (r.totalFarmers||0); });
-    var clarity = clarityDen ? (clarityNum / clarityDen) : 0;
-
-    text($("metric-sessions"), fmtInt(sessions));
-    text($("metric-farmers"), fmtInt(farmers));
-    text($("metric-acres"), fmtInt(acres));
-    text($("metric-cities"), fmtInt(cities));
-    text($("metric-buctril-acres"), fmtInt(est));
-
-    text($("metric-awareness"), fmtPct(awareness));
-    text($("metric-definite"), fmtPct(definite));
-    text($("metric-clarity"), fmtPct(clarity));
-
-    setBar("awareness-bar", awareness);
-    setBar("definite-bar", definite);
-    setBar("clarity-bar", clarity);
-
-    // Hero KPIs (unfiltered overall)
-    var allFarmers = sum(state.all, function(r){ return r.totalFarmers; });
-    text($("hero-farmers"), fmtInt(allFarmers));
-    text($("hero-sessions"), fmtInt(state.all.length));
-
-    // Campaign days + range
-    var dr = computeDateRange(state.all);
-    text($("metric-days"), dr.days ? fmtInt(dr.days) : "–");
-    text($("metric-daterange"), (dr.from && dr.to && dr.from!=="–") ? (dr.from + " → " + dr.to) : "–");
-  }
-
-  function renderAll(){
-    if(!state.filtered.length){
-      showDQ("No rows match your current filters. Clear filters to see data.");
-    } else {
-      hideDQ();
-    }
-    renderMetrics();
-    renderCharts();
-  }
-
-  // ---------- Media ----------
-  function buildCandidateSrc(src){
-    var s = safeText(src);
-    if(!s) return [];
-    var out = [];
-
-    // as-is
-    out.push(s);
-
-    // swap .jpeg/.jpg
-    if(s.toLowerCase().endsWith(".jpeg")) out.push(s.slice(0,-5)+".jpg");
-    if(s.toLowerCase().endsWith(".jpg")) out.push(s.slice(0,-4)+".jpeg");
-
-    // if in assets/gallery, try root
-    if(s.indexOf("assets/gallery/") === 0){
-      out.push(s.replace("assets/gallery/",""));
-    } else {
-      // try adding prefix
-      out.push("assets/gallery/" + s.replace(/^\/+/,""));
-    }
-
-    // also try gallery/
-    if(s.indexOf("gallery/") === 0){
-      out.push(s.replace("gallery/",""));
-    } else {
-      out.push("gallery/" + s.replace(/^\/+/,""));
-    }
-
-    // de-dup
-    var seen = {};
-    return out.filter(function(x){
-      if(seen[x]) return false;
-      seen[x]=true;
-      return true;
+  function sumReasonCounts(reasonCols){
+    const m = new Map();
+    reasonCols.forEach(rc=> m.set(rc.label, 0));
+    FILTERED.forEach(r=>{
+      const row = r._raw || [];
+      reasonCols.forEach(rc=>{
+        const v = row[rc.i];
+        if (isEmpty(v)) return;
+        const n = toNum(v);
+        const add = Number.isFinite(n) ? n : 1;
+        m.set(rc.label, (m.get(rc.label)||0) + add);
+      });
     });
+    return Array.from(m.entries()).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
   }
 
-  function setMediaWithFallback(el, src, isVideo){
-    var cand = buildCandidateSrc(src);
-    var i = 0;
+  function renderReasonBars(){
+    const useItems = sumReasonCounts(REASON_USE_COLS);
+    const notItems = sumReasonCounts(REASON_NOT_COLS);
 
-    function tryNext(){
-      if(i >= cand.length){
-        // final placeholder
-        if(isVideo){
-          el.removeAttribute("src");
-          el.poster = "";
-        } else {
-          el.removeAttribute("src");
+    function makeBar(canvasId, items, refName){
+      const labels = items.length ? items.map(x=>x[0]) : ["No reason columns found / no data"];
+      const vals = items.length ? items.map(x=>x[1]) : [0];
+
+      destroyChart(charts[refName]);
+      charts[refName] = new Chart(document.getElementById(canvasId), {
+        type:"bar",
+        data:{ labels, datasets:[{ label:"Count", data:vals, backgroundColor:"rgba(100,180,255,.55)", borderColor:"rgba(255,255,255,.22)", borderWidth:1 }]},
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          indexAxis:"y",
+          scales:{
+            x:{ ticks:{ color:"rgba(255,255,255,.78)" }, grid:{ color:"rgba(255,255,255,.07)" } },
+            y:{ ticks:{ color:"rgba(255,255,255,.82)", font:{weight:"800"} }, grid:{ color:"rgba(255,255,255,.06)" } }
+          },
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=> ` ${Math.round(ctx.raw||0)}` } } }
         }
-        return;
-      }
-      var s = cand[i++] + (cand[i-1].indexOf("?")>=0 ? "" : ("?v=" + Date.now()));
-      if(isVideo){
-        el.src = s;
-        el.load();
-      } else {
-        el.src = s;
-      }
+      });
     }
-
-    el.addEventListener("error", function(){
-      tryNext();
-    }, { once:false });
-
-    tryNext();
+    makeBar("useBar", useItems, "use");
+    makeBar("notUseBar", notItems, "notUse");
   }
 
-  async function loadMediaList(){
-    var candidates = ["media.json", "assets/gallery/media.json"];
-    for(var i=0;i<candidates.length;i++){
+  async function loadMediaManifest(){
+    const candidates=["media.json","assets/gallery/media.json"];
+    for (const c of candidates){
       try{
-        var res = await fetch(candidates[i] + "?v=" + Date.now(), { cache:"no-store" });
-        if(!res.ok) continue;
-        return await res.json();
+        const r = await fetch(c, {cache:"no-cache"});
+        if (!r.ok) continue;
+        const j = await r.json();
+        if (Array.isArray(j)) return j;
       }catch(e){}
     }
     return [];
   }
 
-  function openLightbox(item){
-    var lb = $("lightbox");
-    var body = $("lbBody");
-    var title = $("lbTitle");
-    if(!lb || !body || !title) return;
+  function candidateSrcs(src){
+    const out = [];
+    const s = String(src||"").trim();
+    if (!s) return out;
+    out.push(s);
+    if (s.endsWith(".jpeg")) out.push(s.replace(/\.jpeg$/i,".jpg"));
+    if (s.endsWith(".jpg")) out.push(s.replace(/\.jpg$/i,".jpeg"));
+    const base = s.split("/").pop();
+    if (base && base!==s) out.push(base);
+    if (base && s===base) out.push("assets/gallery/"+base);
+    return Array.from(new Set(out));
+  }
 
-    body.innerHTML = "";
-    title.textContent = item.caption || item.alt || "Media";
+  function addMediaCard(item){
+    const card = document.createElement("div");
+    card.className="media-card";
 
-    if(item.type === "video"){
-      var v = document.createElement("video");
-      v.controls = true;
-      v.playsInline = true;
-      v.autoplay = true;
-      v.muted = false;
-      setMediaWithFallback(v, item.src, true);
-      body.appendChild(v);
+    const cap = document.createElement("div");
+    cap.className="cap";
+    cap.textContent = item.caption || item.alt || item.src || "Media";
+    card.appendChild(cap);
+
+    const missing = document.createElement("div");
+    missing.className="missing";
+    missing.textContent = "Loading…";
+    card.appendChild(missing);
+
+    const type = (item.type||"").toLowerCase();
+    const srcList = candidateSrcs(item.src);
+
+    let el = null;
+    if (type==="video"){
+      el = document.createElement("video");
+      el.controls = true;
+      el.muted = true;
+      el.playsInline = true;
+      el.preload = "metadata";
     } else {
-      var img = document.createElement("img");
-      img.alt = item.alt || "image";
-      setMediaWithFallback(img, item.src, false);
-      body.appendChild(img);
+      el = document.createElement("img");
+      el.loading = "lazy";
+      el.decoding = "async";
+      el.referrerPolicy = "no-referrer";
     }
+    card.insertBefore(el, cap);
 
-    lb.classList.add("active");
-    lb.setAttribute("aria-hidden", "false");
+    let tried=0;
+    const tryNext = ()=>{
+      if (tried >= srcList.length){
+        missing.textContent = "Missing media:\n" + (item.src||"(no src)");
+        return;
+      }
+      const src = srcList[tried++];
+      if (type==="video"){
+        el.src = src;
+        el.onloadeddata = ()=> { if (missing.parentNode) missing.remove(); };
+        el.onerror = ()=> { tryNext(); };
+      } else {
+        el.src = src;
+        el.onload = ()=> { if (missing.parentNode) missing.remove(); };
+        el.onerror = ()=> { tryNext(); };
+      }
+    };
+    card.addEventListener("click", ()=>{
+      const s = el && el.src ? el.src : (item.src||"");
+      if (s) window.open(s, "_blank");
+    });
+    tryNext();
+    return card;
   }
 
-  function closeLightbox(){
-    var lb = $("lightbox");
-    var body = $("lbBody");
-    if(!lb || !body) return;
-    lb.classList.remove("active");
-    lb.setAttribute("aria-hidden", "true");
-    body.innerHTML = "";
-  }
-
-  async function renderGallery(){
-    var g = $("gallery");
-    if(!g) return;
-    g.innerHTML = "";
-
-    var items = await loadMediaList();
-    if(!items || !items.length){
-      var div = document.createElement("div");
-      div.className = "muted";
-      div.style.padding = "10px 4px";
-      div.textContent = "No media.json found (or it is empty). Upload media.json and your assets (assets/gallery/*).";
-      g.appendChild(div);
+  async function renderMedia(){
+    if (!mediaGrid) return;
+    mediaGrid.innerHTML="";
+    const manifest = await loadMediaManifest();
+    if (!manifest.length){
+      const empty = document.createElement("div");
+      empty.style.color="rgba(255,255,255,.75)";
+      empty.style.fontWeight="800";
+      empty.style.padding="6px 2px";
+      empty.textContent = "No media.json found (or invalid JSON). Upload media.json in repo root OR assets/gallery/media.json. Upload your images/videos to assets/gallery/ (recommended).";
+      mediaGrid.appendChild(empty);
       return;
     }
+    manifest.slice(0,24).forEach(item=> mediaGrid.appendChild(addMediaCard(item)));
+  }
 
-    items.slice(0, 80).forEach(function(item){
-      var tile = document.createElement("div");
-      tile.className = "tile";
+  function rebuildDropdowns(){
+    const cities = distinct(ALL.map(r=>r.city)).sort((a,b)=>a.localeCompare(b));
+    const spots = distinct(ALL.map(r=>r.spot)).sort((a,b)=>a.localeCompare(b));
 
-      var thumb = document.createElement("div");
-      thumb.className = "thumb";
-
-      if(item.type === "video"){
-        var v = document.createElement("video");
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = "metadata";
-        setMediaWithFallback(v, item.src, true);
-
-        // add a simple poster frame via first frame if available
-        // (browser handles it)
-
-        thumb.appendChild(v);
-        var b = document.createElement("div");
-        b.className = "badge";
-        b.textContent = "Video";
-        thumb.appendChild(b);
-      } else {
-        var img = document.createElement("img");
-        img.alt = item.alt || "image";
-        setMediaWithFallback(img, item.src, false);
-        thumb.appendChild(img);
-        var b2 = document.createElement("div");
-        b2.className = "badge";
-        b2.textContent = "Photo";
-        thumb.appendChild(b2);
+    function makeOpts(sel, items, allLabel){
+      sel.innerHTML="";
+      const oAll=document.createElement("option");
+      oAll.value="All"; oAll.textContent=allLabel;
+      sel.appendChild(oAll);
+      for (const it of items){
+        const o=document.createElement("option");
+        o.value=it; o.textContent=it;
+        sel.appendChild(o);
       }
+    }
+    makeOpts(citySel, cities, "All Cities");
+    makeOpts(spotSel, spots, "All Spots");
+  }
 
-      var cap = document.createElement("div");
-      cap.className = "cap";
-      var t = document.createElement("div");
-      t.className = "t";
-      t.textContent = item.alt || "Media";
-      var s = document.createElement("div");
-      s.className = "s";
-      s.textContent = item.caption || "";
-      cap.appendChild(t);
-      cap.appendChild(s);
+  function updateSpotOptionsForCity(){
+    const city = citySel.value || "All";
+    const spots = (city==="All")
+      ? distinct(ALL.map(r=>r.spot))
+      : distinct(ALL.filter(r=>r.city===city).map(r=>r.spot));
+    spots.sort((a,b)=>a.localeCompare(b));
 
-      tile.appendChild(thumb);
-      tile.appendChild(cap);
+    const current = spotSel.value;
+    spotSel.innerHTML="";
+    const oAll=document.createElement("option");
+    oAll.value="All"; oAll.textContent="All Spots";
+    spotSel.appendChild(oAll);
 
-      tile.addEventListener("click", function(){ openLightbox(item); });
+    for (const it of spots){
+      const o=document.createElement("option");
+      o.value=it; o.textContent=it;
+      spotSel.appendChild(o);
+    }
+    if (current && spots.includes(current)) spotSel.value=current;
+  }
 
-      g.appendChild(tile);
+  function applyFilters(){
+    const city = citySel.value || "All";
+    const spot = spotSel.value || "All";
+    const q = (searchBox.value || "").trim().toLowerCase();
+
+    FILTERED = ALL.filter(r=>{
+      if (city!=="All" && r.city!==city) return false;
+      if (spot!=="All" && r.spot!==spot) return false;
+      if (q){
+        const blob = `${r.city} ${r.spot} ${r.remarks||""} ${r.notes||""}`.toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return true;
     });
 
-    var closeBtn = $("lbClose");
-    if(closeBtn) closeBtn.onclick = closeLightbox;
-    var lb = $("lightbox");
-    if(lb){
-      lb.addEventListener("click", function(e){
-        if(e.target === lb) closeLightbox();
-      });
-    }
+    renderAll();
   }
 
-  // ---------- Wire events ----------
+  function renderAll(){
+    renderKPIs();
+    renderDonuts();
+    renderIntent();
+    renderReasonBars();
+  }
+
   function wireUI(){
-    var citySel = $("filter-city");
-    var spotSel = $("filter-spot");
-    var search = $("filter-search");
-    var clear = $("btn-clear");
-
-    if(citySel){
-      citySel.addEventListener("change", function(){
-        state.city = citySel.value;
-        state.spot = "";
-        buildSpotOptions();
-        applyFilters();
-        renderAll();
-      });
-    }
-    if(spotSel){
-      spotSel.addEventListener("change", function(){
-        state.spot = spotSel.value;
-        applyFilters();
-        renderAll();
-      });
-    }
-    if(search){
-      var t=null;
-      search.addEventListener("input", function(){
-        clearTimeout(t);
-        t = setTimeout(function(){
-          state.search = search.value;
-          applyFilters();
-          renderAll();
-        }, 150);
-      });
-    }
-    if(clear){
-      clear.addEventListener("click", function(){
-        state.city = ""; state.spot = ""; state.search = "";
-        if(citySel) citySel.value = "";
-        if(spotSel) spotSel.value = "";
-        if(search) search.value = "";
-        buildSpotOptions();
-        applyFilters();
-        renderAll();
-      });
-    }
+    citySel.addEventListener("change", ()=>{ updateSpotOptionsForCity(); applyFilters(); });
+    spotSel.addEventListener("change", applyFilters);
+    searchBox.addEventListener("input", ()=>{
+      clearTimeout(searchBox._t);
+      searchBox._t = setTimeout(applyFilters, 140);
+    });
+    clearBtn.addEventListener("click", ()=>{
+      citySel.value="All";
+      updateSpotOptionsForCity();
+      spotSel.value="All";
+      searchBox.value="";
+      applyFilters();
+    });
   }
 
-  // ---------- Init ----------
-  async function init(){
+  async function boot(){
     try{
-      setStatus("Initializing libraries…");
-      hideDQ();
+      await setLogos();
+      await trySetBgVideo();
+      await ensureLibs();
 
-      // Make bg optional
-      trySetBgVideo();
+      logStatus("Loading XLSX…");
+      const buf = await fetchWorkbook();
+      const wb = XLSX.read(buf, {type:"array"});
 
-      // Ensure Chart and XLSX exist (fallback if CDN blocked)
-      var chartOk = await ensureGlobal("Chart", [
-        "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
-        "https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js",
-        "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
-      ]);
-
-      var xlsxOk = await ensureGlobal("XLSX", [
-        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
-        "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
-        "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
-      ]);
-
-      if(!chartOk) showDQ("Chart.js could not be loaded (network/CDN blocked). Charts will not render.");
-      if(!xlsxOk) throw new Error("Can't find variable: XLSX (xlsx library failed to load).");
-
-      setStatus("Loading XLSX…");
-
-      // Load workbook
-      var xlsxPathCandidates = ["Buctril_Super_Activations.xlsx", "buctril_super_activations.xlsx"];
-      var buf=null, usedPath=null;
-      for(var i=0;i<xlsxPathCandidates.length;i++){
-        try{
-          buf = await fetchArrayBuffer(xlsxPathCandidates[i]);
-          usedPath = xlsxPathCandidates[i];
-          break;
-        }catch(e){}
-      }
-      if(!buf) throw new Error("Could not load Buctril_Super_Activations.xlsx from repo root.");
-
-      var u8 = new Uint8Array(buf);
-      var wb = XLSX.read(u8, { type:"array" });
-
-      state.all = buildRowsFromSUM(wb);
-
-      if(!state.all.length){
-        throw new Error("Workbook loaded, but no session rows were detected in SUM sheet. Verify 'Total Farmers' is filled for session rows.");
+      ALL = parseSUM(wb);
+      if (!ALL.length){
+        throw new Error("Parsed SUM sheet but found 0 usable rows. Confirm SUM has City + Session Location and data rows under headers.");
       }
 
-      // Populate filters
-      buildFilterOptions();
+      rebuildDropdowns();
+      updateSpotOptionsForCity();
       wireUI();
 
-      // First render
-      applyFilters();
-
-      setStatus("Loaded " + state.all.length + " sessions from " + usedPath + " (SUM sheet).");
+      FILTERED = ALL.slice();
       renderAll();
 
-      // Media render (non-blocking)
-      renderGallery();
+      if (campaignDaysEl) campaignDaysEl.textContent = computeCampaignDays(ALL);
 
-      // Hide loading
-      var loading = document.getElementById("loading");
-      if(loading) loading.style.display = "none";
-
-    }catch(err){
-      var loading = document.getElementById("loading");
-      if(loading) loading.style.display = "block";
-
-      setStatus("Data load failed.");
-      showDQ(
-        "Data load error: <code>" + escapeHtml(err.message || String(err)) + "</code><br><br>" +
-        "Checklist:<br>" +
-        "1) Ensure <code>Buctril_Super_Activations.xlsx</code> is in repo root (same folder as index.html).<br>" +
-        "2) Ensure GitHub Pages is serving the latest files (hard refresh: add <code>?v=3</code> to URL).<br>" +
-        "3) If using Git LFS, upload the real .xlsx binary instead of a pointer.<br>" +
-        "4) If <code>XLSX</code> still missing, your browser/network is blocking CDNs—upload a local <code>xlsx.full.min.js</code> and include it in index.html."
+      logStatus(
+        `Loaded ${ALL.length} session rows from SUM.\n`+
+        `Reason columns found: Use=${REASON_USE_COLS.length}, NotUse=${REASON_NOT_COLS.length}.\n`+
+        `If charts are blank: confirm your GitHub Pages URL is correct and XLSX exists in repo root with exact name.`
       );
-      var loadEl = document.getElementById("loading");
-      if(loadEl) loadEl.textContent = "Error: " + (err.message || String(err));
+
+      await renderMedia();
+    }catch(e){
+      console.error(e);
+      logStatus(String(e && e.message ? e.message : e), true);
+      try{ await renderMedia(); }catch(_){}
     }
   }
 
-  window.addEventListener("DOMContentLoaded", init);
+  boot();
 })();
