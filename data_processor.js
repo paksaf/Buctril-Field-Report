@@ -1,1334 +1,1390 @@
-/* AgriVista dashboard logic (Leaflet + Chart.js + XLSX)
-   - Reads: Buctril_Super_Activations.xlsx (sheet: SUM; session sheets: D#S#)
-   - Reads: media.json (A_compact or flat array)
-   - Updates: KPIs, charts, map (acre bubbles), sessions table, gallery, showcases
-   - Best-match header parsing for inconsistent headers.
-   - IMPORTANT: Must be served via HTTP(S) (GitHub Pages/local server), not file://
+/* AgriVista Dashboard - single file controller
+   - Prefers sessions.json (fast, small; no Git LFS issues)
+   - Falls back to XLSX parsing (Buctril_Super_Activations.xlsx) if sessions.json missing
+   - Media reads media.json (A_compact format) and auto-falls back to placeholder when assets are missing
 */
+
 (() => {
   'use strict';
 
-  const CFG = Object.freeze({
-    xlsx: 'Buctril_Super_Activations.xlsx',
-    media: 'media.json',
-    heroVideo: 'assets/bg.mp4', // optional; hides automatically if missing
-    mapCenter: [30.3753, 69.3451],
-    mapZoom: 5,
-    maxGallery: 72,
-    maxShowcase: 10,
-    maxReasons: 10,
-    bubbleClampMeters: 6000,     // clamp map circles
-    routeLine: false,            // optional route line
-    depTimeoutMs: 12000,
-  });
+  // ---------------------------
+  // Config (you can edit safely)
+  // ---------------------------
+  const CONFIG = {
+    sessionsJson: 'sessions.json',
+    mediaJson: 'media.json',
+    xlsxFallback: 'Buctril_Super_Activations.xlsx',
+    heroVideo: 'assets/bg.mp4',
+    placeholder: 'assets/placeholder.svg',
+    maxShowcase: 5,
+    maxGallery: 48
+  };
 
-  // ---- DOM helpers (IDs preserved) ----
-  const $ = (id) => document.getElementById(id);
-  const qa = (sel) => Array.from(document.querySelectorAll(sel));
+  // ---------------------------
+  // DOM helpers
+  // ---------------------------
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-  function setText(id, val) {
-    const el = $(id);
-    if (el) el.textContent = val;
+  const el = {
+    shell: $('#appShell'),
+    overlay: $('#loadingOverlay'),
+    status: $('#loadingStatus'),
+    buildStamp: $('#buildStamp'),
+    err: $('#errorContainer'),
+    notice: $('#noticeBox'),
+    diag: $('#diagBox'),
+    summary: $('#filterSummary'),
+
+    filterCity: $('#filter-city'),
+    filterSpot: $('#filter-district') || $('#filter-spot'),
+    filterFrom: $('#filter-date-from'),
+    filterTo: $('#filter-date-to'),
+    filterSearch: $('#filter-search'),
+
+    btnExport: $('#btn-export'),
+    btnReset: $('#btn-reset'),
+
+    kpiSessions: $('#kpi-sessions'),
+    kpiFarmers: $('#kpi-farmers'),
+    kpiAcres: $('#kpi-acres'),
+    kpiDemo: $('#kpi-demo'),
+    barSessions: $('#bar-sessions'),
+    barFarmers: $('#bar-farmers'),
+    barAcres: $('#bar-acres'),
+    barDemo: $('#bar-demo'),
+
+    snapshot: $('#snapshot'),
+    snapShowcase: $('#snapshotShowcase'),
+    reasonUse: $('#reasonUse'),
+    reasonNo: $('#reasonNo'),
+
+    chartCity: $('#chartCity'),
+    chartIntent: $('#chartIntent'),
+    chartTrend: $('#chartTrend'),
+
+    mapWrap: $('#map'),
+    mapLegend: $('#mapLegend'),
+    mapSelTitle: $('#mapSelTitle'),
+    mapSelFarmers: $('#mapSelFarmers'),
+    mapSelAcres: $('#mapSelAcres'),
+    mapSelDate: $('#mapSelDate'),
+    mapShowcase: $('#mapShowcase'),
+
+    gallery: $('#galleryGrid'),
+    tbl: $('#tblSessions'),
+
+    heroVideo: $('#heroVideo'),
+
+    // Lightbox
+    lb: $('#lightbox'),
+    lbMedia: $('#lbMedia'),
+    lbCaption: $('#lbCaption'),
+    lbTranscript: $('#lbTranscript'),
+    lbPrev: $('#lbPrev'),
+    lbNext: $('#lbNext'),
+    lbClose: $('#lbClose'),
+  };
+
+  function setLoadingStatus(msg) {
+    if (el.status) el.status.textContent = msg;
+  }
+  function setNotice(html) {
+    if (!el.notice) return;
+    el.notice.innerHTML = html;
+  }
+  function setDiag(lines) {
+    if (!el.diag) return;
+    el.diag.textContent = lines.join('\n');
+  }
+  function showError(html) {
+    if (!el.err) return;
+    el.err.style.display = 'block';
+    el.err.innerHTML = html;
+  }
+  function clearError() {
+    if (!el.err) return;
+    el.err.style.display = 'none';
+    el.err.innerHTML = '';
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, m => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[m]));
-  }
-
-  function setNotice(msg, isErr = false) {
-    const nb = $('noticeBox');
-    if (!nb) return;
-    nb.innerHTML = `<strong>${isErr ? 'Error' : 'Status'}:</strong> ${escapeHtml(String(msg))}`;
-    nb.style.borderColor = isErr ? 'rgba(251,113,133,.55)' : 'rgba(255,255,255,.14)';
-  }
-
-  function showError(message, details = '') {
-    const ec = $('errorContainer');
-    if (ec) {
-      ec.style.display = 'block';
-      ec.innerHTML = `
-        <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(message)}</div>
-        ${details ? `<div style="opacity:.92; margin-bottom:8px;">${escapeHtml(details)}</div>` : ''}
-        <div style="opacity:.85;">
-          <div style="margin-bottom:6px;">Checklist:</div>
-          <ul style="margin-left:18px; line-height:1.45;">
-            <li><code>${escapeHtml(CFG.xlsx)}</code> is in the same folder as <code>index.html</code></li>
-            <li>If you used Git LFS, GitHub Pages may serve a pointer file (not the real XLSX)</li>
-            <li>Open DevTools Console to see the exact failing request</li>
-            <li>Do not open via <code>file://</code>; use GitHub Pages or a local server</li>
-          </ul>
-        </div>
-      `;
+  const fmt = {
+    int: (n) => (n === null || n === undefined || isNaN(n)) ? '—' : Math.round(n).toLocaleString(),
+    num: (n, d=1) => (n === null || n === undefined || isNaN(n)) ? '—' : Number(n).toFixed(d),
+    pct: (n, d=0) => (n === null || n === undefined || isNaN(n)) ? '—' : `${Number(n).toFixed(d)}%`,
+    date: (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' });
     }
-    setNotice(message, true);
-    logDiag(`ERROR: ${message}${details ? ' — ' + details : ''}`);
-  }
+  };
 
-  function updateLoadingStatus(status) {
-    const el = $('loadingStatus');
-    if (el) el.textContent = status;
-  }
+  // ---------------------------
+  // State
+  // ---------------------------
+  const state = {
+    sessions: [],
+    filtered: [],
+    mediaItems: [],
+    mediaBySessionId: new Map(), // sessionId -> media[]
+    pinnedSession: null,
 
-  function logDiag(line) {
-    const el = $('diagBox');
-    if (!el) return;
-    const ts = new Date().toISOString().split('T')[1].replace('Z', '');
-    el.textContent = `[${ts}] ${line}\n` + el.textContent;
-  }
+    map: null,
+    circles: [],
+    charts: { city:null, intent:null, trend:null },
+    lightbox: { items: [], index: 0 }
+  };
 
-  // ---- Formatting ----
-  const fmtInt = (n) => Number.isFinite(n) ? Math.round(n).toLocaleString() : '—';
-  const fmtPct = (p) => Number.isFinite(p) ? `${Math.round(p)}%` : '—';
+  // ---------------------------
+  // Utilities
+  // ---------------------------
+  function uniq(arr) { return Array.from(new Set(arr.filter(Boolean))); }
+  function safeStr(v) { return (v === null || v === undefined) ? '' : String(v).trim(); }
 
-  function asNum(v) {
-    if (v === null || v === undefined) return NaN;
-    const s = String(v).replace(/[,]/g, '').trim();
-    if (!s) return NaN;
-    const n = Number(s.replace(/[ %]/g, ''));
-    return Number.isFinite(n) ? n : NaN;
-  }
-
-  function asDate(v) {
-    if (!v) return null;
-    if (v instanceof Date && !isNaN(v.getTime())) return v;
-
-    // Excel serial date (best effort)
-    if (typeof v === 'number' && window.XLSX?.SSF?.parse_date_code) {
-      const dc = XLSX.SSF.parse_date_code(v);
-      if (dc && dc.y && dc.m && dc.d) return new Date(dc.y, dc.m - 1, dc.d);
-    }
-
-    const dt = new Date(String(v));
+  function parseISO(d) {
+    if (!d) return null;
+    const dt = new Date(d);
     return isNaN(dt.getTime()) ? null : dt;
   }
 
-  function fmtDate(d) {
-    if (!d) return '—';
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dd}`;
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
+  function toCsv(rows, cols) {
+    const esc = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      if (/[,"\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+      return s;
+    };
+    const header = cols.map(c => esc(c.label)).join(',');
+    const lines = rows.map(r => cols.map(c => esc(c.get(r))).join(','));
+    return [header, ...lines].join('\n');
   }
 
-  function pct(a, b) {
-    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) return NaN;
-    return (a / b) * 100;
+  function downloadText(filename, text, mime='text/plain') {
+    const blob = new Blob([text], { type: mime });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
 
-  function avg(nums) {
-    const xs = nums.filter(Number.isFinite);
-    if (!xs.length) return NaN;
-    return xs.reduce((s, n) => s + n, 0) / xs.length;
+  function inferBasePath() {
+    // Works for GitHub Pages under /repo/
+    const u = new URL('.', window.location.href);
+    return u.pathname.endsWith('/') ? u.pathname : (u.pathname + '/');
   }
 
-  function uniq(arr) {
-    return Array.from(new Set(arr.filter(v => v !== null && v !== undefined && String(v).trim() !== '')));
-  }
-
-  // ---- Normalization / matching ----
-  function norm(s) {
-    return String(s ?? '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .replace(/[^\w% ]/g, '');
-  }
-
-  function sheetToMatrix(ws) {
-    // raw:true keeps numbers as numbers; strings as strings
-    return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
-  }
-
-  function findHeaderRow(mat, mustHaveAny) {
-    const must = mustHaveAny.map(norm);
-    for (let r = 0; r < mat.length; r++) {
-      const row = (mat[r] || []).map(norm);
-      const hits = must.filter(k => row.includes(k));
-      if (hits.length >= Math.min(3, must.length)) return r;
+  async function fetchJson(url) {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    const text = await res.text();
+    // Detect Git LFS pointer
+    if (text.includes('version https://git-lfs.github.com/spec/v1')) {
+      const msg = `Git LFS pointer detected for ${url}. GitHub Pages is serving the pointer text, not the real file.`;
+      const e = new Error(msg);
+      e.code = 'LFS_POINTER';
+      throw e;
     }
-    return -1;
+    return JSON.parse(text);
   }
 
-  function findCol(headersNorm, candidates) {
-    const cands = candidates.map(norm);
-
-    // 1) exact match
-    for (const c of cands) {
-      const i = headersNorm.indexOf(c);
-      if (i >= 0) return i;
-    }
-    // 2) substring match
-    for (let i = 0; i < headersNorm.length; i++) {
-      const h = headersNorm[i];
-      for (const c of cands) {
-        if (h && c && h.includes(c)) return i;
+  async function fetchArrayBuffer(url) {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    const buf = await res.arrayBuffer();
+    // LFS pointer detection: if the payload is small and looks like text
+    if (buf.byteLength < 5000) {
+      const txt = new TextDecoder().decode(new Uint8Array(buf));
+      if (txt.includes('version https://git-lfs.github.com/spec/v1')) {
+        const e = new Error(`Git LFS pointer detected for ${url}.`);
+        e.code = 'LFS_POINTER';
+        throw e;
       }
     }
+    return buf;
+  }
+
+  // ---------------------------
+  // Data loading
+  // ---------------------------
+  function normalizeSession(s) {
+    const sn = (s.sn !== null && s.sn !== undefined && s.sn !== '') ? String(s.sn) : '';
+    const date = safeStr(s.date);
+    const city = safeStr(s.city);
+    const spot = safeStr(s.spot);
+    const farmers = (s.farmers === '' ? null : Number(s.farmers));
+    const acres = (s.acres === '' ? null : Number(s.acres));
+    const definite = (s.definite === '' ? null : Number(s.definite));
+    const maybe = (s.maybe === '' ? null : Number(s.maybe));
+    const notInterested = (s.notInterested === '' ? null : Number(s.notInterested));
+    const definitePct = (s.definitePct !== null && s.definitePct !== undefined) ? Number(s.definitePct) :
+      (farmers && definite !== null && !isNaN(farmers) && farmers > 0) ? (definite / farmers * 100) : null;
+    const awarenessPct = (s.awarenessPct !== null && s.awarenessPct !== undefined) ? Number(s.awarenessPct) : null;
+    const clarityPct = (s.clarityPct !== null && s.clarityPct !== undefined) ? Number(s.clarityPct) : null;
+
+    const lat = (s.lat === '' ? null : Number(s.lat));
+    const lon = (s.lon === '' ? null : Number(s.lon));
+
+    return {
+      id: sn || `${date}|${city}|${spot}`,
+      sn,
+      date,
+      city,
+      spot,
+      farmers: isNaN(farmers) ? null : farmers,
+      acres: isNaN(acres) ? null : acres,
+      definite: isNaN(definite) ? null : definite,
+      maybe: isNaN(maybe) ? null : maybe,
+      notInterested: isNaN(notInterested) ? null : notInterested,
+      definitePct: isNaN(definitePct) ? null : definitePct,
+      awarenessPct: isNaN(awarenessPct) ? null : awarenessPct,
+      clarityPct: isNaN(clarityPct) ? null : clarityPct,
+      lat: isNaN(lat) ? null : lat,
+      lon: isNaN(lon) ? null : lon,
+      reasonsUse: safeStr(s.reasonsUse),
+      reasonsNo: safeStr(s.reasonsNo),
+    };
+  }
+
+  async function loadSessionsPreferred() {
+    // 1) sessions.json
+    try {
+      setLoadingStatus('Loading sessions.json…');
+      const payload = await fetchJson(CONFIG.sessionsJson);
+      const sessions = (payload.sessions || payload.data || payload || []);
+      if (!Array.isArray(sessions) || sessions.length === 0) throw new Error('sessions.json is empty or invalid.');
+      return sessions.map(normalizeSession);
+    } catch (e) {
+      // keep error; fallback to xlsx
+      logDiag(`sessions.json failed: ${e.message}`);
+      return null;
+    }
+  }
+
+  function getSheetCell(sheet, r, c) {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    const cell = sheet[addr];
+    return cell ? cell.v : undefined;
+  }
+
+  function bestHeaderIndex(headers, patterns) {
+    const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g,' ').trim();
+    const hs = headers.map(h => norm(h));
+    for (const p of patterns) {
+      const re = new RegExp(p, 'i');
+      const idx = hs.findIndex(h => re.test(h));
+      if (idx >= 0) return idx;
+    }
     return -1;
   }
 
-  // ---- Coordinates: supports "lat,lon" or DMS with N/E/S/W ----
-  function dmsToDd(deg, min, sec, dir) {
-    let dd = Math.abs(deg) + (min || 0) / 60 + (sec || 0) / 3600;
-    if (dir === 'S' || dir === 'W') dd = -dd;
+  function parseDmsToDd(s) {
+    if (!s) return null;
+    const str = String(s).trim();
+    if (!str) return null;
+
+    // decimals like "31.123, 73.456"
+    const m = str.match(/-?\d+(\.\d+)?/g);
+    if (m && m.length === 1 && !/[NSEW]/i.test(str)) {
+      const v = parseFloat(m[0]);
+      return isNaN(v) ? null : v;
+    }
+
+    // DMS like 31°23'28.5"N
+    const mm = str.match(/(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)?\D*(\d+(?:\.\d+)?)?\D*([NSEW])/i);
+    if (!mm) return null;
+    const deg = parseFloat(mm[1]);
+    const min = parseFloat(mm[2] || '0');
+    const sec = parseFloat(mm[3] || '0');
+    const dir = (mm[4] || '').toUpperCase();
+    if ([deg,min,sec].some(x => isNaN(x))) return null;
+    let dd = Math.abs(deg) + (min/60) + (sec/3600);
+    if (dir === 'S' || dir === 'W') dd *= -1;
     return dd;
   }
 
-  function parseOneCoord(part) {
-    // decimal degrees (heuristic: no NSEW in token)
-    const dec = part.match(/-?\d+(?:\.\d+)?/);
-    if (dec && !/[NSEW]/i.test(part)) return Number(dec[0]);
+  function parseCoordPair(s) {
+    if (!s) return { lat:null, lon:null };
+    const str = String(s).trim();
+    if (!str) return { lat:null, lon:null };
 
-    // DMS like 31°23'28.5"N or 31 23 28.5 N
-    const m = part.match(/(-?\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)?\D*(\d+(?:\.\d+)?)?\D*([NSEW])/i);
-    if (!m) return NaN;
-    const deg = Number(m[1]);
-    const mi = m[2] ? Number(m[2]) : 0;
-    const se = m[3] ? Number(m[3]) : 0;
-    const dir = (m[4] || '').toUpperCase();
-    return dmsToDd(deg, mi, se, dir);
-  }
-
-  function parseCoord(s) {
-    if (!s) return { lat: NaN, lon: NaN };
-    const raw = String(s).trim();
-    if (!raw) return { lat: NaN, lon: NaN };
-
-    // "lat, lon"
-    if (raw.includes(',')) {
-      const [a, b] = raw.split(',').map(t => t.trim());
-      const lat = Number(a);
-      const lon = Number(b);
-      return { lat: Number.isFinite(lat) ? lat : NaN, lon: Number.isFinite(lon) ? lon : NaN };
-    }
-
-    // Try to detect two parts (lat then lon)
-    const parts = raw.split(/\s+/);
-    if (parts.length >= 2) {
-      // First try token 0, token 1
-      let lat = parseOneCoord(parts[0]);
-      let lon = parseOneCoord(parts[1]);
-
-      // If failed, split into halves and parse joined
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        const mid = Math.ceil(parts.length / 2);
-        lat = parseOneCoord(parts.slice(0, mid).join(' '));
-        lon = parseOneCoord(parts.slice(mid).join(' '));
-      }
-      return { lat, lon };
-    }
-
-    return { lat: NaN, lon: NaN };
-  }
-
-  // ---- State ----
-  const state = {
-    wb: null,
-    sessions: [],
-    farmers: [],
-    media: [],
-    filtered: [],
-    filter: { city: '', spot: '', q: '', from: null, to: null },
-    charts: { city: null, intent: null, trend: null },
-    map: { obj: null, layer: null, route: null, pinnedKey: '' },
-    lightbox: { items: [], idx: -1 },
-  };
-
-  // ---- Tabs ----
-  function initTabs() {
-    const btns = qa('.tabBtn');
-    btns.forEach(b => b.addEventListener('click', () => {
-      btns.forEach(bb => bb.classList.toggle('active', bb === b));
-      qa('.tabPanel').forEach(p => p.classList.toggle('active', p.id === b.dataset.tab));
-      if (b.dataset.tab === 'tab-map' && state.map.obj) state.map.obj.invalidateSize();
-    }));
-  }
-
-  // ---- Lightbox ----
-  function initLightbox() {
-    const lb = $('lightbox');
-    if (!lb) return;
-
-    const close = () => { lb.style.display = 'none'; };
-    const nav = (delta) => {
-      if (!state.lightbox.items.length) return;
-      state.lightbox.idx = (state.lightbox.idx + delta + state.lightbox.items.length) % state.lightbox.items.length;
-      renderLightbox();
-    };
-
-    $('lbClose')?.addEventListener('click', close);
-    $('lbPrev')?.addEventListener('click', () => nav(-1));
-    $('lbNext')?.addEventListener('click', () => nav(1));
-    lb.addEventListener('click', e => { if (e.target === lb) close(); });
-
-    document.addEventListener('keydown', e => {
-      if (lb.style.display !== 'flex') return;
-      if (e.key === 'Escape') close();
-      if (e.key === 'ArrowLeft') nav(-1);
-      if (e.key === 'ArrowRight') nav(1);
-    });
-  }
-
-  function openLightbox(items, startIdx = 0) {
-    state.lightbox.items = items;
-    state.lightbox.idx = startIdx;
-    renderLightbox();
-    $('lightbox').style.display = 'flex';
-  }
-
-  function renderLightbox() {
-    const item = state.lightbox.items[state.lightbox.idx];
-    const box = $('lbMedia');
-    if (!item || !box) return;
-
-    box.innerHTML = '';
-    if (item.type === 'video') {
-      const v = document.createElement('video');
-      v.src = item.src;
-      v.controls = true;
-      v.autoplay = true;
-      v.playsInline = true;
-      v.preload = 'metadata';
-      box.appendChild(v);
-    } else {
-      const img = document.createElement('img');
-      img.src = item.src;
-      img.alt = item.alt || item.caption || 'image';
-      box.appendChild(img);
-    }
-
-    setText('lbCaption', item.caption || '—');
-    setText('lbTranscript', item.transcript || '—');
-  }
-
-  // ---- Filters ----
-  function debounce(fn, ms) {
-    let t = null;
-    return (...args) => {
-      clearTimeout(t);
-      t = setTimeout(() => fn(...args), ms);
-    };
-  }
-
-  function initFilters() {
-    const citySel = $('filter-city');
-    const spotSel = $('filter-district');
-    const spotCompat = $('filter-spot'); // hidden compat selector
-    const q = $('filter-search');
-    const from = $('filter-date-from');
-    const to = $('filter-date-to');
-    const reset = $('btn-reset');
-    const exportBtn = $('btn-export');
-
-    const apply = () => {
-      state.filter.city = citySel.value || '';
-      state.filter.spot = spotSel.value || '';
-      state.filter.q = (q.value || '').trim();
-      state.filter.from = from.value ? new Date(from.value + 'T00:00:00') : null;
-      state.filter.to = to.value ? new Date(to.value + 'T23:59:59') : null;
-
-      if (spotCompat) spotCompat.value = spotSel.value;
-
-      updateSpotOptions();
-      applyFilters();
-    };
-
-    citySel.addEventListener('change', apply);
-    spotSel.addEventListener('change', apply);
-    q.addEventListener('input', debounce(apply, 120));
-    from.addEventListener('change', apply);
-    to.addEventListener('change', apply);
-
-    reset.addEventListener('click', () => {
-      citySel.value = '';
-      spotSel.value = '';
-      if (spotCompat) spotCompat.value = '';
-      q.value = '';
-      from.value = '';
-      to.value = '';
-      state.filter = { city: '', spot: '', q: '', from: null, to: null };
-      state.map.pinnedKey = '';
-      updateSpotOptions(true);
-      applyFilters();
-    });
-
-    exportBtn.addEventListener('click', exportFilteredCsv);
-  }
-
-  function buildFilterOptions() {
-    const citySel = $('filter-city');
-    citySel.innerHTML = '<option value="">All</option>';
-
-    const cities = uniq(state.sessions.map(s => s.city)).sort((a,b) => a.localeCompare(b));
-    for (const c of cities) {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      citySel.appendChild(opt);
-    }
-    updateSpotOptions(true);
-  }
-
-  function updateSpotOptions(forceReset = false) {
-    const spotSel = $('filter-district');
-    if (!spotSel) return;
-    const cur = forceReset ? '' : (spotSel.value || '');
-    spotSel.innerHTML = '<option value="">All</option>';
-
-    const spots = uniq(
-      state.sessions
-        .filter(s => !state.filter.city || s.city === state.filter.city)
-        .map(s => s.spot)
-    ).sort((a,b) => a.localeCompare(b));
-
-    for (const sp of spots) {
-      const opt = document.createElement('option');
-      opt.value = sp;
-      opt.textContent = sp;
-      spotSel.appendChild(opt);
-    }
-
-    if (cur && spots.includes(cur)) spotSel.value = cur;
-  }
-
-  function matchesText(session, q) {
-    if (!q) return true;
-    const hay = [
-      session.city, session.spot, session.reasonsUse, session.reasonsNo, session.sessionCode
-    ].join(' ').toLowerCase();
-    return hay.includes(q.toLowerCase());
-  }
-
-  function applyFilters() {
-    const { city, spot, q, from, to } = state.filter;
-
-    state.filtered = state.sessions.filter(s => {
-      if (city && s.city !== city) return false;
-      if (spot && s.spot !== spot) return false;
-      if (from && s.date && s.date < from) return false;
-      if (to && s.date && s.date > to) return false;
-      if (q && !matchesText(s, q)) return false;
-      return true;
-    });
-
-    renderAll();
-  }
-
-  // ---- Workbook loading + parsing ----
-  async function loadWorkbook() {
-    updateLoadingStatus('Loading workbook…');
-    const url = new URL(CFG.xlsx, document.baseURI).toString();
-    logDiag(`fetch: ${url}`);
-
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) {
-      throw new Error(`Failed to load workbook (HTTP ${res.status}). Missing file?`);
-    }
-    const buf = await res.arrayBuffer();
-
-    // Git LFS pointer detection (very small file that is plain text)
-    if (buf.byteLength < 2048) {
-      const head = new TextDecoder().decode(buf.slice(0, Math.min(200, buf.byteLength)));
-      if (head.includes('git-lfs.github.com/spec/v1')) {
-        throw new Error('Workbook is a Git LFS pointer (not the real XLSX). GitHub Pages cannot serve LFS objects. Commit the real XLSX (or export to CSV/JSON).');
+    if (str.includes(',')) {
+      const parts = str.split(',').map(x => x.trim());
+      if (parts.length >= 2) {
+        const lat = parseFloat(parts[0]);
+        const lon = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) return { lat, lon };
       }
     }
-    if (buf.byteLength < 100) throw new Error(`Workbook file is too small (${buf.byteLength} bytes).`);
 
-    state.wb = XLSX.read(buf, { type: 'array' });
-    if (!state.wb.SheetNames || !state.wb.SheetNames.length) throw new Error('Workbook has no sheets.');
-    return true;
+    // find two DMS segments
+    const segs = str.match(/(\d+(?:\.\d+)?\D+\d+(?:\.\d+)?\D*\d*(?:\.\d+)?\D*[NSEW])/ig);
+    if (segs && segs.length >= 2) {
+      const a = parseDmsToDd(segs[0]);
+      const b = parseDmsToDd(segs[1]);
+      // Guess which is lat vs lon based on absolute range
+      if (a !== null && b !== null) {
+        const lat = (Math.abs(a) <= 90) ? a : b;
+        const lon = (lat === a) ? b : a;
+        return { lat, lon };
+      }
+    }
+
+    // fallback: take first 2 numbers
+    const nums = str.match(/-?\d+(\.\d+)?/g);
+    if (nums && nums.length >= 2) {
+      const lat = parseFloat(nums[0]);
+      const lon = parseFloat(nums[1]);
+      if (!isNaN(lat) && !isNaN(lon)) return { lat, lon };
+    }
+
+    return { lat:null, lon:null };
   }
 
-  function buildSessions(wb) {
-    // Locate SUM sheet (case-insensitive)
-    const sumName = wb.SheetNames.find(n => String(n).trim().toLowerCase() === 'sum') || wb.SheetNames[0];
-    const sumWs = wb.Sheets[sumName];
-    if (!sumWs) throw new Error('SUM sheet missing and no fallback sheet found.');
-    logDiag(`SUM sheet: ${sumName}`);
+  function normalizeDateExcel(v) {
+    // XLSX: dates may be JS Date or number
+    if (!v) return '';
+    if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0,10);
+    if (typeof v === 'number') {
+      // Excel date number -> JS Date
+      const d = XLSX.SSF.parse_date_code(v);
+      if (d) {
+        const dt = new Date(Date.UTC(d.y, d.m - 1, d.d));
+        if (!isNaN(dt.getTime())) return dt.toISOString().slice(0,10);
+      }
+    }
+    // string
+    const dt = new Date(String(v));
+    return isNaN(dt.getTime()) ? String(v) : dt.toISOString().slice(0,10);
+  }
 
-    const mat = sheetToMatrix(sumWs);
-    let hRow = findHeaderRow(mat, ['City', 'Date', 'Session Location', 'Total Farmers']);
-    if (hRow < 0) hRow = 0;
+  async function loadSessionsFromXlsx() {
+    if (typeof XLSX === 'undefined') throw new Error('SheetJS (XLSX) library not loaded.');
+    setLoadingStatus('Loading XLSX fallback…');
+    const buf = await fetchArrayBuffer(CONFIG.xlsxFallback);
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
 
-    const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
-    const headersNorm = rawHeaders.map(norm);
+    const sheetName = wb.SheetNames.find(n => String(n).toLowerCase() === 'sum') || wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) throw new Error('XLSX: SUM sheet not found.');
 
-    const iCity = findCol(headersNorm, ['city', 'district', 'tehsil']);
-    const iDate = findCol(headersNorm, ['date', 'session date', 'event date']);
-    const iSpot = findCol(headersNorm, ['session location', 'spot', 'location', 'session spot', 'spot name', 'village', 'place']);
-    const iFarmers = findCol(headersNorm, ['total farmers', 'farmers', 'farmers gathered', 'attendees', 'total attendance']);
-    const iAcres = findCol(headersNorm, ['total wheat acres', 'wheat acres', 'crop area', 'acres', 'wheat area']);
-    const iDef = findCol(headersNorm, ['will definitely use', 'definite', 'definitely use', 'definitely']);
-    const iMay = findCol(headersNorm, ['maybe']);
-    const iNo = findCol(headersNorm, ['not interested', 'no', 'no intent', 'not']);
-    const iKnow = findCol(headersNorm, ['know buctril', 'awareness', 'know about buctril', 'already using', 'heard of']);
-    const iCoords = findCol(headersNorm, ['spot coordinates', 'coordinates', 'gps', 'lat', 'latitude']);
-    const iReasonUse = findCol(headersNorm, ['top reason to use', 'reason to use', 'top use reason', 'use reason']);
-    const iReasonNo = findCol(headersNorm, ['top reason not to use', 'reason not to use', 'not use reason']);
-    const iSn = findCol(headersNorm, ['sn', 'sno', 'session no', 'session number', 'sr', 'serial']);
+    // Build header row (assume row index 1 in 0-based == row 2 in Excel)
+    const headerRow = 1;
+    const headers = [];
+    for (let c = 0; c < 220; c++) {
+      const v = getSheetCell(sheet, headerRow, c);
+      if (v === undefined) break;
+      headers.push(v);
+    }
 
-    // Clarity score columns
-    const clarityCols = [];
-    headersNorm.forEach((h, idx) => {
-      if (h.includes('score understood') || h.includes('clarity') || h.includes('message') && h.includes('score')) clarityCols.push(idx);
+    const idx = {
+      sn: bestHeaderIndex(headers, ['^sn$','^s\\.?n\\.?$']),
+      city: bestHeaderIndex(headers, ['^city$']),
+      date: bestHeaderIndex(headers, ['^date$']),
+      spot: bestHeaderIndex(headers, ['session location','spot']),
+      coords: bestHeaderIndex(headers, ['spot coordinates','coordinates']),
+      farmers: bestHeaderIndex(headers, ['total farmers']),
+      acres: bestHeaderIndex(headers, ['total wheat acres','wheat acres']),
+      know: bestHeaderIndex(headers, ['know buctril']),
+      def: bestHeaderIndex(headers, ['will definitely use']),
+      may: bestHeaderIndex(headers, ['^maybe$']),
+      no: bestHeaderIndex(headers, ['not interested']),
+      reasonUse: bestHeaderIndex(headers, ['top reason to use']),
+      reasonNo: bestHeaderIndex(headers, ['top reason not to use']),
+    };
+
+    // score understood columns (1..5)
+    const scoreIdxs = [];
+    headers.forEach((h, i) => {
+      const t = String(h || '').toLowerCase();
+      if (t.includes('score understood')) scoreIdxs.push(i);
     });
 
-    logDiag(`SUM mapping: city=${iCity}, date=${iDate}, spot=${iSpot}, farmers=${iFarmers}, acres=${iAcres}, coords=${iCoords}, sn=${iSn}`);
+    // Parse rows
+    const out = [];
+    let last = {};
+    for (let r = 2; r < 1000; r++) {
+      const row = [];
+      let empty = true;
+      for (let c = 0; c < headers.length; c++) {
+        const v = getSheetCell(sheet, r, c);
+        row.push(v);
+        if (v !== undefined && v !== null && String(v).trim() !== '') empty = false;
+      }
+      if (empty) continue;
 
-    const sessions = [];
-    for (let r = hRow + 1; r < mat.length; r++) {
-      const row = mat[r] || [];
-      const city = iCity >= 0 ? String(row[iCity] ?? '').trim() : '';
-      const spot = iSpot >= 0 ? String(row[iSpot] ?? '').trim() : '';
-      const farmers = iFarmers >= 0 ? asNum(row[iFarmers]) : NaN;
+      // forward fill for merged cells: sn, city, date
+      for (const k of ['sn','city','date']) {
+        const ci = idx[k];
+        if (ci >= 0) {
+          const v = row[ci];
+          if (v === undefined || v === null || String(v).trim() === '') {
+            row[ci] = last[k];
+          } else {
+            last[k] = v;
+          }
+        }
+      }
 
-      // Skip fully empty lines
-      if (!city && !spot && !Number.isFinite(farmers)) continue;
+      const city = safeStr(idx.city >= 0 ? row[idx.city] : '');
+      const spot = safeStr(idx.spot >= 0 ? row[idx.spot] : '');
+      const farmers = idx.farmers >= 0 ? Number(row[idx.farmers]) : null;
 
-      const date = iDate >= 0 ? asDate(row[iDate]) : null;
-      const acres = iAcres >= 0 ? asNum(row[iAcres]) : NaN;
+      if (!city && !spot && !farmers) continue;
 
-      const def = iDef >= 0 ? asNum(row[iDef]) : NaN;
-      const may = iMay >= 0 ? asNum(row[iMay]) : NaN;
-      const no = iNo >= 0 ? asNum(row[iNo]) : NaN;
+      const date = normalizeDateExcel(idx.date >= 0 ? row[idx.date] : '');
+      const sn = idx.sn >= 0 ? safeStr(row[idx.sn]) : '';
+      const acres = idx.acres >= 0 ? Number(row[idx.acres]) : null;
+      const know = idx.know >= 0 ? Number(row[idx.know]) : null;
+      const def = idx.def >= 0 ? Number(row[idx.def]) : null;
+      const may = idx.may >= 0 ? Number(row[idx.may]) : null;
+      const no = idx.no >= 0 ? Number(row[idx.no]) : null;
 
-      const knowRaw = iKnow >= 0 ? asNum(row[iKnow]) : NaN;
-      const awareness = (Number.isFinite(knowRaw) && Number.isFinite(farmers) && farmers > 0)
-        ? (knowRaw <= farmers ? pct(knowRaw, farmers) : (knowRaw <= 100 ? knowRaw : NaN))
-        : NaN;
+      let awarenessPct = null;
+      if (farmers && !isNaN(farmers) && farmers > 0 && know !== null && !isNaN(know)) {
+        awarenessPct = (know <= farmers) ? (know / farmers * 100) : (know <= 100 ? know : null);
+      }
 
-      const clarity = clarityCols.length
-        ? avg(clarityCols.map(ci => asNum(row[ci])).filter(n => Number.isFinite(n) && n <= 100))
-        : NaN;
+      // clarity: average score understood columns; if 1..5 convert to %
+      let clarityPct = null;
+      const scores = scoreIdxs.map(i => Number(row[i])).filter(v => !isNaN(v));
+      if (scores.length) {
+        const avg = scores.reduce((a,b)=>a+b,0) / scores.length;
+        clarityPct = (avg <= 5.01) ? (avg / 5 * 100) : (avg <= 100 ? avg : null);
+      }
 
-      const coordStr = iCoords >= 0 ? String(row[iCoords] ?? '').trim() : '';
-      const { lat, lon } = parseCoord(coordStr);
+      let definitePct = null;
+      if (farmers && def !== null && !isNaN(def) && farmers > 0) definitePct = def / farmers * 100;
 
-      const reasonsUse = iReasonUse >= 0 ? String(row[iReasonUse] ?? '').trim() : '';
-      const reasonsNo = iReasonNo >= 0 ? String(row[iReasonNo] ?? '').trim() : '';
+      const { lat, lon } = parseCoordPair(idx.coords >= 0 ? row[idx.coords] : '');
 
-      const sn = iSn >= 0 ? asNum(row[iSn]) : NaN;
-
-      // Detect D#S# token anywhere in row for linking
-      const joined = row.map(v => String(v ?? '')).join(' ');
-      const m = joined.match(/\bD\d+S\d+\b/i);
-      const sessionCode = m ? m[0].toUpperCase() : '';
-
-      sessions.push({
-        sn: Number.isFinite(sn) ? Math.round(sn) : null,
-        date,
+      out.push(normalizeSession({
+        sn,
         city,
         spot,
-        farmers: Number.isFinite(farmers) ? farmers : NaN,
-        acres: Number.isFinite(acres) ? acres : NaN,
-        def: Number.isFinite(def) ? def : NaN,
-        may: Number.isFinite(may) ? may : NaN,
-        no: Number.isFinite(no) ? no : NaN,
-        defPct: (Number.isFinite(def) && Number.isFinite(farmers) && farmers > 0) ? pct(def, farmers) : NaN,
-        awareness,
-        clarity,
+        date,
+        farmers,
+        acres,
+        definite: def,
+        maybe: may,
+        notInterested: no,
+        definitePct,
+        awarenessPct,
+        clarityPct,
         lat, lon,
-        reasonsUse,
-        reasonsNo,
-        sessionCode,
-      });
+        reasonsUse: idx.reasonUse >= 0 ? row[idx.reasonUse] : '',
+        reasonsNo: idx.reasonNo >= 0 ? row[idx.reasonNo] : ''
+      }));
     }
 
-    sessions.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
-    return sessions;
+    if (!out.length) throw new Error('XLSX parsed but produced 0 sessions.');
+    return out;
   }
 
-  function buildFarmers(wb) {
-    const farmers = [];
-    for (const sh of wb.SheetNames) {
-      if (!/^D\d+S\d+$/i.test(sh)) continue;
-      const ws = wb.Sheets[sh];
-      const mat = sheetToMatrix(ws);
-      const hRow = findHeaderRow(mat, ['name', 'mobile']);
-      if (hRow < 0) continue;
+  async function loadSessions() {
+    const fromJson = await loadSessionsPreferred();
+    if (fromJson) return fromJson;
 
-      const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
-      const headersNorm = rawHeaders.map(norm);
-
-      const iName = findCol(headersNorm, ['name', 'farmer name']);
-      const iPhone = findCol(headersNorm, ['mobile', 'mobile / whatsapp', 'phone', 'whatsapp']);
-
-      for (let r = hRow + 1; r < mat.length; r++) {
-        const row = mat[r] || [];
-        const name = iName >= 0 ? String(row[iName] ?? '').trim() : '';
-        const phone = iPhone >= 0 ? String(row[iPhone] ?? '').trim() : '';
-        if (!name && !phone) continue;
-        farmers.push({ session: sh.toUpperCase(), name, phone });
-      }
-    }
-    return farmers;
-  }
-
-  // ---- Media loading ----
-  async function loadMedia() {
-    updateLoadingStatus('Loading media…');
-    const url = new URL(CFG.media, document.baseURI).toString();
-    logDiag(`fetch: ${url}`);
-
+    // fallback
     try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) {
-        logDiag(`media: HTTP ${res.status} — using empty array`);
-        state.media = [];
-        return;
-      }
-      const data = await res.json();
-      state.media = expandMedia(data);
-      logDiag(`media: items=${state.media.length}`);
+      const fromXlsx = await loadSessionsFromXlsx();
+      setNotice(`<strong>Status:</strong> Loaded XLSX fallback (<code>${CONFIG.xlsxFallback}</code>). Consider committing <code>sessions.json</code> to avoid Git LFS issues.`);
+      return fromXlsx;
     } catch (e) {
-      state.media = [];
-      logDiag(`media: failed (${e.message})`);
+      const lfsHint = (e && e.code === 'LFS_POINTER')
+        ? `<br/><br/><b>Fix:</b> do not serve XLSX via Git LFS on GitHub Pages. Use <code>sessions.json</code> (recommended) or host the XLSX on a non-LFS URL (e.g., GitHub Release / CDN).`
+        : '';
+      throw new Error(`Unable to load sessions data. ${e.message}${lfsHint}`);
     }
   }
 
-  function normalizeMediaItem(m) {
-    if (!m || !m.src) return null;
-    const type = (String(m.type || '').toLowerCase() === 'video') ? 'video' : 'image';
-    const caption = String(m.caption || '').trim();
-    const alt = String(m.alt || caption || 'media').trim();
-    const transcript = String(m.transcript || '').trim();
-
-    let sessionId = null;
-    if (Number.isFinite(Number(m.sessionId))) sessionId = Number(m.sessionId);
-
-    // Parse from caption "Session 12"
-    if (!sessionId && caption) {
-      const mm = caption.match(/\b(?:session|sess)\s*(\d+)\b/i);
-      if (mm) sessionId = Number(mm[1]);
-    }
-    // Parse from filename ".../12a.jpg"
-    if (!sessionId) {
-      const mm = String(m.src).match(/\/(\d+)[a-z]?\.(jpg|jpeg|png|webp|mp4|mov)$/i);
-      if (mm) sessionId = Number(mm[1]);
-    }
-
-    return {
-      type,
-      src: String(m.src),
-      caption: caption || (sessionId ? `Session ${sessionId}` : 'Media'),
-      alt,
-      transcript,
-      sessionId,
-      city: String(m.city || ''),
-      spot: String(m.spot || ''),
-      date: String(m.date || ''),
-    };
-  }
-
-  function expandMedia(data) {
-    if (Array.isArray(data)) return data.map(normalizeMediaItem).filter(Boolean);
-
-    if (!data || data.format !== 'A_compact' || !Array.isArray(data.sessions)) return [];
-
-    const base = String(data.basePath || '');
-    const d = data.defaults || {};
+  // ---------------------------
+  // Media loading
+  // ---------------------------
+  function expandMediaCompact(payload) {
+    const basePath = safeStr(payload.basePath || '');
+    const d = payload.defaults || {};
     const mainVideoExt = d.mainVideoExt || 'mp4';
     const mainImageExt = d.mainImageExt || 'jpg';
     const variantImageExt = d.variantImageExt || 'jpg';
     const variantVideoExt = d.variantVideoExt || 'mp4';
     const variants = Array.isArray(d.variants) ? d.variants : ['a','b','c','d','e','f'];
 
+    const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
     const items = [];
-    for (const s of data.sessions) {
-      const sid = s.id;
-      const stem = `${base}${sid}`;
 
-      items.push(normalizeMediaItem({
-        type: 'video', src: `${stem}.${mainVideoExt}`,
-        caption: s.caption ? `${s.caption} (Video)` : `Session ${sid} (Video)`,
-        transcript: s.transcript || '',
-        sessionId: Number(sid),
-        city: s.city || '', spot: s.spot || '', date: s.date || '',
-      }));
-      items.push(normalizeMediaItem({
-        type: 'image', src: `${stem}.${mainImageExt}`,
-        caption: s.caption ? `${s.caption} (Photo)` : `Session ${sid} (Photo)`,
-        transcript: '',
-        sessionId: Number(sid),
-        city: s.city || '', spot: s.spot || '', date: s.date || '',
-      }));
+    for (const s of sessions) {
+      const id = safeStr(s.id);
+      if (!id) continue;
 
+      const caption = safeStr(s.caption) || `Session ${id}`;
+      const transcript = safeStr(s.transcript);
+      const city = safeStr(s.city);
+      const spot = safeStr(s.spot);
+      const date = safeStr(s.date);
+
+      // main video + image
+      items.push({
+        sessionId: id,
+        type: 'video',
+        src: `${basePath}${id}.${mainVideoExt}`,
+        caption,
+        transcript,
+        city, spot, date
+      });
+      items.push({
+        sessionId: id,
+        type: 'image',
+        src: `${basePath}${id}.${mainImageExt}`,
+        caption,
+        transcript,
+        city, spot, date
+      });
+
+      // variants (images first)
       for (const v of variants) {
-        items.push(normalizeMediaItem({
-          type: 'image', src: `${stem}${v}.${variantImageExt}`,
-          caption: s.caption ? `${s.caption} (Photo ${String(v).toUpperCase()})` : `Session ${sid} (Photo ${String(v).toUpperCase()})`,
-          sessionId: Number(sid), city: s.city || '', spot: s.spot || '', date: s.date || '',
-        }));
-        items.push(normalizeMediaItem({
-          type: 'video', src: `${stem}${v}.${variantVideoExt}`,
-          caption: s.caption ? `${s.caption} (Video ${String(v).toUpperCase()})` : `Session ${sid} (Video ${String(v).toUpperCase()})`,
-          sessionId: Number(sid), city: s.city || '', spot: s.spot || '', date: s.date || '',
-        }));
+        items.push({
+          sessionId: id,
+          type: 'image',
+          src: `${basePath}${id}_${v}.${variantImageExt}`,
+          caption: `${caption} (${v})`,
+          transcript,
+          city, spot, date
+        });
+      }
+      // optional variant videos
+      for (const v of variants) {
+        items.push({
+          sessionId: id,
+          type: 'video',
+          src: `${basePath}${id}_${v}.${variantVideoExt}`,
+          caption: `${caption} (${v} video)`,
+          transcript,
+          city, spot, date
+        });
       }
     }
-    return items.filter(Boolean);
+    return items;
   }
 
-  // ---- Derived computations ----
-  function computeTotals(rows) {
-    const sessions = rows.length;
-    const farmers = rows.reduce((a, s) => a + (Number.isFinite(s.farmers) ? s.farmers : 0), 0);
-    const acres = rows.reduce((a, s) => a + (Number.isFinite(s.acres) ? s.acres : 0), 0);
-    const def = rows.reduce((a, s) => a + (Number.isFinite(s.def) ? s.def : 0), 0);
-    const may = rows.reduce((a, s) => a + (Number.isFinite(s.may) ? s.may : 0), 0);
-    const no = rows.reduce((a, s) => a + (Number.isFinite(s.no) ? s.no : 0), 0);
-    const defPct = pct(def, farmers);
-
-    const dates = rows.map(s => s.date).filter(Boolean).sort((a,b) => a - b);
-    const dateFrom = dates.length ? dates[dates.length - 1] : null; // sessions sorted desc; but keep min/max reliably:
-    const dateTo = dates.length ? dates[0] : null;
-    const minD = dates.length ? dates[0] : null;
-    const maxD = dates.length ? dates[dates.length - 1] : null;
-
-    return { sessions, farmers, acres, def, may, no, defPct, dateFrom: minD, dateTo: maxD };
-  }
-
-  function dateRangeLabel(minD, maxD) {
-    if (!minD || !maxD) return '—';
-    const a = fmtDate(minD);
-    const b = fmtDate(maxD);
-    return a === b ? a : `${a} → ${b}`;
-  }
-
-  function topCounts(values, maxN) {
-    const m = new Map();
-    for (const v of values) {
-      const k = String(v).trim();
-      if (!k) continue;
-      m.set(k, (m.get(k) || 0) + 1);
-    }
-    return Array.from(m.entries()).sort((a,b) => b[1] - a[1]).slice(0, maxN);
-  }
-
-  // ---- Rendering ----
-  function renderAll() {
-    renderFilterSummary();
-    renderKpis();
-    renderSnapshotText();
-    renderCharts();
-    renderMap();
-    renderSessionsTable();
-    renderShowcases();
-    renderGallery();
-  }
-
-  function renderFilterSummary() {
-    const sum = computeTotals(state.filtered);
-    const city = state.filter.city || 'All Cities';
-    const spot = state.filter.spot || 'All Spots';
-    const dateLabel = dateRangeLabel(sum.dateFrom, sum.dateTo);
-
-    const fs = $('filterSummary');
-    if (fs) {
-      fs.innerHTML =
-        `<b>Selection:</b> ${escapeHtml(city)} • ${escapeHtml(spot)}<br/>` +
-        `<b>Sessions:</b> ${fmtInt(sum.sessions)} • <b>Farmers:</b> ${fmtInt(sum.farmers)} • <b>Acres:</b> ${fmtInt(sum.acres)}<br/>` +
-        `<b>Date:</b> ${escapeHtml(dateLabel)}`;
-    }
-
-    // If not pinned, map banner reflects aggregate selection
-    if (!state.map.pinnedKey) {
-      setText('mapSelTitle', `${city} • ${spot}`);
-      setText('mapSelFarmers', fmtInt(sum.farmers));
-      setText('mapSelAcres', fmtInt(sum.acres));
-      setText('mapSelDate', dateLabel);
-    }
-  }
-
-  function renderKpis() {
-    const sum = computeTotals(state.filtered);
-
-    setText('kpi-sessions', fmtInt(sum.sessions));
-    setText('kpi-farmers', fmtInt(sum.farmers));
-    setText('kpi-acres', fmtInt(sum.acres));
-    setText('kpi-demo', Number.isFinite(sum.defPct) ? `${Math.round(sum.defPct)}% definite` : '—');
-
-    // Bars relative to full dataset
-    const all = computeTotals(state.sessions);
-    const pctSessions = all.sessions ? (sum.sessions / all.sessions) * 100 : 0;
-    const pctFarmers = all.farmers ? (sum.farmers / all.farmers) * 100 : 0;
-    const pctAcres = all.acres ? (sum.acres / all.acres) * 100 : 0;
-    const pctDemo = Number.isFinite(sum.defPct) ? Math.max(0, Math.min(100, sum.defPct)) : 0;
-
-    const setBar = (id, p) => {
-      const el = $(id);
-      if (el) el.style.width = `${Math.max(0, Math.min(100, p))}%`;
-    };
-    setBar('bar-sessions', pctSessions);
-    setBar('bar-farmers', pctFarmers);
-    setBar('bar-acres', pctAcres);
-    setBar('bar-demo', pctDemo);
-  }
-
-  function renderSnapshotText() {
-    const sum = computeTotals(state.filtered);
-    const city = state.filter.city || 'All Cities';
-    const spot = state.filter.spot || 'All Spots';
-    const dateLabel = dateRangeLabel(sum.dateFrom, sum.dateTo);
-
-    const topUse = topCounts(state.filtered.map(s => s.reasonsUse).filter(Boolean), CFG.maxReasons);
-    const topNo = topCounts(state.filtered.map(s => s.reasonsNo).filter(Boolean), CFG.maxReasons);
-
-    const snap = $('snapshot');
-    if (snap) {
-      snap.textContent =
-        `${city} • ${spot} • Date: ${dateLabel}. ` +
-        `Sessions: ${fmtInt(sum.sessions)}, Farmers: ${fmtInt(sum.farmers)}, Acres: ${fmtInt(sum.acres)}. ` +
-        (Number.isFinite(sum.defPct) ? `Definite intent: ${Math.round(sum.defPct)}%. ` : '') +
-        (topUse.length ? `Top reason to use: "${topUse[0][0]}" (${topUse[0][1]}). ` : '') +
-        (topNo.length ? `Top reason not to use: "${topNo[0][0]}" (${topNo[0][1]}).` : '');
-    }
-
-    renderReasons('reasonUse', topUse);
-    renderReasons('reasonNo', topNo);
-  }
-
-  function renderReasons(tbodyId, pairs) {
-    const tb = $(tbodyId);
-    if (!tb) return;
-    tb.innerHTML = '';
-    if (!pairs.length) {
-      tb.innerHTML = `<tr><td class="muted">—</td><td class="muted">—</td></tr>`;
-      return;
-    }
-    for (const [k, v] of pairs) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(k)}</td><td>${fmtInt(v)}</td>`;
-      tb.appendChild(tr);
-    }
-  }
-
-  // ---- Charts ----
-  function ensureChart(prev, canvasEl, type, data, options) {
-    if (!canvasEl || !window.Chart) return null;
-    if (prev) prev.destroy();
+  async function loadMedia(sessions) {
     try {
-      return new Chart(canvasEl, {
-        type,
-        data,
-        options: Object.assign({
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'right' } }
-        }, options || {})
-      });
+      setLoadingStatus('Loading media.json…');
+      const payload = await fetchJson(CONFIG.mediaJson);
+      let items = [];
+      if (payload && payload.format === 'A_compact') {
+        items = expandMediaCompact(payload);
+      } else if (Array.isArray(payload)) {
+        // flat array support
+        items = payload.map(x => ({
+          sessionId: safeStr(x.sessionId || x.session || ''),
+          type: safeStr(x.type || 'image'),
+          src: safeStr(x.src || ''),
+          caption: safeStr(x.caption || ''),
+          transcript: safeStr(x.transcript || ''),
+          city: safeStr(x.city || ''),
+          spot: safeStr(x.spot || ''),
+          date: safeStr(x.date || '')
+        }));
+      } else if (payload && Array.isArray(payload.items)) {
+        items = payload.items;
+      }
+
+      // If sessionId missing, infer from filename prefix (e.g., "11_a.jpg" -> "11")
+      for (const it of items) {
+        if (!it.sessionId && it.src) {
+          const m = it.src.match(/\/(\d+)[._]/) || it.src.match(/^(\d+)[._]/);
+          if (m) it.sessionId = m[1];
+        }
+        if (!it.caption) it.caption = it.sessionId ? `Session ${it.sessionId}` : 'Media';
+      }
+
+      // Build lookup
+      const by = new Map();
+      for (const it of items) {
+        const k = it.sessionId || '';
+        if (!k) continue;
+        if (!by.has(k)) by.set(k, []);
+        by.get(k).push(it);
+      }
+
+      // Keep only sessions that exist in data OR have identifiable fields
+      const knownSessionIds = new Set(sessions.map(s => s.sn).filter(Boolean));
+      const filteredItems = items.filter(it => it.sessionId && knownSessionIds.has(String(it.sessionId)));
+
+      state.mediaItems = filteredItems;
+      state.mediaBySessionId = by;
+
+      return filteredItems;
     } catch (e) {
-      logDiag(`chart error: ${e.message}`);
-      return null;
+      logDiag(`media.json failed: ${e.message}`);
+      state.mediaItems = [];
+      state.mediaBySessionId = new Map();
+      return [];
     }
   }
 
-  function palette(n) {
-    const out = [];
-    for (let i = 0; i < n; i++) {
-      const h = Math.round((360 * i) / Math.max(1, n));
-      out.push(`hsla(${h}, 70%, 55%, 0.75)`);
-    }
-    return out;
+  // ---------------------------
+  // Rendering: KPIs, charts, table
+  // ---------------------------
+  function sum(arr, fn) {
+    return arr.reduce((acc, x) => {
+      const v = fn(x);
+      return acc + (typeof v === 'number' && !isNaN(v) ? v : 0);
+    }, 0);
   }
 
-  function renderCharts() {
-    // City distribution (count of sessions)
-    const cityCounts = new Map();
-    for (const s of state.filtered) {
-      const k = s.city || 'Other';
-      cityCounts.set(k, (cityCounts.get(k) || 0) + 1);
+  function mean(arr, fn) {
+    const vals = arr.map(fn).filter(v => typeof v === 'number' && !isNaN(v));
+    if (!vals.length) return null;
+    return vals.reduce((a,b)=>a+b,0) / vals.length;
+  }
+
+  function setBar(elBar, valuePct) {
+    if (!elBar) return;
+    const w = clamp(valuePct || 0, 0, 100);
+    elBar.style.width = `${w}%`;
+  }
+
+  function computeKpis(rows) {
+    const sessions = rows.length;
+    const farmers = sum(rows, r => r.farmers);
+    const acres = sum(rows, r => r.acres);
+    const defPct = mean(rows, r => r.definitePct);
+    return { sessions, farmers, acres, defPct };
+  }
+
+  function updateKpis(rows) {
+    const k = computeKpis(rows);
+    el.kpiSessions.textContent = fmt.int(k.sessions);
+    el.kpiFarmers.textContent = fmt.int(k.farmers);
+    el.kpiAcres.textContent = fmt.num(k.acres, 1);
+    el.kpiDemo.textContent = fmt.pct(k.defPct, 0);
+
+    // Bars are relative indicators, not absolute truth.
+    setBar(el.barSessions, clamp((k.sessions / Math.max(1, state.sessions.length)) * 100, 0, 100));
+    const totFarmers = sum(state.sessions, s => s.farmers);
+    const totAcres = sum(state.sessions, s => s.acres);
+    setBar(el.barFarmers, clamp((k.farmers / Math.max(1, totFarmers)) * 100, 0, 100));
+    setBar(el.barAcres, clamp((k.acres / Math.max(1e-9, totAcres)) * 100, 0, 100));
+    setBar(el.barDemo, clamp(k.defPct || 0, 0, 100));
+  }
+
+  function renderReasons(rows) {
+    const splitReasons = (txt) => {
+      return String(txt || '')
+        .split(/[,;|]/g)
+        .map(s => s.trim())
+        .filter(s => s.length >= 3);
+    };
+
+    const countMap = (field) => {
+      const m = new Map();
+      for (const r of rows) {
+        for (const part of splitReasons(r[field])) {
+          const key = part.toLowerCase();
+          m.set(key, (m.get(key) || 0) + 1);
+        }
+      }
+      const sorted = Array.from(m.entries()).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      return sorted.map(([k,v]) => ({ label: k, count: v }));
+    };
+
+    const renderTable = (tbody, items) => {
+      if (!tbody) return;
+      tbody.innerHTML = items.map(it =>
+        `<tr><td style="width:70%">${escapeHtml(it.label)}</td><td>${it.count}</td></tr>`
+      ).join('') || `<tr><td colspan="2" class="muted">No data</td></tr>`;
+    };
+
+    renderTable(el.reasonUse, countMap('reasonsUse'));
+    renderTable(el.reasonNo, countMap('reasonsNo'));
+  }
+
+  function renderSnapshot(rows) {
+    const k = computeKpis(rows);
+    const city = el.filterCity?.value || '';
+    const spot = el.filterSpot?.value || '';
+    const scope = (city || spot) ? `${city || 'All cities'}${spot ? ' → ' + spot : ''}` : 'All sessions';
+
+    const avgAware = mean(rows, r => r.awarenessPct);
+    const avgClarity = mean(rows, r => r.clarityPct);
+
+    el.snapshot.innerHTML =
+      `<div><b>Scope:</b> ${escapeHtml(scope)}</div>
+       <div style="margin-top:8px" class="muted">
+         Sessions: <b>${fmt.int(k.sessions)}</b> · Farmers: <b>${fmt.int(k.farmers)}</b> · Acres: <b>${fmt.num(k.acres,1)}</b><br/>
+         Definite intent: <b>${fmt.pct(k.defPct,0)}</b> · Awareness: <b>${fmt.pct(avgAware,0)}</b> · Clarity: <b>${fmt.pct(avgClarity,0)}</b>
+       </div>`;
+
+    renderReasons(rows);
+
+    // Showcase: attempt to show pinned session media, else first sessions’ media
+    const ids = [];
+    if (state.pinnedSession?.sn) ids.push(String(state.pinnedSession.sn));
+    for (const r of rows) {
+      if (ids.length >= CONFIG.maxShowcase) break;
+      if (r.sn && !ids.includes(String(r.sn))) ids.push(String(r.sn));
     }
-    const cityLabels = Array.from(cityCounts.keys()).sort((a,b) => a.localeCompare(b));
-    const cityData = cityLabels.map(l => cityCounts.get(l));
+    renderShowcase(el.snapShowcase, ids);
+  }
 
-    state.charts.city = ensureChart(
-      state.charts.city,
-      $('chartCity'),
-      'doughnut',
-      { labels: cityLabels, datasets: [{ data: cityData, backgroundColor: palette(cityLabels.length) }] }
-    );
+  function destroyChart(ch) {
+    try { ch?.destroy(); } catch(_) {}
+  }
 
-    // Intent split
-    const sum = computeTotals(state.filtered);
-    state.charts.intent = ensureChart(
-      state.charts.intent,
-      $('chartIntent'),
-      'pie',
-      { labels: ['Definite', 'Maybe', 'Not Interested'], datasets: [{ data: [sum.def, sum.may, sum.no], backgroundColor: ['rgba(134,239,172,.75)','rgba(251,191,36,.75)','rgba(251,113,133,.75)'] }] }
-    );
+  function renderCharts(rows) {
+    if (typeof Chart === 'undefined') return;
 
-    // Trend: by date (sum farmers, sum acres)
-    const byDate = new Map();
-    for (const s of state.filtered) {
-      const d = s.date ? fmtDate(s.date) : 'Unknown';
-      const cur = byDate.get(d) || { farmers: 0, acres: 0 };
-      cur.farmers += Number.isFinite(s.farmers) ? s.farmers : 0;
-      cur.acres += Number.isFinite(s.acres) ? s.acres : 0;
-      byDate.set(d, cur);
+    // City mix (doughnut)
+    const byCity = new Map();
+    for (const r of rows) byCity.set(r.city, (byCity.get(r.city) || 0) + (r.farmers || 0));
+    const cityLabels = Array.from(byCity.keys());
+    const cityVals = Array.from(byCity.values());
+
+    destroyChart(state.charts.city);
+    state.charts.city = new Chart(el.chartCity, {
+      type: 'doughnut',
+      data: { labels: cityLabels, datasets: [{ data: cityVals }] },
+      options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{ color:'#e7edf7' } } } }
+    });
+
+    // Intent split (pie): definite/maybe/no totals
+    const sumDef = sum(rows, r => r.definite);
+    const sumMay = sum(rows, r => r.maybe);
+    const sumNo = sum(rows, r => r.notInterested);
+
+    destroyChart(state.charts.intent);
+    state.charts.intent = new Chart(el.chartIntent, {
+      type: 'pie',
+      data: { labels: ['Definite','Maybe','Not Interested'], datasets: [{ data: [sumDef, sumMay, sumNo] }] },
+      options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{ color:'#e7edf7' } } } }
+    });
+
+    // Trend (line): farmers & acres by date
+    const buckets = new Map(); // date -> agg
+    for (const r of rows) {
+      const d = r.date || '';
+      if (!d) continue;
+      if (!buckets.has(d)) buckets.set(d, { farmers:0, acres:0 });
+      const b = buckets.get(d);
+      b.farmers += (r.farmers || 0);
+      b.acres += (r.acres || 0);
     }
-    const tLabels = Array.from(byDate.keys()).sort();
-    const tFarmers = tLabels.map(d => byDate.get(d).farmers);
-    const tAcres = tLabels.map(d => byDate.get(d).acres);
+    const dates = Array.from(buckets.keys()).sort((a,b) => new Date(a) - new Date(b));
+    const farmersSeries = dates.map(d => buckets.get(d).farmers);
+    const acresSeries = dates.map(d => buckets.get(d).acres);
 
-    state.charts.trend = ensureChart(
-      state.charts.trend,
-      $('chartTrend'),
-      'line',
-      {
-        labels: tLabels,
+    destroyChart(state.charts.trend);
+    state.charts.trend = new Chart(el.chartTrend, {
+      type: 'line',
+      data: {
+        labels: dates.map(d => fmt.date(d)),
         datasets: [
-          { label: 'Farmers', data: tFarmers, tension: 0.25, borderWidth: 2, pointRadius: 2 },
-          { label: 'Acres', data: tAcres, tension: 0.25, borderWidth: 2, pointRadius: 2 },
+          { label:'Farmers', data: farmersSeries, tension:.25 },
+          { label:'Wheat Acres', data: acresSeries, tension:.25 }
         ]
       },
-      { scales: { y: { beginAtZero: true } } }
-    );
+      options: {
+        responsive:true,
+        plugins:{ legend:{ position:'bottom', labels:{ color:'#e7edf7' } } },
+        scales: {
+          x: { ticks:{ color:'#9fb0ca' }, grid:{ color:'rgba(255,255,255,.08)' } },
+          y: { ticks:{ color:'#9fb0ca' }, grid:{ color:'rgba(255,255,255,.08)' } }
+        }
+      }
+    });
   }
 
-  // ---- Map (Leaflet) ----
-  function initMapIfNeeded() {
-    if (state.map.obj) return;
-    if (!window.L) throw new Error('Leaflet not available.');
+  function renderTable(rows) {
+    if (!el.tbl) return;
+    el.tbl.innerHTML = rows.map(r => {
+      const defP = r.definitePct;
+      const aw = r.awarenessPct;
+      const cl = r.clarityPct;
+      return `<tr data-sn="${escapeHtml(r.sn || '')}">
+        <td>${escapeHtml(fmt.date(r.date))}</td>
+        <td>${escapeHtml(r.city || '—')}</td>
+        <td>${escapeHtml(r.spot || '—')}</td>
+        <td>${fmt.int(r.farmers)}</td>
+        <td>${fmt.num(r.acres,1)}</td>
+        <td>${fmt.pct(defP,0)}</td>
+        <td>${fmt.pct(aw,0)}</td>
+        <td>${fmt.pct(cl,0)}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="8" class="muted">No sessions match the filters.</td></tr>`;
 
-    const mapEl = $('map');
-    if (!mapEl) return;
+    // row click
+    el.tbl.querySelectorAll('tr[data-sn]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const sn = tr.getAttribute('data-sn');
+        const session = state.filtered.find(x => String(x.sn) === String(sn)) || state.sessions.find(x => String(x.sn) === String(sn));
+        if (session) pinSession(session, { openMedia:true, focusMap:true });
+      });
+    });
+  }
 
-    state.map.obj = L.map(mapEl).setView(CFG.mapCenter, CFG.mapZoom);
+  // ---------------------------
+  // Map
+  // ---------------------------
+  function initMap() {
+    if (!el.mapWrap) return;
+    if (typeof L === 'undefined') {
+      showError('Leaflet did not load. Check your network and script tags.');
+      return;
+    }
+    state.map = L.map(el.mapWrap, { preferCanvas:true });
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(state.map.obj);
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(state.map);
 
-    state.map.layer = L.layerGroup().addTo(state.map.obj);
-    logDiag('map: initialized');
+    // Default view Pakistan
+    state.map.setView([30.3753, 69.3451], 5);
+  }
+
+  function clearMap() {
+    if (!state.map) return;
+    for (const c of state.circles) c.remove();
+    state.circles = [];
   }
 
   function acresToRadiusMeters(acres) {
-    if (!Number.isFinite(acres) || acres <= 0) return 150;
-    const area = acres * 4046.86; // m^2
+    // area scale: acres -> m^2 (1 acre = 4046.86 m^2) => radius = sqrt(area/pi)
+    const a = (typeof acres === 'number' && !isNaN(acres) && acres > 0) ? acres : 1;
+    const area = a * 4046.86;
     const r = Math.sqrt(area / Math.PI);
-    return Math.max(120, Math.min(CFG.bubbleClampMeters, r));
+    return clamp(r, 25, 2200);
   }
 
-  function groupForMap(rows) {
-    // Group by city+spot to reflect "spot-level coverage"
-    const m = new Map();
-    for (const s of rows) {
-      const key = `${s.city || ''}||${s.spot || ''}`.trim();
-      if (!key.replace(/\|/g,'').trim()) continue;
-      const g = m.get(key) || {
-        key, city: s.city || '', spot: s.spot || '',
-        sessions: [],
-        farmers: 0, acres: 0,
-        def: 0, may: 0, no: 0,
-        latSum: 0, lonSum: 0, coordN: 0,
-        minD: null, maxD: null,
-        sns: new Set(),
-      };
-      g.sessions.push(s);
-      if (Number.isFinite(s.farmers)) g.farmers += s.farmers;
-      if (Number.isFinite(s.acres)) g.acres += s.acres;
-      if (Number.isFinite(s.def)) g.def += s.def;
-      if (Number.isFinite(s.may)) g.may += s.may;
-      if (Number.isFinite(s.no)) g.no += s.no;
-      if (Number.isFinite(s.lat) && Number.isFinite(s.lon)) {
-        g.latSum += s.lat; g.lonSum += s.lon; g.coordN += 1;
-      }
-      if (s.date) {
-        if (!g.minD || s.date < g.minD) g.minD = s.date;
-        if (!g.maxD || s.date > g.maxD) g.maxD = s.date;
-      }
-      if (Number.isFinite(Number(s.sn))) g.sns.add(Number(s.sn));
-      m.set(key, g);
-    }
+  function renderMap(rows) {
+    if (!state.map) return;
+    clearMap();
 
-    const groups = Array.from(m.values()).map(g => {
-      const lat = g.coordN ? (g.latSum / g.coordN) : NaN;
-      const lon = g.coordN ? (g.lonSum / g.coordN) : NaN;
-      const defPct = pct(g.def, g.farmers);
-      return Object.assign(g, { lat, lon, defPct });
-    });
-
-    // Stable ordering (largest acres first)
-    groups.sort((a,b) => (b.acres || 0) - (a.acres || 0));
-    return groups;
-  }
-
-  function renderMap() {
-    if (!window.L) {
-      showError('Map library not loaded', 'Leaflet failed to load from CDN.');
+    const points = rows.filter(r => typeof r.lat === 'number' && typeof r.lon === 'number' && !isNaN(r.lat) && !isNaN(r.lon));
+    if (!points.length) {
+      el.mapLegend.textContent = 'No coordinates available in the filtered set.';
       return;
+    }
+    el.mapLegend.textContent = 'Bubble radius represents wheat acres covered (area-scaled). Click a bubble to pin that session.';
+
+    const bounds = [];
+    for (const r of points) {
+      const radius = acresToRadiusMeters(r.acres || 1);
+      const c = L.circle([r.lat, r.lon], {
+        radius,
+        weight: 1,
+        opacity: 0.9,
+        fillOpacity: 0.22
+      }).addTo(state.map);
+
+      c.on('click', () => pinSession(r, { openMedia:false, focusMap:false }));
+
+      const html = `
+        <div style="min-width:210px">
+          <div style="font-weight:900">${escapeHtml(r.city || '')} — ${escapeHtml(r.spot || '')}</div>
+          <div style="margin-top:6px; font-size:12px">
+            <b>Date:</b> ${escapeHtml(fmt.date(r.date))}<br/>
+            <b>Farmers:</b> ${fmt.int(r.farmers)}<br/>
+            <b>Wheat Acres:</b> ${fmt.num(r.acres,1)}<br/>
+            <b>Definite:</b> ${fmt.pct(r.definitePct,0)} · <b>Clarity:</b> ${fmt.pct(r.clarityPct,0)}
+          </div>
+        </div>`;
+      c.bindPopup(html);
+
+      state.circles.push(c);
+      bounds.push([r.lat, r.lon]);
     }
 
     try {
-      initMapIfNeeded();
-    } catch (e) {
-      showError('Failed to initialize map', e.message);
+      state.map.fitBounds(bounds, { padding:[18,18] });
+    } catch(_) {}
+  }
+
+  function updateMapBanner(rows) {
+    const s = state.pinnedSession;
+    if (s) {
+      el.mapSelTitle.textContent = `${s.city || '—'} — ${s.spot || '—'}`;
+      el.mapSelFarmers.textContent = fmt.int(s.farmers);
+      el.mapSelAcres.textContent = fmt.num(s.acres, 1);
+      el.mapSelDate.textContent = fmt.date(s.date);
+      renderShowcase(el.mapShowcase, [String(s.sn)].filter(Boolean));
       return;
     }
 
-    const layer = state.map.layer;
-    layer.clearLayers();
+    const k = computeKpis(rows);
+    el.mapSelTitle.textContent = 'All sessions';
+    el.mapSelFarmers.textContent = fmt.int(k.farmers);
+    el.mapSelAcres.textContent = fmt.num(k.acres, 1);
+    // show date span
+    const dates = rows.map(r => parseISO(r.date)).filter(Boolean).sort((a,b)=>a-b);
+    const span = dates.length ? `${dates[0].toISOString().slice(0,10)} → ${dates[dates.length-1].toISOString().slice(0,10)}` : '—';
+    el.mapSelDate.textContent = span;
+    renderShowcase(el.mapShowcase, []);
+  }
 
-    const groups = groupForMap(state.filtered).filter(g => Number.isFinite(g.lat) && Number.isFinite(g.lon));
-    if (!groups.length) {
-      const legend = $('mapLegend');
-      if (legend) legend.textContent = 'No valid coordinates for the current selection. Ensure SUM has a Spot Coordinates column (decimal or DMS).';
-      return;
+  function invalidateMapSoon() {
+    if (!state.map) return;
+    setTimeout(() => { try{ state.map.invalidateSize(); } catch(_) {} }, 80);
+  }
+
+  // ---------------------------
+  // Media / Showcase / Lightbox
+  // ---------------------------
+  function buildGalleryList(rows) {
+    // Choose media items for the filtered sessions; keep a max
+    const ids = rows.map(r => r.sn).filter(Boolean).map(String);
+    const items = [];
+    for (const id of ids) {
+      const arr = state.mediaBySessionId.get(id) || [];
+      for (const it of arr) items.push(it);
+      if (items.length >= CONFIG.maxGallery) break;
     }
-
-    const latlngs = [];
-    for (const g of groups) {
-      const rMeters = acresToRadiusMeters(g.acres);
-
-      const circle = L.circle([g.lat, g.lon], {
-        radius: rMeters,
-        color: 'rgba(134,239,172,.95)',
-        weight: 2,
-        fillColor: 'rgba(125,211,252,.35)',
-        fillOpacity: 0.55
-      });
-
-      const dLabel = dateRangeLabel(g.minD, g.maxD);
-      circle.bindPopup(
-        `<b>${escapeHtml(g.spot || 'Spot')}</b><br/>` +
-        `${escapeHtml(g.city || '')}<br/>` +
-        `Farmers: ${fmtInt(g.farmers)}<br/>` +
-        `Wheat acres: ${fmtInt(g.acres)}<br/>` +
-        `Date: ${escapeHtml(dLabel)}`
-      );
-      circle.on('click', () => pinMapGroup(g));
-      circle.addTo(layer);
-
-      L.circleMarker([g.lat, g.lon], {
-        radius: 4,
-        color: 'rgba(231,237,247,.95)',
-        weight: 1,
-        fillOpacity: 1
-      }).addTo(layer);
-
-      latlngs.push([g.lat, g.lon]);
-    }
-
-    // Fit bounds
-    const bounds = L.latLngBounds(latlngs);
-    if (bounds.isValid()) state.map.obj.fitBounds(bounds, { padding: [30, 30] });
-  }
-
-  function pinMapGroup(g) {
-    state.map.pinnedKey = g.key;
-
-    setText('mapSelTitle', `${g.city || '—'} • ${g.spot || '—'}`);
-    setText('mapSelFarmers', fmtInt(g.farmers));
-    setText('mapSelAcres', fmtInt(g.acres));
-    setText('mapSelDate', dateRangeLabel(g.minD, g.maxD));
-
-    // Showcase: prefer media by sessionId (SN)
-    const sns = Array.from(g.sns || []);
-    const rel = relatedMediaBySessionIds(sns);
-    renderShowcase('mapShowcase', rel);
-
-    if (rel.length) {
-      // Keep pinned selection; do not auto-open lightbox
-      logDiag(`map: pinned ${g.city} / ${g.spot} (media=${rel.length})`);
-    } else {
-      logDiag(`map: pinned ${g.city} / ${g.spot} (no media match)`);
-    }
-  }
-
-  // ---- Sessions table ----
-  function renderSessionsTable() {
-    const tb = $('tblSessions');
-    if (!tb) return;
-    tb.innerHTML = '';
-
-    const rows = state.filtered.slice().sort((a,b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
-    if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="8" class="muted">No sessions match the current filters.</td></tr>`;
-      return;
-    }
-
-    for (const s of rows) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${escapeHtml(fmtDate(s.date))}</td>
-        <td>${escapeHtml(s.city || '—')}</td>
-        <td>${escapeHtml(s.spot || '—')}</td>
-        <td>${fmtInt(s.farmers)}</td>
-        <td>${fmtInt(s.acres)}</td>
-        <td>${fmtPct(s.defPct)}</td>
-        <td>${fmtPct(s.awareness)}</td>
-        <td>${fmtPct(s.clarity)}</td>
-      `;
-
-      tr.addEventListener('click', () => {
-        // Pin map to this session's spot (group)
-        const key = `${s.city || ''}||${s.spot || ''}`.trim();
-        const groups = groupForMap(state.filtered);
-        const g = groups.find(x => x.key === key);
-        if (g) pinMapGroup(g);
-
-        // Lightbox for this session by SN
-        const sid = Number.isFinite(Number(s.sn)) ? Number(s.sn) : null;
-        const rel = sid ? relatedMediaBySessionIds([sid]) : [];
-        if (rel.length) openLightbox(rel, 0);
-      });
-
-      tb.appendChild(tr);
-    }
-  }
-
-  // ---- Media: filtering + rendering ----
-  function relatedMediaBySessionIds(ids) {
-    const set = new Set((ids || []).filter(x => Number.isFinite(Number(x))).map(Number));
-    if (!set.size) return [];
-
-    const items = state.media.filter(m => m.sessionId && set.has(m.sessionId));
-    return items;
-  }
-
-  function filteredMedia() {
-    const rows = state.filtered;
-    const ids = rows.map(s => s.sn).filter(n => Number.isFinite(Number(n))).map(Number);
-    const set = new Set(ids);
-
-    let items = state.media;
-    if (set.size) items = items.filter(m => m.sessionId && set.has(m.sessionId));
-
-    // search filter
-    const q = (state.filter.q || '').toLowerCase();
-    if (q) items = items.filter(m => (m.caption || '').toLowerCase().includes(q));
-
-    return items;
-  }
-
-  function renderShowcases() {
-    const items = filteredMedia().slice(0, CFG.maxShowcase);
-    renderShowcase('snapshotShowcase', items);
-  }
-
-  function renderShowcase(id, items) {
-    const sc = $(id);
-    if (!sc) return;
-    sc.innerHTML = '';
-    if (!items.length) return;
-
-    items.slice(0, CFG.maxShowcase).forEach((item, idx) => {
-      const it = document.createElement('div');
-      it.className = 'showItem';
-
-      const prev = document.createElement(item.type === 'video' ? 'video' : 'img');
-      prev.className = 'showPrev';
-      prev.src = item.src;
-      prev.loading = 'lazy';
-      if (item.type === 'video') {
-        prev.muted = true;
-        prev.playsInline = true;
-        prev.preload = 'metadata';
-      } else {
-        prev.alt = item.alt || item.caption || 'media';
-      }
-      prev.addEventListener('error', () => {
-        // Replace broken image with inline placeholder
-        if (item.type !== 'video') {
-          prev.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
-               <rect width="640" height="480" fill="#0f1a2e"/>
-               <text x="50%" y="50%" font-family="Arial" font-size="18" fill="#9fb0ca" text-anchor="middle" dy=".3em">Missing image</text>
-             </svg>`
-          );
-        }
-      });
-
-      it.title = item.caption || '';
-      it.appendChild(prev);
-      it.addEventListener('click', () => openLightbox(items, idx));
-      sc.appendChild(it);
-    });
-  }
-
-  function renderGallery() {
-    const gg = $('galleryGrid');
-    if (!gg) return;
-    gg.innerHTML = '';
-
-    const items = filteredMedia().slice(0, CFG.maxGallery);
+    // If empty, show placeholders derived from sessions
     if (!items.length) {
-      gg.innerHTML = `<div class="muted">No media matched the current filters.</div>`;
+      for (const id of ids.slice(0, Math.min(CONFIG.maxGallery, 12))) {
+        items.push({ sessionId: id, type:'image', src: CONFIG.placeholder, caption:`Session ${id}`, transcript:'' });
+      }
+    }
+    return items.slice(0, CONFIG.maxGallery);
+  }
+
+  function renderShowcase(container, sessionIds) {
+    if (!container) return;
+    container.innerHTML = '';
+
+    const ids = sessionIds.filter(Boolean).slice(0, CONFIG.maxShowcase);
+    if (!ids.length) {
+      container.innerHTML = `<div class="muted" style="grid-column:1/-1">No pinned session. Click a bubble or a session row to preview media.</div>`;
       return;
     }
 
-    items.forEach((item, i) => {
+    for (const id of ids) {
+      const items = (state.mediaBySessionId.get(String(id)) || []).slice(0, 1);
+      const it = items[0] || { sessionId: id, type:'image', src: CONFIG.placeholder, caption:`Session ${id}` };
+
+      const tile = document.createElement('div');
+      tile.className = 'showItem';
+      tile.title = it.caption || '';
+
+      const node = makeMediaNode(it, true);
+      tile.appendChild(node);
+
+      tile.addEventListener('click', () => openLightboxForSession(String(id)));
+
+      container.appendChild(tile);
+    }
+  }
+
+  function makeMediaNode(it, mute=false) {
+    const src = it.src || CONFIG.placeholder;
+
+    if (it.type === 'video') {
+      const v = document.createElement('video');
+      v.src = src;
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.autoplay = mute;
+      v.controls = false;
+      v.addEventListener('error', () => {
+        // fallback to image placeholder
+        v.replaceWith(makeImageNode(CONFIG.placeholder, it.caption));
+      });
+      return v;
+    }
+    return makeImageNode(src, it.caption);
+  }
+
+  function makeImageNode(src, alt='') {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = alt || '';
+    img.loading = 'lazy';
+    img.addEventListener('error', () => {
+      if (img.src.endsWith(CONFIG.placeholder)) return;
+      img.src = CONFIG.placeholder;
+    });
+    return img;
+  }
+
+  function renderGallery(rows) {
+    if (!el.gallery) return;
+    const items = buildGalleryList(rows);
+    el.gallery.innerHTML = '';
+
+    items.forEach((it, idx) => {
       const tile = document.createElement('div');
       tile.className = 'mediaTile';
-
-      const prev = document.createElement(item.type === 'video' ? 'video' : 'img');
-      prev.className = 'mediaPrev';
-      prev.src = item.src;
-      prev.loading = 'lazy';
-      if (item.type === 'video') {
-        prev.muted = true;
-        prev.playsInline = true;
-        prev.preload = 'metadata';
-      } else {
-        prev.alt = item.alt || item.caption || 'media';
-      }
-      prev.addEventListener('error', () => {
-        if (item.type !== 'video') {
-          prev.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
-               <rect width="640" height="480" fill="#0f1a2e"/>
-               <text x="50%" y="50%" font-family="Arial" font-size="18" fill="#9fb0ca" text-anchor="middle" dy=".3em">Missing image</text>
-             </svg>`
-          );
-        }
-      });
+      tile.dataset.index = String(idx);
+      tile.appendChild(makeMediaNode(it, false));
 
       const tag = document.createElement('div');
       tag.className = 'mediaTag';
-      tag.textContent = item.caption || (item.sessionId ? `Session ${item.sessionId}` : 'Media');
-
-      tile.appendChild(prev);
+      tag.textContent = it.caption || `Session ${it.sessionId || ''}`;
       tile.appendChild(tag);
 
-      tile.addEventListener('click', () => openLightbox(items, i));
-      gg.appendChild(tile);
+      tile.addEventListener('click', () => openLightbox(items, idx));
+      el.gallery.appendChild(tile);
     });
   }
 
-  // ---- Export ----
-  function exportFilteredCsv() {
-    const rows = state.filtered;
-    if (!rows.length) {
-      setNotice('Nothing to export (no rows in the current filter).', true);
+  function openLightbox(items, index) {
+    state.lightbox.items = items;
+    state.lightbox.index = index;
+    renderLightbox();
+    el.lb.style.display = 'flex';
+  }
+
+  function openLightboxForSession(sessionId) {
+    const items = (state.mediaBySessionId.get(String(sessionId)) || []).filter(it => it.src);
+    if (!items.length) {
+      openLightbox([{ sessionId, type:'image', src: CONFIG.placeholder, caption:`Session ${sessionId}`, transcript:'' }], 0);
       return;
     }
+    openLightbox(items.slice(0, 50), 0);
+  }
 
-    const header = ['Date','City','Spot','Farmers','Acres','Definite','Maybe','NotInterested','DefinitePct','AwarenessPct','ClarityPct','SN','SessionCode'];
-    const lines = [header.join(',')];
-    for (const s of rows) {
-      const vals = [
-        fmtDate(s.date),
-        csvSafe(s.city),
-        csvSafe(s.spot),
-        safeNum(s.farmers),
-        safeNum(s.acres),
-        safeNum(s.def),
-        safeNum(s.may),
-        safeNum(s.no),
-        safeNum(s.defPct),
-        safeNum(s.awareness),
-        safeNum(s.clarity),
-        safeNum(s.sn),
-        csvSafe(s.sessionCode),
-      ];
-      lines.push(vals.join(','));
+  function closeLightbox() {
+    el.lb.style.display = 'none';
+    el.lbMedia.innerHTML = '';
+  }
+
+  function renderLightbox() {
+    const items = state.lightbox.items || [];
+    const idx = clamp(state.lightbox.index || 0, 0, Math.max(0, items.length - 1));
+    state.lightbox.index = idx;
+
+    const it = items[idx] || null;
+    if (!it) return;
+
+    el.lbCaption.textContent = it.caption || `Session ${it.sessionId || ''}`;
+    el.lbTranscript.textContent = it.transcript || '—';
+
+    el.lbMedia.innerHTML = '';
+    const node = makeMediaNode(it, false);
+    // In lightbox, show controls for video
+    if (node.tagName === 'VIDEO') {
+      node.controls = true;
+      node.autoplay = true;
+    }
+    el.lbMedia.appendChild(node);
+
+    // keyboard
+    el.lbPrev.disabled = (idx <= 0);
+    el.lbNext.disabled = (idx >= items.length - 1);
+  }
+
+  function bindLightbox() {
+    if (!el.lb) return;
+    el.lbClose.addEventListener('click', closeLightbox);
+    el.lbPrev.addEventListener('click', () => { state.lightbox.index--; renderLightbox(); });
+    el.lbNext.addEventListener('click', () => { state.lightbox.index++; renderLightbox(); });
+    el.lb.addEventListener('click', (e) => {
+      if (e.target === el.lb) closeLightbox();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (el.lb.style.display !== 'flex') return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') { state.lightbox.index--; renderLightbox(); }
+      if (e.key === 'ArrowRight') { state.lightbox.index++; renderLightbox(); }
+    });
+  }
+
+  // ---------------------------
+  // Filters
+  // ---------------------------
+  function populateFilters() {
+    const cities = uniq(state.sessions.map(s => s.city)).sort((a,b)=>a.localeCompare(b));
+    el.filterCity.innerHTML = `<option value="">All</option>` + cities.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    populateSpot();
+    initDateBounds();
+  }
+
+  function populateSpot() {
+    const city = el.filterCity.value;
+    const rows = city ? state.sessions.filter(s => s.city === city) : state.sessions;
+    const spots = uniq(rows.map(s => s.spot)).sort((a,b)=>a.localeCompare(b));
+    el.filterSpot.innerHTML = `<option value="">All</option>` + spots.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  }
+
+  function initDateBounds() {
+    const dates = state.sessions.map(s => parseISO(s.date)).filter(Boolean).sort((a,b)=>a-b);
+    if (!dates.length) return;
+    const min = dates[0].toISOString().slice(0,10);
+    const max = dates[dates.length-1].toISOString().slice(0,10);
+    el.filterFrom.value = min;
+    el.filterTo.value = max;
+    el.filterFrom.min = min; el.filterFrom.max = max;
+    el.filterTo.min = min; el.filterTo.max = max;
+  }
+
+  function applyFilters() {
+    const city = el.filterCity.value;
+    const spot = el.filterSpot.value;
+    const from = el.filterFrom.value;
+    const to = el.filterTo.value;
+    const q = (el.filterSearch.value || '').trim().toLowerCase();
+
+    const fromDt = from ? new Date(from) : null;
+    const toDt = to ? new Date(to) : null;
+
+    let rows = state.sessions.slice();
+
+    if (city) rows = rows.filter(r => r.city === city);
+    if (spot) rows = rows.filter(r => r.spot === spot);
+
+    if (fromDt && !isNaN(fromDt.getTime())) {
+      rows = rows.filter(r => {
+        const d = parseISO(r.date);
+        return d ? (d >= fromDt) : true;
+      });
+    }
+    if (toDt && !isNaN(toDt.getTime())) {
+      // inclusive end
+      const end = new Date(toDt.getTime() + 24*3600*1000 - 1);
+      rows = rows.filter(r => {
+        const d = parseISO(r.date);
+        return d ? (d <= end) : true;
+      });
     }
 
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `AgriVista_export_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    if (q) {
+      rows = rows.filter(r => {
+        const hay = `${r.city} ${r.spot} ${r.reasonsUse} ${r.reasonsNo}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    // Sort by date desc then sn
+    rows.sort((a,b) => {
+      const da = parseISO(a.date), db = parseISO(b.date);
+      const ta = da ? da.getTime() : 0;
+      const tb = db ? db.getTime() : 0;
+      if (tb !== ta) return tb - ta;
+      return String(a.sn||'').localeCompare(String(b.sn||''));
+    });
+
+    state.filtered = rows;
+
+    updateSummary(rows);
+    updateKpis(rows);
+    renderSnapshot(rows);
+    renderCharts(rows);
+    renderTable(rows);
+    renderMap(rows);
+    updateMapBanner(rows);
+    renderGallery(rows);
+
+    // note: keep pinned session only if still in scope; else clear
+    if (state.pinnedSession) {
+      const exists = rows.some(r => r.id === state.pinnedSession.id);
+      if (!exists) state.pinnedSession = null;
+    }
+
+    setNotice(`<strong>Status:</strong> Ready · <b>${fmt.int(rows.length)}</b> sessions in current view.`);
   }
 
-  function safeNum(n) {
-    return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : '';
-  }
-  function csvSafe(s) {
-    const v = String(s ?? '');
-    if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
-    return v;
+  function updateSummary(rows) {
+    const city = el.filterCity.value || 'All cities';
+    const spot = el.filterSpot.value || 'All spots';
+    const from = el.filterFrom.value || '—';
+    const to = el.filterTo.value || '—';
+    const q = (el.filterSearch.value || '').trim();
+    const k = computeKpis(rows);
+    el.summary.innerHTML =
+      `<b>Selection:</b> ${escapeHtml(city)} → ${escapeHtml(spot)}<br/>
+       <span class="muted">${escapeHtml(from)} → ${escapeHtml(to)}${q ? ' · Search: <b>' + escapeHtml(q) + '</b>' : ''}</span><br/>
+       <span class="muted">Sessions: <b>${fmt.int(k.sessions)}</b> · Farmers: <b>${fmt.int(k.farmers)}</b> · Acres: <b>${fmt.num(k.acres,1)}</b></span>`;
   }
 
-  // ---- Hero video (optional) ----
+  function resetFilters() {
+    el.filterCity.value = '';
+    populateSpot();
+    initDateBounds();
+    el.filterSearch.value = '';
+    state.pinnedSession = null;
+    applyFilters();
+  }
+
+  // ---------------------------
+  // Pin session
+  // ---------------------------
+  function pinSession(session, opts={ openMedia:false, focusMap:false }) {
+    state.pinnedSession = session;
+    updateMapBanner(state.filtered);
+
+    if (opts.focusMap && state.map && session.lat && session.lon) {
+      try {
+        state.map.setView([session.lat, session.lon], 12, { animate:true });
+      } catch(_) {}
+    }
+
+    // Select related media if available
+    if (opts.openMedia) {
+      // Switch to Media tab and open lightbox for this session
+      activateTab('tab-media');
+      invalidateMapSoon();
+      openLightboxForSession(String(session.sn));
+    }
+  }
+
+  // ---------------------------
+  // Tabs
+  // ---------------------------
+  function activateTab(tabId) {
+    $$('.tabBtn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    $$('.tabPanel').forEach(p => p.classList.toggle('active', p.id === tabId));
+    if (tabId === 'tab-map') invalidateMapSoon();
+  }
+
+  function bindTabs() {
+    $$('.tabBtn').forEach(btn => {
+      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+    });
+  }
+
+  // ---------------------------
+  // Diagnostics / logging
+  // ---------------------------
+  const diagLines = [];
+  function logDiag(line) {
+    diagLines.push(`[${new Date().toISOString()}] ${line}`);
+    if (diagLines.length > 200) diagLines.shift();
+    setDiag(diagLines.slice(-40));
+  }
+
+  // ---------------------------
+  // Hero video
+  // ---------------------------
   function initHeroVideo() {
-    const v = $('heroVideo');
-    if (!v) return;
-    v.src = new URL(CFG.heroVideo, document.baseURI).toString();
-    v.addEventListener('error', () => {
-      v.style.display = 'none';
-      logDiag(`heroVideo: not found (${CFG.heroVideo})`);
+    if (!el.heroVideo) return;
+    el.heroVideo.src = CONFIG.heroVideo;
+    el.heroVideo.addEventListener('error', () => el.heroVideo.classList.add('hide'));
+    // If it loads, play (autoplay might be blocked; keep muted)
+    el.heroVideo.addEventListener('canplay', () => {
+      try { el.heroVideo.play(); } catch(_) {}
     });
   }
 
-  // ---- Dependency wait ----
-  function waitForDependencies() {
-    return new Promise((resolve, reject) => {
-      const start = Date.now();
-      const tick = () => {
-        if (window.L && window.Chart && window.XLSX) return resolve();
-        if (Date.now() - start > CFG.depTimeoutMs) {
-          return reject(new Error('Dependencies did not load (Leaflet / Chart.js / XLSX). Check internet/CDN access.'));
-        }
-        setTimeout(tick, 120);
-      };
-      tick();
-    });
+  // ---------------------------
+  // Escaping
+  // ---------------------------
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (m) => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[m]));
   }
 
-  // ---- Init ----
-  async function init() {
-    const loadingOverlay = $('loadingOverlay');
-    const shell = document.querySelector('.shell');
-
-    setText('buildStamp', 'v' + new Date().toISOString().slice(0,10));
-    setNotice('Initializing…');
-
+  // ---------------------------
+  // Boot
+  // ---------------------------
+  async function boot() {
     try {
-      updateLoadingStatus('Loading libraries…');
-      await waitForDependencies();
+      setLoadingStatus('Initializing UI…');
 
-      updateLoadingStatus('Setting up UI…');
-      initTabs();
-      initLightbox();
-      initFilters();
+      clearError();
+      bindTabs();
+      bindLightbox();
+
+      el.shell.style.display = 'grid';
+      el.shell.classList.add('ready');
+
+      el.buildStamp.textContent = `build ${new Date().toISOString().slice(0,10)}`;
+
+      // Filters events
+      el.filterCity.addEventListener('change', () => { populateSpot(); state.pinnedSession = null; applyFilters(); });
+      el.filterSpot.addEventListener('change', () => { state.pinnedSession = null; applyFilters(); });
+      el.filterFrom.addEventListener('change', () => applyFilters());
+      el.filterTo.addEventListener('change', () => applyFilters());
+      el.filterSearch.addEventListener('input', debounce(applyFilters, 220));
+      el.btnReset.addEventListener('click', resetFilters);
+
+      el.btnExport.addEventListener('click', () => {
+        const rows = state.filtered.slice().reverse(); // export oldest -> newest
+        const csv = toCsv(rows, [
+          { label:'SN', get:r => r.sn },
+          { label:'Date', get:r => r.date },
+          { label:'City', get:r => r.city },
+          { label:'Spot', get:r => r.spot },
+          { label:'Farmers', get:r => r.farmers },
+          { label:'Wheat Acres', get:r => r.acres },
+          { label:'Definite', get:r => r.definite },
+          { label:'Maybe', get:r => r.maybe },
+          { label:'Not Interested', get:r => r.notInterested },
+          { label:'Definite %', get:r => r.definitePct },
+          { label:'Awareness %', get:r => r.awarenessPct },
+          { label:'Clarity %', get:r => r.clarityPct },
+          { label:'Lat', get:r => r.lat },
+          { label:'Lon', get:r => r.lon },
+          { label:'Top reason to use', get:r => r.reasonsUse },
+          { label:'Top reason not to use', get:r => r.reasonsNo },
+        ]);
+        downloadText('sessions_export.csv', csv, 'text/csv');
+      });
+
+      // init hero
       initHeroVideo();
 
-      updateLoadingStatus('Loading workbook…');
-      await loadWorkbook();
+      // init map
+      initMap();
 
-      updateLoadingStatus('Parsing workbook…');
-      state.sessions = buildSessions(state.wb);
-      state.farmers = buildFarmers(state.wb);
-      logDiag(`workbook: sheets=${state.wb.SheetNames.length}, sessions=${state.sessions.length}, farmers=${state.farmers.length}`);
+      // Data
+      setNotice('<strong>Status:</strong> Loading data…');
+      logDiag(`basePath = ${inferBasePath()}`);
+      logDiag(`sessionsJson = ${CONFIG.sessionsJson}`);
+      logDiag(`mediaJson = ${CONFIG.mediaJson}`);
+      logDiag(`xlsxFallback = ${CONFIG.xlsxFallback}`);
 
-      updateLoadingStatus('Loading media…');
-      await loadMedia();
+      const sessions = await loadSessions();
+      state.sessions = sessions;
 
-      updateLoadingStatus('Building filters…');
-      buildFilterOptions();
+      logDiag(`sessions loaded: ${sessions.length}`);
 
-      state.filtered = state.sessions.slice();
-      renderAll();
+      const media = await loadMedia(sessions);
+      logDiag(`media items loaded: ${media.length}`);
 
-      setNotice('Ready.');
-      logDiag('init: ready');
+      // Populate filters and initial render
+      populateFilters();
+      applyFilters();
+
+      // Done
+      setLoadingStatus('Ready');
+      el.overlay.style.opacity = '0';
+      setTimeout(() => { el.overlay.style.display = 'none'; }, 250);
 
     } catch (e) {
-      console.error(e);
-      showError('Dashboard failed to initialize', e.message || String(e));
-      // Render minimal empty UI to avoid blank page
-      state.sessions = state.sessions || [];
-      state.filtered = state.sessions.slice();
-      renderAll();
-    } finally {
-      // Show UI even if there were errors (so user can see diagnostics)
-      if (shell) shell.style.display = 'grid';
-      if (loadingOverlay) {
-        loadingOverlay.style.opacity = '0';
-        setTimeout(() => { loadingOverlay.style.display = 'none'; }, 280);
-      }
+      const msg = (e && e.message) ? e.message : String(e);
+      showError(`<b>Dashboard failed to load.</b><br/><br/>${escapeHtml(msg)}<br/><br/>
+        <b>Quick checks:</b><br/>
+        1) Verify these files exist at your GitHub Pages root: <code>index.html</code>, <code>data_processor.js</code>, <code>sessions.json</code>, <code>media.json</code><br/>
+        2) If you use Git LFS for assets, GitHub Pages may serve pointer files (not actual media). In that case, host media via GitHub Releases / CDN.<br/>
+        3) Open browser DevTools → Console and Network for specific 404/blocked errors.`);
+      setNotice('<strong>Status:</strong> Error');
+      logDiag(`boot error: ${msg}`);
+
+      el.shell.style.display = 'grid';
+      el.shell.classList.add('ready');
+      el.overlay.style.display = 'none';
     }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+  function debounce(fn, ms) {
+    let t = null;
+    return (...args) => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  // Start after DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
