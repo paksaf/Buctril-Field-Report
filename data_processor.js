@@ -39,6 +39,31 @@
     nb.style.borderColor = isErr ? 'rgba(251,113,133,.55)' : 'rgba(255,255,255,.14)';
   }
 
+  function showError(message, details = '') {
+    const errorContainer = $('errorContainer');
+    if (errorContainer) {
+      errorContainer.innerHTML = `
+        <strong>⚠️ Error:</strong> ${escapeHtml(message)}<br>
+        ${details ? `<small>${escapeHtml(details)}</small>` : ''}
+        <br><br>
+        <small>Possible solutions:</small>
+        <ul style="margin-left: 20px; margin-top: 5px;">
+          <li>Ensure <code>Buctril_Super_Activations.xlsx</code> is in the same folder</li>
+          <li>Check browser console (F12) for detailed errors</li>
+          <li>Try opening this page via a local server (not file://)</li>
+        </ul>
+      `;
+      errorContainer.style.display = 'block';
+    }
+    setNotice(message, true);
+    logDiag(`ERROR: ${message} ${details}`);
+  }
+
+  function updateLoadingStatus(status) {
+    const statusEl = $('loadingStatus');
+    if (statusEl) statusEl.textContent = status;
+  }
+
   function logDiag(line) {
     const el = $('diagBox');
     if (!el) return;
@@ -397,172 +422,256 @@
 
   // --- Workbook loading ---
   async function loadWorkbook() {
-    logDiag(`fetch: ${CFG.xlsx}`);
-    const res = await fetch(CFG.xlsx);
-    if (!res.ok) throw new Error(`Failed to load ${CFG.xlsx} (HTTP ${res.status})`);
-    const buf = await res.arrayBuffer();
+    try {
+      updateLoadingStatus('Loading workbook...');
+      logDiag(`fetch: ${CFG.xlsx}`);
+      const res = await fetch(CFG.xlsx);
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error(`File not found: ${CFG.xlsx}. Make sure it's in the same folder as index.html`);
+        }
+        throw new Error(`Failed to load ${CFG.xlsx} (HTTP ${res.status})`);
+      }
+      
+      const buf = await res.arrayBuffer();
 
-    // Git LFS pointer detection (common on GitHub if LFS not configured on Pages)
-    const head = new TextDecoder().decode(buf.slice(0, 140));
-    if (head.includes('git-lfs.github.com/spec/v1')) {
-      throw new Error(`Your XLSX appears to be a Git LFS pointer. GitHub Pages will not serve the real binary unless LFS is properly published. Upload the actual XLSX (non-LFS) to the Pages branch/folder.`);
+      // Git LFS pointer detection
+      if (buf.byteLength < 1024) {
+        const head = new TextDecoder().decode(buf.slice(0, 140));
+        if (head.includes('git-lfs.github.com/spec/v1')) {
+          throw new Error(`XLSX file is a Git LFS pointer. Download the actual .xlsx file from GitHub and place it in this folder.`);
+        }
+      }
+
+      // Check if file is empty or too small
+      if (buf.byteLength < 100) {
+        throw new Error(`XLSX file appears to be empty or corrupted (${buf.byteLength} bytes)`);
+      }
+
+      state.wb = XLSX.read(buf, { type: 'array' });
+      
+      // Check if workbook has sheets
+      if (!state.wb.SheetNames || state.wb.SheetNames.length === 0) {
+        throw new Error('Workbook has no sheets');
+      }
+      
+      return true;
+    } catch (e) {
+      showError('Failed to load workbook', e.message);
+      // Create dummy data for demo purposes
+      state.sessions = createDummySessions();
+      state.farmers = [];
+      return false;
     }
+  }
 
-    state.wb = XLSX.read(buf, { type: 'array' });
-    state.sessions = buildSessions(state.wb);
-    state.farmers = buildFarmers(state.wb);
-    logDiag(`workbook: sheets=${state.wb.SheetNames.length}, sessions=${state.sessions.length}, farmers=${state.farmers.length}`);
+  // Create dummy data for testing
+  function createDummySessions() {
+    logDiag('Using dummy data for testing');
+    const dummySessions = [];
+    const cities = ['Lahore', 'Faisalabad', 'Multan', 'Rawalpindi', 'Karachi'];
+    const spots = ['Village A', 'Village B', 'Village C', 'Village D'];
+    
+    for (let i = 1; i <= 20; i++) {
+      const city = cities[Math.floor(Math.random() * cities.length)];
+      const spot = spots[Math.floor(Math.random() * spots.length)];
+      
+      dummySessions.push({
+        sn: i,
+        date: new Date(2025, 10, Math.floor(Math.random() * 30) + 1), // Nov 2025
+        city,
+        spot,
+        farmers: Math.floor(Math.random() * 100) + 50,
+        acres: Math.floor(Math.random() * 500) + 100,
+        def: Math.floor(Math.random() * 80) + 20,
+        may: Math.floor(Math.random() * 30) + 10,
+        no: Math.floor(Math.random() * 10) + 1,
+        defPct: Math.floor(Math.random() * 30) + 60,
+        awareness: Math.floor(Math.random() * 30) + 50,
+        clarity: Math.floor(Math.random() * 40) + 40,
+        lat: 30 + Math.random() * 5,
+        lon: 69 + Math.random() * 5,
+        reasonsUse: ['Good quality', 'Affordable', 'Effective'],
+        reasonsNo: ['Too expensive', 'Not available', 'Tried before'],
+        sessionCode: `D${Math.floor(i/5)+1}S${(i%5)+1}`
+      });
+    }
+    
+    return dummySessions;
   }
 
   function buildSessions(wb) {
-    const sumWs = wb.Sheets['SUM'] || wb.Sheets['Sum'] || wb.Sheets['sum'];
-    if (!sumWs) throw new Error('Missing SUM sheet');
-
-    const mat = sheetToMatrix(sumWs);
-    const hRow = findHeaderRow(mat, ['City', 'Date', 'Session Location', 'Total Farmers']);
-    if (hRow < 0) throw new Error('Could not find a header row in SUM (expected City/Date/Session Location/Total Farmers)');
-
-    const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
-    const headersNorm = rawHeaders.map(norm);
-
-    // Required (best-match)
-    const iCity = findCol(headersNorm, ['city', 'district', 'tehsil']);
-    const iDate = findCol(headersNorm, ['date', 'session date', 'event date']);
-    const iSpot = findCol(headersNorm, ['session location', 'spot', 'location', 'session spot', 'spot name', 'village', 'place']);
-    const iFarmers = findCol(headersNorm, ['total farmers', 'farmers', 'farmers gathered', 'attendees', 'total attendance']);
-    const iAcres = findCol(headersNorm, ['total wheat acres', 'wheat acres', 'crop area', 'acres', 'wheat area']);
-    const iDef = findCol(headersNorm, ['will definitely use', 'definite', 'definitely use', 'definitely']);
-    const iMay = findCol(headersNorm, ['maybe']);
-    const iNo = findCol(headersNorm, ['not interested', 'no', 'no intent', 'not']);
-    const iKnow = findCol(headersNorm, ['know buctril', 'awareness', 'know about buctril', 'already using', 'heard of']);
-    const iCoords = findCol(headersNorm, ['spot coordinates', 'coordinates', 'lat', 'latitude', 'gps']);
-    const iReasonUse = findCol(headersNorm, ['top reason to use', 'reason to use', 'top use reason', 'use reason']);
-    const iReasonNo = findCol(headersNorm, ['top reason not to use', 'reason not to use', 'no reason', 'not use reason']);
-
-    const iSn = findCol(headersNorm, ['sn', 'sno', 'session no', 'session number', 'sr']);
-
-    // Clarity score columns: all columns that contain "score understood" or "understood:" or "clarity"
-    const clarityCols = [];
-    headersNorm.forEach((h, idx) => {
-      if (h.includes('score understood') || h.includes('understood') || h.includes('clarity score') || h.includes('message clarity')) {
-        clarityCols.push(idx);
+    try {
+      const sumWs = wb.Sheets['SUM'] || wb.Sheets['Sum'] || wb.Sheets['sum'];
+      if (!sumWs) {
+        logDiag('No SUM sheet found, using first sheet');
+        // Use first sheet as fallback
+        const firstSheetName = wb.SheetNames[0];
+        const sumWs = wb.Sheets[firstSheetName];
       }
-    });
 
-    if (iCity < 0 || iDate < 0 || iSpot < 0 || iFarmers < 0) {
-      logDiag(`SUM mapping: city=${iCity}, date=${iDate}, spot=${iSpot}, farmers=${iFarmers}. (Some required columns not detected.)`);
-    } else {
-      logDiag(`SUM mapping: city=${rawHeaders[iCity]}, date=${rawHeaders[iDate]}, spot=${rawHeaders[iSpot]}, farmers=${rawHeaders[iFarmers]}`);
-    }
-
-    const sessions = [];
-    for (let r = hRow + 1; r < mat.length; r++) {
-      const row = mat[r] || [];
-      const city = iCity >= 0 ? String(row[iCity] ?? '').trim() : '';
-      const spot = iSpot >= 0 ? String(row[iSpot] ?? '').trim() : '';
-      const farmers = iFarmers >= 0 ? asNum(row[iFarmers]) : NaN;
-
-      // Skip empty rows
-      if (!city && !spot && !Number.isFinite(farmers)) continue;
-
-      const date = iDate >= 0 ? asDate(row[iDate]) : null;
-      const acres = iAcres >= 0 ? asNum(row[iAcres]) : NaN;
-
-      const def = iDef >= 0 ? asNum(row[iDef]) : NaN;
-      const may = iMay >= 0 ? asNum(row[iMay]) : NaN;
-      const no = iNo >= 0 ? asNum(row[iNo]) : NaN;
-
-      const knowRaw = iKnow >= 0 ? asNum(row[iKnow]) : NaN;
-      // awareness heuristic: if <= farmers => count, else if <=100 assume percent
-      const awareness = (Number.isFinite(knowRaw) && Number.isFinite(farmers) && farmers > 0)
-        ? (knowRaw <= farmers ? pct(knowRaw, farmers) : (knowRaw <= 100 ? knowRaw : NaN))
-        : NaN;
-
-      const clarity = clarityCols.length
-        ? avg(clarityCols.map(ci => asNum(row[ci])).filter(n => Number.isFinite(n) && n <= 100))
-        : NaN;
-
-      const coordStr = iCoords >= 0 ? String(row[iCoords] ?? '').trim() : '';
-      const { lat, lon } = parseCoord(coordStr);
-
-      const reasonsUse = iReasonUse >= 0 ? String(row[iReasonUse] ?? '').trim() : '';
-      const reasonsNo = iReasonNo >= 0 ? String(row[iReasonNo] ?? '').trim() : '';
-
-      const sn = iSn >= 0 ? asNum(row[iSn]) : NaN;
-
-      // Optional day/session code if present (D#S#) in SUM
-      const sessionCode = (() => {
-        // Scan the row for tokens like D1S1 (useful for cross-linking)
-        const joined = row.map(v => String(v ?? '')).join(' ');
-        const m = joined.match(/\bD\d+S\d+\b/i);
-        return m ? m[0].toUpperCase() : '';
-      })();
-
-      sessions.push({
-        sn: Number.isFinite(sn) ? Math.round(sn) : null,
-        date,
-        city,
-        spot,
-        farmers: Number.isFinite(farmers) ? farmers : NaN,
-        acres: Number.isFinite(acres) ? acres : NaN,
-        def: Number.isFinite(def) ? def : NaN,
-        may: Number.isFinite(may) ? may : NaN,
-        no: Number.isFinite(no) ? no : NaN,
-        defPct: (Number.isFinite(def) && Number.isFinite(farmers) && farmers > 0) ? pct(def, farmers) : NaN,
-        awareness,
-        clarity,
-        lat, lon,
-        reasonsUse,
-        reasonsNo,
-        sessionCode,
-      });
-    }
-
-    // Sort by date then city/spot
-    sessions.sort((a, b) => {
-      const ad = a.date ? a.date.getTime() : 0;
-      const bd = b.date ? b.date.getTime() : 0;
-      if (ad !== bd) return ad - bd;
-      const c = (a.city || '').localeCompare(b.city || '');
-      if (c) return c;
-      return (a.spot || '').localeCompare(b.spot || '');
-    });
-
-    return sessions;
-  }
-
-  function buildFarmers(wb) {
-    const farmers = [];
-    for (const sh of wb.SheetNames) {
-      if (!/^D\d+S\d+$/i.test(sh)) continue;
-      const ws = wb.Sheets[sh];
-      const mat = sheetToMatrix(ws);
-      const hRow = findHeaderRow(mat, ['name', 'mobile']);
-      if (hRow < 0) continue;
+      const mat = sheetToMatrix(sumWs);
+      const hRow = findHeaderRow(mat, ['City', 'Date', 'Session Location', 'Total Farmers']);
+      if (hRow < 0) {
+        logDiag('Could not find header row, using first row as headers');
+        // Use first row as headers
+        hRow = 0;
+      }
 
       const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
       const headersNorm = rawHeaders.map(norm);
 
-      const iName = findCol(headersNorm, ['name', 'farmer name']);
-      const iPhone = findCol(headersNorm, ['mobile', 'mobile whatsapp', 'phone', 'mobile / whatsapp', 'mobilewhatsapp']);
+      // Required (best-match)
+      const iCity = findCol(headersNorm, ['city', 'district', 'tehsil']);
+      const iDate = findCol(headersNorm, ['date', 'session date', 'event date']);
+      const iSpot = findCol(headersNorm, ['session location', 'spot', 'location', 'session spot', 'spot name', 'village', 'place']);
+      const iFarmers = findCol(headersNorm, ['total farmers', 'farmers', 'farmers gathered', 'attendees', 'total attendance']);
+      const iAcres = findCol(headersNorm, ['total wheat acres', 'wheat acres', 'crop area', 'acres', 'wheat area']);
+      const iDef = findCol(headersNorm, ['will definitely use', 'definite', 'definitely use', 'definitely']);
+      const iMay = findCol(headersNorm, ['maybe']);
+      const iNo = findCol(headersNorm, ['not interested', 'no', 'no intent', 'not']);
+      const iKnow = findCol(headersNorm, ['know buctril', 'awareness', 'know about buctril', 'already using', 'heard of']);
+      const iCoords = findCol(headersNorm, ['spot coordinates', 'coordinates', 'lat', 'latitude', 'gps']);
+      const iReasonUse = findCol(headersNorm, ['top reason to use', 'reason to use', 'top use reason', 'use reason']);
+      const iReasonNo = findCol(headersNorm, ['top reason not to use', 'reason not to use', 'no reason', 'not use reason']);
 
+      const iSn = findCol(headersNorm, ['sn', 'sno', 'session no', 'session number', 'sr']);
+
+      // Clarity score columns: all columns that contain "score understood" or "understood:" or "clarity"
+      const clarityCols = [];
+      headersNorm.forEach((h, idx) => {
+        if (h.includes('score understood') || h.includes('understood') || h.includes('clarity score') || h.includes('message clarity')) {
+          clarityCols.push(idx);
+        }
+      });
+
+      if (iCity < 0 || iDate < 0 || iSpot < 0 || iFarmers < 0) {
+        logDiag(`SUM mapping: city=${iCity}, date=${iDate}, spot=${iSpot}, farmers=${iFarmers}. (Some required columns not detected.)`);
+      } else {
+        logDiag(`SUM mapping: city=${rawHeaders[iCity]}, date=${rawHeaders[iDate]}, spot=${rawHeaders[iSpot]}, farmers=${rawHeaders[iFarmers]}`);
+      }
+
+      const sessions = [];
       for (let r = hRow + 1; r < mat.length; r++) {
         const row = mat[r] || [];
-        const name = iName >= 0 ? String(row[iName] ?? '').trim() : '';
-        const phone = iPhone >= 0 ? String(row[iPhone] ?? '').trim() : '';
-        if (!name && !phone) continue;
-        farmers.push({ session: sh.toUpperCase(), name, phone });
+        const city = iCity >= 0 ? String(row[iCity] ?? '').trim() : '';
+        const spot = iSpot >= 0 ? String(row[iSpot] ?? '').trim() : '';
+        const farmers = iFarmers >= 0 ? asNum(row[iFarmers]) : NaN;
+
+        // Skip empty rows
+        if (!city && !spot && !Number.isFinite(farmers)) continue;
+
+        const date = iDate >= 0 ? asDate(row[iDate]) : null;
+        const acres = iAcres >= 0 ? asNum(row[iAcres]) : NaN;
+
+        const def = iDef >= 0 ? asNum(row[iDef]) : NaN;
+        const may = iMay >= 0 ? asNum(row[iMay]) : NaN;
+        const no = iNo >= 0 ? asNum(row[iNo]) : NaN;
+
+        const knowRaw = iKnow >= 0 ? asNum(row[iKnow]) : NaN;
+        // awareness heuristic: if <= farmers => count, else if <=100 assume percent
+        const awareness = (Number.isFinite(knowRaw) && Number.isFinite(farmers) && farmers > 0)
+          ? (knowRaw <= farmers ? pct(knowRaw, farmers) : (knowRaw <= 100 ? knowRaw : NaN))
+          : NaN;
+
+        const clarity = clarityCols.length
+          ? avg(clarityCols.map(ci => asNum(row[ci])).filter(n => Number.isFinite(n) && n <= 100))
+          : NaN;
+
+        const coordStr = iCoords >= 0 ? String(row[iCoords] ?? '').trim() : '';
+        const { lat, lon } = parseCoord(coordStr);
+
+        const reasonsUse = iReasonUse >= 0 ? String(row[iReasonUse] ?? '').trim() : '';
+        const reasonsNo = iReasonNo >= 0 ? String(row[iReasonNo] ?? '').trim() : '';
+
+        const sn = iSn >= 0 ? asNum(row[iSn]) : NaN;
+
+        // Optional day/session code if present (D#S#) in SUM
+        const sessionCode = (() => {
+          // Scan the row for tokens like D1S1 (useful for cross-linking)
+          const joined = row.map(v => String(v ?? '')).join(' ');
+          const m = joined.match(/\bD\d+S\d+\b/i);
+          return m ? m[0].toUpperCase() : '';
+        })();
+
+        sessions.push({
+          sn: Number.isFinite(sn) ? Math.round(sn) : null,
+          date,
+          city,
+          spot,
+          farmers: Number.isFinite(farmers) ? farmers : NaN,
+          acres: Number.isFinite(acres) ? acres : NaN,
+          def: Number.isFinite(def) ? def : NaN,
+          may: Number.isFinite(may) ? may : NaN,
+          no: Number.isFinite(no) ? no : NaN,
+          defPct: (Number.isFinite(def) && Number.isFinite(farmers) && farmers > 0) ? pct(def, farmers) : NaN,
+          awareness,
+          clarity,
+          lat, lon,
+          reasonsUse,
+          reasonsNo,
+          sessionCode,
+        });
       }
+
+      // Sort by date then city/spot
+      sessions.sort((a, b) => {
+        const ad = a.date ? a.date.getTime() : 0;
+        const bd = b.date ? b.date.getTime() : 0;
+        if (ad !== bd) return ad - bd;
+        const c = (a.city || '').localeCompare(b.city || '');
+        if (c) return c;
+        return (a.spot || '').localeCompare(b.spot || '');
+      });
+
+      return sessions;
+    } catch (e) {
+      showError('Error parsing workbook', e.message);
+      return createDummySessions();
+    }
+  }
+
+  function buildFarmers(wb) {
+    const farmers = [];
+    try {
+      for (const sh of wb.SheetNames) {
+        if (!/^D\d+S\d+$/i.test(sh)) continue;
+        const ws = wb.Sheets[sh];
+        const mat = sheetToMatrix(ws);
+        const hRow = findHeaderRow(mat, ['name', 'mobile']);
+        if (hRow < 0) continue;
+
+        const rawHeaders = (mat[hRow] || []).map(v => String(v ?? '').trim());
+        const headersNorm = rawHeaders.map(norm);
+
+        const iName = findCol(headersNorm, ['name', 'farmer name']);
+        const iPhone = findCol(headersNorm, ['mobile', 'mobile whatsapp', 'phone', 'mobile / whatsapp', 'mobilewhatsapp']);
+
+        for (let r = hRow + 1; r < mat.length; r++) {
+          const row = mat[r] || [];
+          const name = iName >= 0 ? String(row[iName] ?? '').trim() : '';
+          const phone = iPhone >= 0 ? String(row[iPhone] ?? '').trim() : '';
+          if (!name && !phone) continue;
+          farmers.push({ session: sh.toUpperCase(), name, phone });
+        }
+      }
+    } catch (e) {
+      logDiag(`Error building farmers: ${e.message}`);
     }
     return farmers;
   }
 
   // --- Media loading ---
   async function loadMedia() {
-    logDiag(`fetch: ${CFG.media}`);
     try {
+      updateLoadingStatus('Loading media...');
+      logDiag(`fetch: ${CFG.media}`);
       const res = await fetch(CFG.media, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        logDiag(`media: HTTP ${res.status}, using empty media array`);
+        state.media = [];
+        return;
+      }
       const data = await res.json();
       state.media = expandMedia(data);
       logDiag(`media: items=${state.media.length}`);
@@ -680,14 +789,19 @@
 
   // --- Render pipeline ---
   function renderAll() {
-    renderFilterSummary();
-    renderKpis();
-    renderSnapshotText();
-    renderCharts();
-    renderMap();
-    renderSessionsTable();
-    renderShowcases();
-    renderGallery();
+    try {
+      renderFilterSummary();
+      renderKpis();
+      renderSnapshotText();
+      renderCharts();
+      renderMap();
+      renderSessionsTable();
+      renderShowcases();
+      renderGallery();
+    } catch (e) {
+      console.error('Error in renderAll:', e);
+      showError('Error rendering dashboard', e.message);
+    }
   }
 
   function computeTotals(rows) {
@@ -806,7 +920,12 @@
   function ensureChart(prev, canvasEl, type, data, options) {
     if (!canvasEl) return null;
     if (prev) prev.destroy();
-    return new Chart(canvasEl, { type, data, options: options || {} });
+    try {
+      return new Chart(canvasEl, { type, data, options: options || {} });
+    } catch (e) {
+      console.error('Chart error:', e);
+      return null;
+    }
   }
 
   function renderCharts() {
@@ -878,13 +997,18 @@
     const mapEl = $('map');
     if (!mapEl) return;
 
-    state.map.obj = L.map(mapEl).setView(CFG.mapCenter, CFG.mapZoom);
-    state.map.base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(state.map.obj);
+    try {
+      state.map.obj = L.map(mapEl).setView(CFG.mapCenter, CFG.mapZoom);
+      state.map.base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(state.map.obj);
 
-    state.map.layer = L.layerGroup().addTo(state.map.obj);
-    logDiag('map: initialized');
+      state.map.layer = L.layerGroup().addTo(state.map.obj);
+      logDiag('map: initialized');
+    } catch (e) {
+      showError('Failed to initialize map', 'Leaflet might not be loaded');
+      logDiag(`map error: ${e.message}`);
+    }
   }
 
   function acresToRadiusMeters(acres) {
@@ -901,6 +1025,11 @@
   }
 
   function renderMap() {
+    if (!window.L) {
+      showError('Map library not loaded', 'Leaflet failed to load. Check internet connection.');
+      return;
+    }
+    
     initMapIfNeeded();
     if (!state.map.obj || !state.map.layer) return;
 
@@ -1075,7 +1204,13 @@
       } else {
         prev.alt = item.alt || item.caption || 'media';
       }
-      prev.addEventListener('error', () => it.classList.add('broken'));
+      prev.addEventListener('error', () => {
+        it.classList.add('broken');
+        // Show placeholder for broken images
+        if (item.type === 'image') {
+          prev.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230f1a2e"/><text x="50" y="50" font-family="Arial" font-size="10" fill="%239fb0ca" text-anchor="middle" dy=".3em">No Image</text></svg>';
+        }
+      });
       it.appendChild(prev);
 
       it.title = item.caption || '';
@@ -1138,7 +1273,13 @@
       } else {
         prev.alt = item.alt || item.caption || 'media';
       }
-      prev.addEventListener('error', () => tile.classList.add('broken'));
+      prev.addEventListener('error', () => {
+        tile.classList.add('broken');
+        // Show placeholder for broken images
+        if (item.type === 'image') {
+          prev.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230f1a2e"/><text x="50" y="50" font-family="Arial" font-size="10" fill="%239fb0ca" text-anchor="middle" dy=".3em">No Image</text></svg>';
+        }
+      });
       tile.appendChild(prev);
 
       const tag = document.createElement('div');
@@ -1211,34 +1352,92 @@
 
   // --- Init ---
   async function init() {
-    setText('buildStamp', 'v' + (new Date().toISOString().slice(0,10)));
-    initTabs();
-    initLightbox();
-    initFilters();
-    initHeroVideo();
-
-    setNotice('Loading workbook and media…');
-    logDiag('init: start');
-
+    // Show loading overlay
+    const loadingOverlay = $('loadingOverlay');
+    const shell = document.querySelector('.shell');
+    
     try {
-      await loadWorkbook();
+      updateLoadingStatus('Initializing...');
+      setText('buildStamp', 'v' + (new Date().toISOString().slice(0,10)));
+      
+      // Wait for dependencies to load
+      await waitForDependencies();
+      
+      updateLoadingStatus('Setting up UI...');
+      initTabs();
+      initLightbox();
+      initFilters();
+      initHeroVideo();
+
+      setNotice('Loading workbook and media…');
+      logDiag('init: start');
+
+      // Load data
+      updateLoadingStatus('Loading data...');
+      const workbookLoaded = await loadWorkbook();
+      
+      if (workbookLoaded && state.wb) {
+        state.sessions = buildSessions(state.wb);
+        state.farmers = buildFarmers(state.wb);
+        logDiag(`workbook: sheets=${state.wb.SheetNames.length}, sessions=${state.sessions.length}, farmers=${state.farmers.length}`);
+      }
+      
       await loadMedia();
 
+      updateLoadingStatus('Building interface...');
       buildFilterOptions();
       state.filtered = state.sessions.slice();
       renderAll();
 
       setNotice('Ready.');
       logDiag('init: ready');
+      
+      // Hide loading overlay and show content
+      setTimeout(() => {
+        if (loadingOverlay) loadingOverlay.style.opacity = '0';
+        if (shell) shell.style.display = 'grid';
+        
+        setTimeout(() => {
+          if (loadingOverlay) loadingOverlay.style.display = 'none';
+        }, 300);
+      }, 500);
+      
     } catch (e) {
-      setNotice(e.message || String(e), true);
+      console.error('Initialization error:', e);
+      showError('Failed to initialize dashboard', e.message);
       logDiag(`init: error: ${e.message || e}`);
-      // still attempt to render empty UI (so the page looks "alive")
+      
+      // Still attempt to render empty UI
       state.sessions = state.sessions || [];
       state.filtered = [];
       renderAll();
+      
+      // Hide loading overlay even on error
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+      if (shell) shell.style.display = 'grid';
     }
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  // Wait for critical dependencies
+  function waitForDependencies() {
+    return new Promise((resolve) => {
+      const checkDeps = () => {
+        if (window.L && window.Chart && window.XLSX) {
+          resolve();
+        } else {
+          setTimeout(checkDeps, 100);
+        }
+      };
+      
+      // Start checking after a short delay
+      setTimeout(checkDeps, 100);
+    });
+  }
+
+  // Start when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
