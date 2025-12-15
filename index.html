@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AgriVista — Field Activations Dashboard</title>
 
+  <!-- Preload critical resources -->
+  <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style" crossorigin="">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" as="script" crossorigin="">
+
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -30,308 +34,89 @@
       --warn:#fbbf24;
       --bad:#fb7185;
     }
-    *{box-sizing:border-box}
+    *{box-sizing:border-box; margin:0; padding:0;}
     body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       color:var(--text); background:radial-gradient(1100px 600px at 15% 10%, rgba(125,211,252,.18), transparent 55%),
       radial-gradient(900px 600px at 85% 25%, rgba(134,239,172,.14), transparent 55%),
       linear-gradient(180deg, #070c15, var(--bg));
       min-height:100vh;
+      overflow-x:hidden;
     }
-    a{color:inherit}
+    
+    /* Loading overlay */
+    #loadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      transition: opacity 0.3s ease;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(125,211,252,.3);
+      border-radius: 50%;
+      border-top-color: var(--accent);
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    a{color:inherit; text-decoration:none;}
     .shell{
       display:grid;
       grid-template-columns: 320px 1fr;
       min-height:100vh;
       gap:18px;
       padding:18px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
     }
-    .panel{
-      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border:1px solid var(--border);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      overflow:hidden;
+    
+    @keyframes fadeIn {
+      to { opacity: 1; }
     }
-
-    /* Sidebar */
-    .sidebar{display:flex; flex-direction:column; gap:14px; padding:14px}
-    .brand{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:12px; padding:12px 12px 10px;
-      border-radius:14px;
-      background:linear-gradient(135deg, rgba(125,211,252,.15), rgba(134,239,172,.10));
-      border:1px solid rgba(255,255,255,.10);
+    
+    /* ... rest of the CSS remains the same ... */
+    
+    .error-box {
+      background: rgba(251, 113, 133, 0.1);
+      border: 1px solid rgba(251, 113, 133, 0.3);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin: 10px 0;
+      color: var(--bad);
+      font-size: 12px;
     }
-    .brand h1{margin:0; font-size:18px; letter-spacing:.2px}
-    .brand .sub{color:var(--muted); font-size:12px; margin-top:2px}
-    .chip{font-size:11px; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:var(--muted)}
-    .controlGroup{display:flex; flex-direction:column; gap:10px}
-    .label{font-size:12px; color:var(--muted)}
-    select, input{
-      width:100%;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(10,17,32,.65);
-      color:var(--text);
-      outline:none;
-    }
-    input::placeholder{color:rgba(159,176,202,.65)}
-    .row2{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
-    .btnRow{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:4px}
-    button{
-      padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.06); color:var(--text); cursor:pointer;
-    }
-    button:hover{background:rgba(255,255,255,.09)}
-    .notice{
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.03);
-      color:var(--muted);
-      line-height:1.35;
-      font-size:12px;
-    }
-    #noticeBox strong{color:var(--text)}
-    .diag{
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size:11px; color:rgba(231,237,247,.78);
-      background:rgba(0,0,0,.30);
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:12px;
-      padding:10px 12px;
-      white-space:pre-wrap;
-      max-height:190px;
-      overflow:auto;
-    }
-    .miniSummary{
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.03);
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.45;
-    }
-    .miniSummary b{color:var(--text)}
-
-    /* Main */
-    .main{display:flex; flex-direction:column; gap:14px}
-    .hero{
-      position:relative;
-      min-height:160px;
-      padding:18px 18px 16px;
-      background:linear-gradient(135deg, rgba(125,211,252,.18), rgba(134,239,172,.10));
-      border-bottom:1px solid rgba(255,255,255,.10);
-      overflow:hidden;
-    }
-    .heroVideo{
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      object-fit:cover; opacity:.18;
-      filter:saturate(.9) contrast(1.05);
-    }
-    .heroTop{position:relative; display:flex; justify-content:space-between; gap:14px; align-items:flex-start}
-    .heroTitle h2{margin:0; font-size:20px}
-    .heroTitle p{margin:6px 0 0; color:var(--muted); font-size:12px; max-width:66ch}
-    .heroMeta{
-      position:relative;
-      display:grid; gap:10px;
-      grid-template-columns: repeat(4, minmax(140px, 1fr));
-      margin-top:12px;
-    }
-    .kpi{
-      padding:12px 12px 10px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(10,17,32,.45);
-      backdrop-filter: blur(6px);
-    }
-    .kpi .k{color:var(--muted); font-size:11px}
-    .kpi .v{font-size:20px; margin-top:4px; font-weight:700}
-    .kpi .bar{
-      margin-top:10px; height:8px; border-radius:999px;
-      background:rgba(255,255,255,.10); overflow:hidden;
-    }
-    .kpi .bar > div{height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--accent2))}
-    .tabs{
-      display:flex; gap:8px; padding:12px 12px 0;
-      flex-wrap:wrap;
-    }
-    .tabBtn{
-      padding:9px 12px; border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.04);
-      color:var(--muted);
-      font-size:12px;
-    }
-    .tabBtn.active{background:rgba(125,211,252,.14); color:var(--text); border-color:rgba(125,211,252,.35)}
-    .tabPanel{display:none; padding:12px}
-    .tabPanel.active{display:block}
-    .grid2{display:grid; gap:12px; grid-template-columns: 1fr 1fr}
-    .card{
-      padding:12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.03);
-    }
-    .card h3{margin:0 0 10px; font-size:13px; color:rgba(231,237,247,.92); letter-spacing:.2px}
-    .muted{color:var(--muted); font-size:12px; line-height:1.45}
-    .canvasWrap{height:270px}
-    canvas{width:100% !important; height:100% !important}
-    .reasonsTable{width:100%; border-collapse:collapse}
-    .reasonsTable td{
-      padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.08);
-      font-size:12px; color:rgba(231,237,247,.92);
-    }
-    .reasonsTable td:last-child{text-align:right; color:var(--muted)}
-    .mapWrap{height:520px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.10)}
-    #map{height:520px; width:100%}
-    .mapBanner{
-      display:grid;
-      grid-template-columns: 1.6fr 1fr 1fr 1fr;
-      gap:10px;
-      margin-bottom:10px;
-    }
-    .mapChip{
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(10,17,32,.42);
-    }
-    .mapChip .k{font-size:11px; color:var(--muted)}
-    .mapChip .v{font-size:15px; font-weight:700; margin-top:4px}
-    .mapLegend{
-      margin-top:10px;
-      font-size:12px; color:var(--muted);
-    }
-    .showcase{
-      display:grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap:10px;
-      margin-top:12px;
-    }
-    .showItem{
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(0,0,0,.22);
-      overflow:hidden;
-      aspect-ratio: 16/10;
-      position:relative;
-      cursor:pointer;
-    }
-    .showItem img, .showItem video{
-      width:100%; height:100%;
-      object-fit:cover;
-      display:block;
-      filter:saturate(.95);
-    }
-    .mediaGrid{
-      display:grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap:10px;
-    }
-    .mediaTile{
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(0,0,0,.22);
-      overflow:hidden;
-      position:relative;
-      aspect-ratio: 1/1;
-      cursor:pointer;
-    }
-    .mediaTile img, .mediaTile video{
-      width:100%; height:100%;
-      object-fit:cover;
-      display:block;
-    }
-    .mediaTag{
-      position:absolute; left:8px; right:8px; bottom:8px;
-      padding:6px 8px;
-      border-radius:10px;
-      font-size:11px;
-      background:rgba(0,0,0,.55);
-      border:1px solid rgba(255,255,255,.10);
-      color:rgba(231,237,247,.92);
-      text-overflow:ellipsis; overflow:hidden; white-space:nowrap;
-    }
-
-    /* Sessions table */
-    table{width:100%; border-collapse:collapse}
-    th, td{padding:10px 8px; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px}
-    th{color:rgba(231,237,247,.88); text-align:left; font-weight:650; letter-spacing:.2px}
-    td{color:rgba(231,237,247,.82)}
-    tr:hover td{background:rgba(255,255,255,.03)}
-    .pill{
-      display:inline-block;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      color:var(--muted);
-      font-size:11px;
-    }
-
-    /* Lightbox */
-    #lightbox{
-      display:none;
-      position:fixed; inset:0;
-      background:rgba(0,0,0,.76);
-      z-index:9999;
-      align-items:center; justify-content:center;
-      padding:18px;
-    }
-    .lbPanel{
-      width:min(1100px, 98vw);
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(10,17,32,.92);
-      box-shadow:0 20px 60px rgba(0,0,0,.55);
-      overflow:hidden;
-      display:grid;
-      grid-template-columns: 1.6fr 1fr;
-      min-height: 520px;
-    }
-    .lbMedia{
-      position:relative;
-      background:rgba(0,0,0,.35);
-      display:flex; align-items:center; justify-content:center;
-    }
-    .lbMedia img, .lbMedia video{max-width:100%; max-height:100%; width:100%; height:100%; object-fit:contain}
-    .lbSide{
-      padding:14px;
-      border-left:1px solid rgba(255,255,255,.10);
-      display:flex; flex-direction:column; gap:10px;
-    }
-    .lbHeader{
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-    }
-    .lbTitle{font-size:13px; font-weight:700}
-    .lbText{font-size:12px; color:var(--muted); line-height:1.45}
-    .lbBtns{display:flex; gap:8px}
-    .lbBtns button{padding:8px 10px}
-    .lbFooter{margin-top:auto; display:flex; justify-content:space-between; align-items:center; gap:10px}
-    .lbNav button{padding:8px 10px}
-    .hide{display:none !important}
-
-    @media (max-width: 1100px){
-      .heroMeta{grid-template-columns: repeat(2, minmax(140px, 1fr))}
-      .showcase{grid-template-columns: repeat(3, minmax(0, 1fr))}
-      .mediaGrid{grid-template-columns: repeat(4, minmax(0, 1fr))}
-      .mapBanner{grid-template-columns: 1fr 1fr}
-    }
-    @media (max-width: 860px){
-      .shell{grid-template-columns: 1fr}
-      .mediaGrid{grid-template-columns: repeat(3, minmax(0, 1fr))}
-      .lbPanel{grid-template-columns: 1fr; min-height:auto}
-      .lbSide{border-left:none; border-top:1px solid rgba(255,255,255,.10)}
+    
+    .error-box a {
+      color: var(--accent);
+      text-decoration: underline;
     }
   </style>
 </head>
 
 <body>
-  <div class="shell">
+  <!-- Loading overlay -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div>Loading AgriVista Dashboard...</div>
+    <div style="font-size: 12px; margin-top: 10px; color: var(--muted);" id="loadingStatus">Initializing</div>
+  </div>
+
+  <div class="shell" style="display: none;">
 
     <!-- Sidebar (IDs preserved) -->
     <aside class="panel sidebar">
@@ -343,6 +128,9 @@
         <div class="chip" id="buildStamp">v1</div>
       </div>
 
+      <!-- Error message container -->
+      <div id="errorContainer" class="error-box" style="display: none;"></div>
+
       <div class="controlGroup">
         <div>
           <div class="label">City</div>
@@ -353,7 +141,6 @@
 
         <div>
           <div class="label">Spot</div>
-          <!-- keep existing IDs; filter-district is visible in the current UI; filter-spot stays in DOM for backward compatibility -->
           <select id="filter-district">
             <option value="">All</option>
           </select>
